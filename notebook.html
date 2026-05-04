@@ -275,7 +275,7 @@ const C = {
 
 const $   = id => document.getElementById(id);
 const fmt = v  => v || "—";
-const fmtDT = v => v ? new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+const fmtDT = v => v ? new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "—";
 const fmtD  = v => v ? new Date(v).toLocaleDateString("pt-BR") : "—";
 function set(id,val){const e=$(id);if(e)e.textContent=val;}
 
@@ -331,7 +331,9 @@ function renderApp(f) {
   set("f-obs", fmt(f[C.obsTI]||"Solicitação aprovada conforme política de uso de equipamentos."));
 
   set("f-anexo-nome", (f[C.protocolo]||"Formulário")+".pdf");
-  const anexoUrl = f[C.anexoUrl];
+  // AnexoURL é coluna Hiperlink no SharePoint - retorna objeto {Url, Description}
+  const anexoUrlRaw = f[C.anexoUrl];
+  const anexoUrl = typeof anexoUrlRaw === "object" ? anexoUrlRaw?.Url : anexoUrlRaw;
   const btnDl = $("btn-download");
   if (anexoUrl) {
     btnDl.onclick = () => window.open(anexoUrl, "_blank");
