@@ -391,7 +391,7 @@ async function init() {
 
   const msal_ = new msal.PublicClientApplication({
     auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
-           redirectUri: "https://polystell.github.io/central-autorizacoes/notebook.html" },
+           redirectUri: "https://app.polystell.com.br/central-autorizacoes/notebook.html" },
     cache:{ cacheLocation:"sessionStorage" }
   });
   await msal_.initialize();
