@@ -270,6 +270,7 @@ const C = {
   statusTI:"StatusTI", obsTI:"ObservacaoTI",
   dataAprovTI:"DataAprovacaoTI", nomeAprovTI:"NomeAprovadorTI",
   criado:"Created",
+  anexoUrl:"AnexoURL",
 };
 
 const $   = id => document.getElementById(id);
@@ -330,8 +331,17 @@ function renderApp(f) {
   set("f-obs", fmt(f[C.obsTI]||"Solicitação aprovada conforme política de uso de equipamentos."));
 
   set("f-anexo-nome", (f[C.protocolo]||"Formulário")+".pdf");
-  $("btn-download").style.opacity = "0.35";
-  $("btn-download").title = "PDF disponível no e-mail recebido";
+  const anexoUrl = f[C.anexoUrl];
+  const btnDl = $("btn-download");
+  if (anexoUrl) {
+    btnDl.onclick = () => window.open(anexoUrl, "_blank");
+    btnDl.title = "Baixar PDF";
+    btnDl.style.opacity = "1";
+    btnDl.style.cursor = "pointer";
+  } else {
+    btnDl.style.opacity = "0.35";
+    btnDl.title = "PDF não disponível";
+  }
 
   const eventos = [
     {label:"Solicitação criada",              data:f[C.criado]},
