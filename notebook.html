@@ -369,7 +369,8 @@ async function init() {
   const itemId    = params.get("id");
   const protocolo = params.get("protocolo");
 
-  if (!itemId && !protocolo) {
+  const savedCheck = sessionStorage.getItem("ca_id") || sessionStorage.getItem("ca_protocolo");
+  if (!itemId && !protocolo && !savedCheck) {
     showError("Parâmetro ausente","A URL não contém 'id' ou 'protocolo'. Verifique o QR Code.");
     return;
   }
@@ -378,11 +379,24 @@ async function init() {
 
   const msal_ = new msal.PublicClientApplication({
     auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
-           redirectUri: window.location.origin+window.location.pathname },
+           redirectUri: "https://polystell.github.io/central-autorizacoes/notebook.html" },
     cache:{ cacheLocation:"sessionStorage" }
   });
   await msal_.initialize();
+
+  // Salva os parâmetros antes do redirect e restaura depois
+  if (itemId)    sessionStorage.setItem("ca_id",       itemId);
+  if (protocolo) sessionStorage.setItem("ca_protocolo", protocolo);
+
   await msal_.handleRedirectPromise();
+
+  // Restaura parâmetros perdidos após o redirect
+  const savedId       = sessionStorage.getItem("ca_id");
+  const savedProto    = sessionStorage.getItem("ca_protocolo");
+  if (!itemId && savedId)    { params.set("id", savedId);               }
+  if (!protocolo && savedProto) { params.set("protocolo", savedProto);  }
+  const finalId       = params.get("id");
+  const finalProtocolo = params.get("protocolo");
 
   const scopes = ["https://graph.microsoft.com/Sites.Read.All"];
   let token;
@@ -397,9 +411,9 @@ async function init() {
   const h  = {Authorization:"Bearer "+token};
   const base = "https://graph.microsoft.com/v1.0/sites/"+CONFIG.siteHost+":"+CONFIG.sitePath+":/lists/"+CONFIG.listId;
 
-  const url = itemId
-    ? base+"/items/"+itemId+"?$expand=fields"
-    : base+"/items?$expand=fields&$filter=fields/Protocolo eq '"+encodeURIComponent(protocolo)+"'";
+  const url = finalId
+    ? base+"/items/"+finalId+"?$expand=fields"
+    : base+"/items?$expand=fields&$filter=fields/Protocolo eq '"+encodeURIComponent(finalProtocolo)+"'";
 
   const res  = await fetch(url,{headers:h});
   if(!res.ok){ showError("Erro SharePoint","HTTP "+res.status); return; }
