@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central de Autorizações – Polystell</title>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
+  #loading-screen{position:fixed;inset:0;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+  .spinner{width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#1e3a5f;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-text{font-size:14px;color:#6b7280}
+  #error-screen{position:fixed;inset:0;background:#f3f4f6;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  .error-icon{font-size:48px}.error-title{font-size:18px;font-weight:600;color:#dc2626}
+  .error-msg{font-size:13px;color:#6b7280;text-align:center;max-width:400px}
+  #app{display:none}
+  .header{background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100}
+  .header-left{display:flex;align-items:center;gap:14px}
+  .header-icon{width:38px;height:38px;background:rgba(255,255,255,.15);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .header-icon svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8}
+  .header-title{font-size:16px;font-weight:700}.header-subtitle{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
+  .header-home{display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.85);text-decoration:none;padding:6px 12px;border-radius:6px;transition:background .15s}
+  .header-home:hover{background:rgba(255,255,255,.12)}
+  .header-home svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .main{max-width:820px;margin:0 auto;padding:28px 16px 48px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:16px}
+  .status-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .status-left{display:flex;align-items:center;gap:16px}
+  .status-icon{width:48px;height:48px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .status-icon.pendente{background:#d97706}
+  .status-icon.reprovado{background:#dc2626}
+  .status-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+  .status-title{font-size:20px;font-weight:700;color:#16a34a}
+  .status-title.pendente{color:#d97706}
+  .status-title.reprovado{color:#dc2626}.status-sub{font-size:13px;color:#6b7280;margin-top:3px}
+  .qr-box{text-align:center}.qr-label{font-size:10px;color:#9ca3af;margin-bottom:8px;line-height:1.4}
+  .qr-img{width:90px;height:90px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .qr-img img{width:100%;height:100%;object-fit:contain}
+  .section-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #f0f0f0}
+  .section-icon{width:30px;height:30px;border:1.5px solid #d1d5db;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .section-icon svg{width:15px;height:15px;stroke:#6b7280;fill:none;stroke-width:1.8}
+  .section-title{font-size:15px;font-weight:600;color:#111827}
+  .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  @media(max-width:600px){.info-grid{grid-template-columns:1fr 1fr}}
+  .info-item label{display:block;font-size:11px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .info-item span{font-size:13px;color:#1f2937}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px}
+  .badge-concluido{background:#dcfce7;color:#15803d}.badge-pendente{background:#fef9c3;color:#854d0e}.badge-reprovado{background:#fee2e2;color:#991b1b}
+  .aprovacao-list{display:flex;flex-direction:column}
+  .aprovacao-item{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid #f3f4f6}
+  .aprovacao-item:last-child{border-bottom:none}
+  .timeline-col{display:flex;flex-direction:column;align-items:center}
+  .aprv-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .aprv-icon.aprovado{background:#16a34a}.aprv-icon.pendente{background:#d97706}.aprv-icon.reprovado{background:#dc2626}
+  .aprv-icon svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+  .timeline-line{width:2px;flex:1;background:#d1fae5;margin-top:4px;min-height:32px}
+  .aprv-body{flex:1}
+  .aprv-header{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .aprv-name{font-size:14px;font-weight:600;color:#111827}
+  .aprv-badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .aprv-badge.aprovado{background:#dcfce7;color:#15803d}.aprv-badge.pendente{background:#fef9c3;color:#854d0e}.aprv-badge.reprovado{background:#fee2e2;color:#991b1b}
+  .aprv-meta{font-size:12px;color:#6b7280}.aprv-meta span{color:#3b82f6;font-weight:500}
+  .aprv-date{font-size:12px;color:#6b7280;text-align:right;white-space:nowrap}
+  .aprv-date strong{display:block;font-size:11px;font-weight:600;color:#9ca3af;margin-bottom:2px}
+  .obs-text{font-size:13px;color:#6b7280;font-style:italic}
+  .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:540px){.bottom-grid{grid-template-columns:1fr}}
+  .anexo-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;margin-top:4px}
+  .anexo-left{display:flex;align-items:center;gap:12px}
+  .pdf-icon{width:36px;height:36px;background:#fee2e2;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#dc2626}
+  .anexo-name{font-size:13px;font-weight:500;color:#111827}.anexo-size{font-size:11px;color:#9ca3af}
+  .download-btn{background:none;border:none;cursor:pointer;color:#6b7280;padding:4px}
+  .download-btn:hover{color:#1f2937}
+  .download-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .historico-list{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+  .hist-row{display:flex;justify-content:space-between;font-size:12px}
+  .hist-label{color:#374151}.hist-date{color:#9ca3af}
+  .page-footer{background:#fff;border-top:1px solid #e5e7eb;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#9ca3af;flex-wrap:wrap;gap:10px}
+  .footer-left{display:flex;align-items:center;gap:8px}
+  .lock-icon svg{width:14px;height:14px;stroke:#9ca3af;fill:none;stroke-width:1.8}
+  .powered-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;font-weight:500}
+  .sp-icon{width:22px;height:22px;background:#0078d4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
+  .pa-icon{width:22px;height:22px;background:#0066ff;border-radius:4px;display:flex;align-items:center;justify-content:center}
+  .pa-icon svg{width:14px;height:14px;fill:white}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text">Carregando autorização...</div>
+</div>
+<div id="error-screen">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title" id="error-title">Registro não encontrado</div>
+  <div class="error-msg" id="error-msg">Não foi possível localizar a solicitação.</div>
+</div>
+
+<div id="app">
+  <header class="header">
+    <div class="header-left">
+      <img src="data:image/png;base64,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" alt="Polystell" style="height:36px;object-fit:contain;margin-right:12px;">
+      <div style="border-left:1px solid rgba(255,255,255,0.3);padding-left:14px;">
+        <div class="header-title">Central de Autorizações</div>
+        <div class="header-subtitle">Solicitação de Uso de Notebook</div>
+      </div>
+    </div>
+    <a href="https://www.polystell.com.br" class="header-home">
+      <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>
+      Início
+    </a>
+  </header>
+
+  <main class="main">
+    <div class="card">
+      <div class="status-card">
+        <div class="status-left">
+          <div class="status-icon" id="status-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div>
+            <div class="status-title" id="status-title">—</div>
+            <div class="status-sub" id="status-sub">—</div>
+          </div>
+        </div>
+        <div class="qr-box">
+          <div class="qr-label">Escaneie o QR Code para<br>verificar esta aprovação</div>
+          <div class="qr-img"><img id="qr-img" src="" alt="QR Code"/></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="section-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        <span class="section-title">Informações da Solicitação</span>
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><label>Protocolo</label><span id="f-protocolo">—</span></div>
+        <div class="info-item"><label>Data da Solicitação</label><span id="f-datasol">—</span></div>
+        <div class="info-item"><label>Status Atual</label><span id="f-status">—</span></div>
+        <div class="info-item"><label>Solicitante</label><span id="f-solicitante">—</span></div>
+        <div class="info-item"><label>Departamento</label><span id="f-dept">—</span></div>
+        <div class="info-item"><label>Cargo</label><span id="f-cargo">—</span></div>
+        <div class="info-item"><label>Período de Uso</label><span id="f-periodo">—</span></div>
+        <div class="info-item"><label>Local de Uso</label><span id="f-local">—</span></div>
+        <div class="info-item"><label>Motivo</label><span id="f-motivo">—</span></div>
+        <div class="info-item"><label>Notebook</label><span id="f-notebook">—</span></div>
+        <div class="info-item"><label>Marca / Modelo</label><span id="f-marca">—</span></div>
+        <div class="info-item"><label>Nº de Série</label><span id="f-serie">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="section-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="section-title">Aprovações</span>
+      </div>
+      <div class="aprovacao-list">
+        <div class="aprovacao-item">
+          <div class="timeline-col">
+            <div class="aprv-icon pendente" id="icon-gestor"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="timeline-line"></div>
+          </div>
+          <div class="aprv-body">
+            <div class="aprv-header"><span class="aprv-name">Aprovação do Gestor</span><span class="aprv-badge pendente" id="badge-gestor">Pendente</span></div>
+            <div class="aprv-meta">Aprovador: <span id="a1-aprovador">—</span></div>
+            <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a1-obs">—</span></div>
+          </div>
+          <div class="aprv-date"><strong id="a1-data-lbl">Data da Aprovação</strong><span id="a1-data">—</span></div>
+        </div>
+        <div class="aprovacao-item">
+          <div class="timeline-col">
+            <div class="aprv-icon pendente" id="icon-rh"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="timeline-line"></div>
+          </div>
+          <div class="aprv-body">
+            <div class="aprv-header"><span class="aprv-name">Aprovação do RH</span><span class="aprv-badge pendente" id="badge-rh">Pendente</span></div>
+            <div class="aprv-meta">Aprovador: <span id="a2-aprovador">—</span></div>
+            <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a2-obs">—</span></div>
+          </div>
+          <div class="aprv-date"><strong id="a2-data-lbl">Data da Aprovação</strong><span id="a2-data">—</span></div>
+        </div>
+        <div class="aprovacao-item">
+          <div class="timeline-col">
+            <div class="aprv-icon pendente" id="icon-ti"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          </div>
+          <div class="aprv-body">
+            <div class="aprv-header"><span class="aprv-name">Aprovação da TI</span><span class="aprv-badge pendente" id="badge-ti">Pendente</span></div>
+            <div class="aprv-meta">Aprovador: <span id="a3-aprovador">—</span></div>
+            <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a3-obs">—</span></div>
+          </div>
+          <div class="aprv-date"><strong id="a3-data-lbl">Data da Aprovação</strong><span id="a3-data">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="section-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <span class="section-title">Observações Gerais</span>
+      </div>
+      <p class="obs-text" id="f-obs">—</p>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="card" style="margin-bottom:0">
+        <div class="section-header">
+          <div class="section-icon"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></div>
+          <span class="section-title">Anexos</span>
+        </div>
+        <div class="anexo-item">
+          <div class="anexo-left">
+            <div class="pdf-icon">PDF</div>
+            <div>
+              <div class="anexo-name" id="f-anexo-nome">—</div>
+              <div class="anexo-size">Formulário de Autorização</div>
+            </div>
+          </div>
+          <button class="download-btn" id="btn-download" title="Baixar">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="section-header">
+          <div class="section-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <span class="section-title">Histórico</span>
+        </div>
+        <div class="historico-list" id="historico-list"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <div class="footer-left">
+      <div class="lock-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <span>Documento gerado automaticamente. Para validar a autenticidade, escaneie o QR Code ou acesse a Central de Autorizações.</span>
+    </div>
+    <div class="powered-badge">
+      Powered by Power Automate + SharePoint
+      <div class="sp-icon">S</div>
+      <div class="pa-icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// ⚙️  CONFIGURAÇÕES
+// ════════════════════════════════════════════════════
+const CONFIG = {
+  clientId: "c066630d-9dc2-4c4a-8c60-8f0056e9e5e2",
+  tenantId: "fdb7cb21-cc9d-4f32-bb70-e71cad1eb164",
+  siteHost: "polystellcombr.sharepoint.com",
+  sitePath: "/sites/Apps",
+  listId:   "6171ec64-e90d-4073-b413-4da23e9b2550",
+};
+
+// Colunas da lista (já mapeadas com os nomes reais)
+const C = {
+  protocolo:"Protocolo", nomeSolicitante:"NomeSolicitante",
+  departamento:"Departamento", cargo:"Cargo",
+  dataRetirada:"DataRetirada", dataDevolucao:"DataDevolucao",
+  localUso:"LocalUso", motivoUso:"MotivoUso",
+  dataSolicitacao:"DataSolicitacao", statusAtual:"StatusAtual",
+  identificacao:"IdentificacaoNotebook", marca:"MarcaNotebook",
+  modelo:"ModeloNotebook", serie:"NumeroSerieNotebook",
+  statusGestor:"StatusGestor", obsGestor:"ObservacaoGestor",
+  dataAprovGestor:"DataAprovacaoGestor", nomeAprovGestor:"NomeAprovadorGestor",
+  statusRH:"StatusRH", obsRH:"ObservacaoRH",
+  dataAprovRH:"DataAprovacaoRH", nomeAprovRH:"NomeAprovadorRH",
+  statusTI:"StatusTI", obsTI:"ObservacaoTI",
+  dataAprovTI:"DataAprovacaoTI", nomeAprovTI:"NomeAprovadorTI",
+  criado:"Created",
+  anexoUrl:"AnexoURL",
+};
+
+const $   = id => document.getElementById(id);
+const fmt = v  => v || "—";
+const fmtDT = v => v ? new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "—";
+const fmtD  = v => v ? new Date(v).toLocaleDateString("pt-BR") : "—";
+function set(id,val){const e=$(id);if(e)e.textContent=val;}
+
+function renderAprovacao(sufixo, num, statusVal, nome, obs, data) {
+  const s   = (statusVal||"").toLowerCase();
+  const isAprov  = s.includes("aprov");
+  const isReprov = s.includes("reprov");
+  const cls = isReprov ? "reprovado" : isAprov ? "aprovado" : "pendente";
+  const lbl = isReprov ? "Reprovado"  : isAprov ? "Aprovado" : "Pendente";
+  const dataLbl = isReprov ? "Data da Reprovação" : isAprov ? "Data da Aprovação" : "Data";
+  const icon  = $("icon-"+sufixo);
+  const badge = $("badge-"+sufixo);
+  const dataEl = $("a"+num+"-data-lbl");
+  if(icon)  icon.className  = "aprv-icon "+cls;
+  if(badge){badge.className = "aprv-badge "+cls; badge.textContent = lbl;}
+  if(dataEl) dataEl.textContent = dataLbl;
+  set("a"+num+"-aprovador", fmt(nome));
+  set("a"+num+"-obs",       fmt(obs));
+  set("a"+num+"-data",      fmtDT(data));
+}
+
+function showError(title, msg) {
+  $("loading-screen").style.display = "none";
+  const e = $("error-screen"); e.style.display = "flex";
+  $("error-title").textContent = title||"Erro";
+  $("error-msg").textContent   = msg||"";
+}
+
+function renderApp(f) {
+  $("loading-screen").style.display = "none";
+  $("app").style.display = "block";
+
+  $("qr-img").src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(window.location.href);
+
+  // Status card dinâmico
+  const stRaw = f[C.statusAtual] || "Pendente";
+  const stLow = stRaw.toLowerCase();
+  const isConcluido = stLow.includes("conclu");
+  const isReprovado = stLow.includes("reprov");
+  const isPendente  = !isConcluido && !isReprovado;
+  const stIcon  = $("status-icon");
+  const stTitle = $("status-title");
+  const stSub   = $("status-sub");
+  const pendSvg = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const okSvg   = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const noSvg   = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  if (isConcluido) {
+    stIcon.className = "status-icon"; stIcon.innerHTML = okSvg;
+    stTitle.className = "status-title"; stTitle.textContent = "Solicitação Concluída";
+    stSub.textContent = "Todas as aprovações foram realizadas com sucesso.";
+  } else if (isReprovado) {
+    stIcon.className = "status-icon reprovado"; stIcon.innerHTML = noSvg;
+    stTitle.className = "status-title reprovado"; stTitle.textContent = "Solicitação Reprovada";
+    stSub.textContent = "Esta solicitação foi reprovada.";
+  } else {
+    stIcon.className = "status-icon pendente"; stIcon.innerHTML = pendSvg;
+    stTitle.className = "status-title pendente"; stTitle.textContent = "Aguardando Aprovação";
+    stSub.textContent = "Esta solicitação está em processo de aprovação.";
+  }
+
+  set("f-protocolo",  fmt(f[C.protocolo]));
+  set("f-datasol",    fmtDT(f[C.dataSolicitacao]||f[C.criado]));
+  set("f-solicitante",fmt(f[C.nomeSolicitante]));
+  set("f-dept",       fmt(f[C.departamento]));
+  set("f-cargo",      fmt(f[C.cargo]));
+  set("f-local",      fmt(f[C.localUso]));
+  set("f-motivo",     fmt(f[C.motivoUso]));
+  set("f-notebook",   fmt(f[C.identificacao]));
+  set("f-marca",      [f[C.marca],f[C.modelo]].filter(Boolean).join(" / ")||"—");
+  set("f-serie",      fmt(f[C.serie]));
+
+  const dr=f[C.dataRetirada], dd=f[C.dataDevolucao];
+  set("f-periodo", dr&&dd ? fmtD(dr)+" até "+fmtD(dd) : fmtD(dr));
+
+  const st = f[C.statusAtual]||"Concluído";
+  const stCls = st.toLowerCase().includes("conclu") ? "badge-concluido"
+              : st.toLowerCase().includes("reprov") ? "badge-reprovado" : "badge-pendente";
+  $("f-status").innerHTML = '<span class="badge '+stCls+'">'+st+'</span>';
+
+  renderAprovacao("gestor",1, f[C.statusGestor], f[C.nomeAprovGestor], f[C.obsGestor], f[C.dataAprovGestor]);
+  renderAprovacao("rh",    2, f[C.statusRH],     f[C.nomeAprovRH],     f[C.obsRH],     f[C.dataAprovRH]);
+  renderAprovacao("ti",    3, f[C.statusTI],     f[C.nomeAprovTI],     f[C.obsTI],     f[C.dataAprovTI]);
+
+  set("f-obs", fmt(f[C.obsTI]||"Solicitação aprovada conforme política de uso de equipamentos."));
+
+  set("f-anexo-nome", (f[C.protocolo]||"Formulário")+".pdf");
+  // AnexoURL é coluna Hiperlink no SharePoint - retorna objeto {Url, Description}
+  const anexoUrlRaw = f[C.anexoUrl];
+  const anexoUrl = typeof anexoUrlRaw === "object" ? anexoUrlRaw?.Url : anexoUrlRaw;
+  const btnDl = $("btn-download");
+  if (anexoUrl) {
+    btnDl.onclick = () => window.open(anexoUrl, "_blank");
+    btnDl.title = "Baixar PDF";
+    btnDl.style.opacity = "1";
+    btnDl.style.cursor = "pointer";
+  } else {
+    btnDl.style.opacity = "0.35";
+    btnDl.title = "PDF não disponível";
+  }
+
+  const stG = (f[C.statusGestor]||"").toLowerCase();
+  const stR = (f[C.statusRH]||"").toLowerCase();
+  const stT = (f[C.statusTI]||"").toLowerCase();
+  const lblGestor = stG.includes("reprov") ? "Reprovada pelo gestor" : "Aprovada pelo gestor";
+  const lblRH     = stR.includes("reprov") ? "Reprovada pelo RH"     : "Aprovada pelo RH";
+  const lblTI     = stT.includes("reprov") ? "Reprovada pela TI"     : "Aprovada pela TI";
+  const stFinal   = (f[C.statusAtual]||"").toLowerCase();
+  const lblFinal  = stFinal.includes("reprov") ? "Solicitação reprovada" : "Solicitação concluída";
+
+  const eventos = [
+    {label:"Solicitação criada",              data:f[C.criado]},
+    {label:"Enviada para aprovação do gestor",data:f[C.criado]},
+    {label:lblGestor,                         data:f[C.dataAprovGestor]},
+    {label:lblRH,                             data:f[C.dataAprovRH]},
+    {label:lblTI,                             data:f[C.dataAprovTI]},
+    {label:lblFinal,                          data:f[C.dataAprovTI]},
+  ].filter(e=>e.data);
+
+  $("historico-list").innerHTML = eventos.map(e=>
+    '<div class="hist-row"><span class="hist-label">'+e.label+'</span><span class="hist-date">'+fmtDT(e.data)+'</span></div>'
+  ).join("");
+}
+
+// Dados demo (sem clientId configurado)
+const DEMO = {
+  [C.protocolo]:"AUTNBK-28-PRODUÇÃO-20260430",[C.nomeSolicitante]:"Alexandre Belline",
+  [C.departamento]:"Produção",[C.cargo]:"Gerente de Produção",
+  [C.localUso]:"Casa",[C.motivoUso]:"Atendimento externo",
+  [C.dataRetirada]:"2026-04-29T00:00:00Z",[C.dataDevolucao]:"2026-04-30T00:00:00Z",
+  [C.dataSolicitacao]:"2026-04-29T09:15:00Z",[C.statusAtual]:"Concluído",
+  [C.identificacao]:"—",[C.marca]:"Dell",[C.modelo]:"Latitude 5430",[C.serie]:"—",
+  [C.statusGestor]:"Aprovado",[C.nomeAprovGestor]:"Leonardo Carolino",
+  [C.obsGestor]:"Aprovado!",[C.dataAprovGestor]:"2026-04-29T21:10:00Z",
+  [C.statusRH]:"Aprovado",[C.nomeAprovRH]:"Leonardo Carolino",
+  [C.obsRH]:"Tudo ok!",[C.dataAprovRH]:"2026-04-29T21:12:00Z",
+  [C.statusTI]:"Aprovado",[C.nomeAprovTI]:"Leonardo Carolino",
+  [C.obsTI]:"Muito bom!",[C.dataAprovTI]:"2026-04-29T21:12:00Z",
+  [C.criado]:"2026-04-29T09:15:00Z",
+};
+
+async function init() {
+  const params    = new URLSearchParams(window.location.search);
+  const itemId    = params.get("id");
+  const protocolo = params.get("protocolo");
+
+  const savedCheck = sessionStorage.getItem("ca_id") || sessionStorage.getItem("ca_protocolo");
+  if (!itemId && !protocolo && !savedCheck) {
+    showError("Parâmetro ausente","A URL não contém 'id' ou 'protocolo'. Verifique o QR Code.");
+    return;
+  }
+
+  /* demo desativado */
+
+  const msal_ = new msal.PublicClientApplication({
+    auth:{ clientId:CONFIG.clientId, authority:"https://login.microsoftonline.com/"+CONFIG.tenantId,
+           redirectUri: "https://app.polystell.com.br/autorizacao-notebook.html" },
+    cache:{ cacheLocation:"sessionStorage" }
+  });
+  await msal_.initialize();
+
+  // Salva os parâmetros antes do redirect e restaura depois
+  if (itemId)    sessionStorage.setItem("ca_id",       itemId);
+  if (protocolo) sessionStorage.setItem("ca_protocolo", protocolo);
+
+  await msal_.handleRedirectPromise();
+
+  // Restaura parâmetros perdidos após o redirect
+  const savedId       = sessionStorage.getItem("ca_id");
+  const savedProto    = sessionStorage.getItem("ca_protocolo");
+  if (!itemId && savedId)    { params.set("id", savedId);               }
+  if (!protocolo && savedProto) { params.set("protocolo", savedProto);  }
+  const finalId       = params.get("id");
+  const finalProtocolo = params.get("protocolo");
+
+  const scopes = ["https://graph.microsoft.com/Sites.Read.All"];
+  let token;
+  try {
+    const acc = msal_.getAllAccounts();
+    if(!acc.length) throw new Error("login");
+    token = (await msal_.acquireTokenSilent({scopes,account:acc[0]})).accessToken;
+  } catch {
+    await msal_.acquireTokenRedirect({scopes}); return;
+  }
+
+  const h  = {Authorization:"Bearer "+token};
+  const base = "https://graph.microsoft.com/v1.0/sites/"+CONFIG.siteHost+":"+CONFIG.sitePath+":/lists/"+CONFIG.listId;
+
+  const url = finalId
+    ? base+"/items/"+finalId+"?$expand=fields"
+    : base+"/items?$expand=fields&$filter=fields/Protocolo eq '"+encodeURIComponent(finalProtocolo)+"'";
+
+  const res  = await fetch(url,{headers:h});
+  if(!res.ok){ showError("Erro SharePoint","HTTP "+res.status); return; }
+  const data = await res.json();
+  const fields = itemId ? data.fields : data.value?.[0]?.fields;
+  if(!fields){ showError("Não encontrado","Solicitação não localizada."); return; }
+  renderApp(fields);
+}
+
+init().catch(e=>{ console.error(e); showError("Erro inesperado",e.message); });
+</script>
+</body>
+</html>
