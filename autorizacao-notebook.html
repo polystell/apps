@@ -160,38 +160,38 @@
       <div class="aprovacao-list">
         <div class="aprovacao-item">
           <div class="timeline-col">
-            <div class="aprv-icon aprovado" id="icon-gestor"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="aprv-icon pendente" id="icon-gestor"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
             <div class="timeline-line"></div>
           </div>
           <div class="aprv-body">
-            <div class="aprv-header"><span class="aprv-name">Aprovação do Gestor</span><span class="aprv-badge aprovado" id="badge-gestor">Aprovado</span></div>
+            <div class="aprv-header"><span class="aprv-name">Aprovação do Gestor</span><span class="aprv-badge pendente" id="badge-gestor">Pendente</span></div>
             <div class="aprv-meta">Aprovador: <span id="a1-aprovador">—</span></div>
             <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a1-obs">—</span></div>
           </div>
-          <div class="aprv-date"><strong>Data da Aprovação</strong><span id="a1-data">—</span></div>
+          <div class="aprv-date"><strong id="a1-data-lbl">Data da Aprovação</strong><span id="a1-data">—</span></div>
         </div>
         <div class="aprovacao-item">
           <div class="timeline-col">
-            <div class="aprv-icon aprovado" id="icon-rh"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="aprv-icon pendente" id="icon-rh"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
             <div class="timeline-line"></div>
           </div>
           <div class="aprv-body">
-            <div class="aprv-header"><span class="aprv-name">Aprovação do RH</span><span class="aprv-badge aprovado" id="badge-rh">Aprovado</span></div>
+            <div class="aprv-header"><span class="aprv-name">Aprovação do RH</span><span class="aprv-badge pendente" id="badge-rh">Pendente</span></div>
             <div class="aprv-meta">Aprovador: <span id="a2-aprovador">—</span></div>
             <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a2-obs">—</span></div>
           </div>
-          <div class="aprv-date"><strong>Data da Aprovação</strong><span id="a2-data">—</span></div>
+          <div class="aprv-date"><strong id="a2-data-lbl">Data da Aprovação</strong><span id="a2-data">—</span></div>
         </div>
         <div class="aprovacao-item">
           <div class="timeline-col">
-            <div class="aprv-icon aprovado" id="icon-ti"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="aprv-icon pendente" id="icon-ti"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           </div>
           <div class="aprv-body">
-            <div class="aprv-header"><span class="aprv-name">Aprovação da TI</span><span class="aprv-badge aprovado" id="badge-ti">Aprovado</span></div>
+            <div class="aprv-header"><span class="aprv-name">Aprovação da TI</span><span class="aprv-badge pendente" id="badge-ti">Pendente</span></div>
             <div class="aprv-meta">Aprovador: <span id="a3-aprovador">—</span></div>
             <div class="aprv-meta" style="margin-top:2px">Observação: <span id="a3-obs">—</span></div>
           </div>
-          <div class="aprv-date"><strong>Data da Aprovação</strong><span id="a3-data">—</span></div>
+          <div class="aprv-date"><strong id="a3-data-lbl">Data da Aprovação</strong><span id="a3-data">—</span></div>
         </div>
       </div>
     </div>
@@ -285,12 +285,17 @@ function set(id,val){const e=$(id);if(e)e.textContent=val;}
 
 function renderAprovacao(sufixo, num, statusVal, nome, obs, data) {
   const s   = (statusVal||"").toLowerCase();
-  const cls = s.includes("reprov") ? "reprovado" : s.includes("pend") ? "pendente" : "aprovado";
-  const lbl = s.includes("reprov") ? "Reprovado"  : s.includes("pend") ? "Pendente"  : "Aprovado";
+  const isAprov  = s.includes("aprov");
+  const isReprov = s.includes("reprov");
+  const cls = isReprov ? "reprovado" : isAprov ? "aprovado" : "pendente";
+  const lbl = isReprov ? "Reprovado"  : isAprov ? "Aprovado" : "Pendente";
+  const dataLbl = isReprov ? "Data da Reprovação" : isAprov ? "Data da Aprovação" : "Data";
   const icon  = $("icon-"+sufixo);
   const badge = $("badge-"+sufixo);
+  const dataEl = $("a"+num+"-data-lbl");
   if(icon)  icon.className  = "aprv-icon "+cls;
   if(badge){badge.className = "aprv-badge "+cls; badge.textContent = lbl;}
+  if(dataEl) dataEl.textContent = dataLbl;
   set("a"+num+"-aprovador", fmt(nome));
   set("a"+num+"-obs",       fmt(obs));
   set("a"+num+"-data",      fmtDT(data));
