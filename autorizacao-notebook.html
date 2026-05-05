@@ -319,10 +319,48 @@ function renderApp(f) {
   const dr=f[C.dataRetirada], dd=f[C.dataDevolucao];
   set("f-periodo", dr&&dd ? fmtD(dr)+" até "+fmtD(dd) : fmtD(dr));
 
-  const st = f[C.statusAtual]||"Concluído";
+  // Status geral calculado pelas aprovações.
+  // Evita exibir "Solicitação Concluída" enquanto Gestor/RH/TI ainda estiverem pendentes.
+  const statusAprovacoes = [
+    f[C.statusGestor],
+    f[C.statusRH],
+    f[C.statusTI]
+  ].map(s => (s || "").toString().toLowerCase());
+
+  let st = "Pendente";
+  if (statusAprovacoes.some(s => s.includes("reprov"))) {
+    st = "Reprovado";
+  } else if (statusAprovacoes.every(s => s.includes("aprov"))) {
+    st = "Concluído";
+  }
+
   const stCls = st.toLowerCase().includes("conclu") ? "badge-concluido"
               : st.toLowerCase().includes("reprov") ? "badge-reprovado" : "badge-pendente";
   $("f-status").innerHTML = '<span class="badge '+stCls+'">'+st+'</span>';
+
+  const statusTitle = document.querySelector(".status-title");
+  const statusSub   = document.querySelector(".status-sub");
+  const statusIcon  = document.querySelector(".status-icon");
+
+  if (st === "Concluído") {
+    statusTitle.textContent = "Solicitação Concluída";
+    statusSub.textContent = "Todas as aprovações foram realizadas com sucesso.";
+    statusTitle.style.color = "#16a34a";
+    statusIcon.style.background = "#16a34a";
+    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  } else if (st === "Reprovado") {
+    statusTitle.textContent = "Solicitação Reprovada";
+    statusSub.textContent = "A solicitação foi reprovada em uma das etapas.";
+    statusTitle.style.color = "#dc2626";
+    statusIcon.style.background = "#dc2626";
+    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  } else {
+    statusTitle.textContent = "Solicitação Pendente";
+    statusSub.textContent = "A solicitação ainda possui aprovações pendentes.";
+    statusTitle.style.color = "#d97706";
+    statusIcon.style.background = "#d97706";
+    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+  }
 
   renderAprovacao("gestor",1, f[C.statusGestor], f[C.nomeAprovGestor], f[C.obsGestor], f[C.dataAprovGestor]);
   renderAprovacao("rh",    2, f[C.statusRH],     f[C.nomeAprovRH],     f[C.obsRH],     f[C.dataAprovRH]);
