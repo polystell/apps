@@ -30,8 +30,12 @@
   .status-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .status-left{display:flex;align-items:center;gap:16px}
   .status-icon{width:48px;height:48px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .status-icon.pendente{background:#d97706}
+  .status-icon.reprovado{background:#dc2626}
   .status-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-  .status-title{font-size:20px;font-weight:700;color:#16a34a}.status-sub{font-size:13px;color:#6b7280;margin-top:3px}
+  .status-title{font-size:20px;font-weight:700;color:#16a34a}
+  .status-title.pendente{color:#d97706}
+  .status-title.reprovado{color:#dc2626}.status-sub{font-size:13px;color:#6b7280;margin-top:3px}
   .qr-box{text-align:center}.qr-label{font-size:10px;color:#9ca3af;margin-bottom:8px;line-height:1.4}
   .qr-img{width:90px;height:90px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .qr-img img{width:100%;height:100%;object-fit:contain}
@@ -114,10 +118,10 @@
     <div class="card">
       <div class="status-card">
         <div class="status-left">
-          <div class="status-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="status-icon" id="status-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
           <div>
-            <div class="status-title">Solicitação Concluída</div>
-            <div class="status-sub">Todas as aprovações foram realizadas com sucesso.</div>
+            <div class="status-title" id="status-title">—</div>
+            <div class="status-sub" id="status-sub">—</div>
           </div>
         </div>
         <div class="qr-box">
@@ -305,6 +309,32 @@ function renderApp(f) {
 
   $("qr-img").src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(window.location.href);
 
+  // Status card dinâmico
+  const stRaw = f[C.statusAtual] || "Pendente";
+  const stLow = stRaw.toLowerCase();
+  const isConcluido = stLow.includes("conclu");
+  const isReprovado = stLow.includes("reprov");
+  const isPendente  = !isConcluido && !isReprovado;
+  const stIcon  = $("status-icon");
+  const stTitle = $("status-title");
+  const stSub   = $("status-sub");
+  const pendSvg = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const okSvg   = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const noSvg   = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  if (isConcluido) {
+    stIcon.className = "status-icon"; stIcon.innerHTML = okSvg;
+    stTitle.className = "status-title"; stTitle.textContent = "Solicitação Concluída";
+    stSub.textContent = "Todas as aprovações foram realizadas com sucesso.";
+  } else if (isReprovado) {
+    stIcon.className = "status-icon reprovado"; stIcon.innerHTML = noSvg;
+    stTitle.className = "status-title reprovado"; stTitle.textContent = "Solicitação Reprovada";
+    stSub.textContent = "Esta solicitação foi reprovada.";
+  } else {
+    stIcon.className = "status-icon pendente"; stIcon.innerHTML = pendSvg;
+    stTitle.className = "status-title pendente"; stTitle.textContent = "Aguardando Aprovação";
+    stSub.textContent = "Esta solicitação está em processo de aprovação.";
+  }
+
   set("f-protocolo",  fmt(f[C.protocolo]));
   set("f-datasol",    fmtDT(f[C.dataSolicitacao]||f[C.criado]));
   set("f-solicitante",fmt(f[C.nomeSolicitante]));
@@ -319,48 +349,10 @@ function renderApp(f) {
   const dr=f[C.dataRetirada], dd=f[C.dataDevolucao];
   set("f-periodo", dr&&dd ? fmtD(dr)+" até "+fmtD(dd) : fmtD(dr));
 
-  // Status geral calculado pelas aprovações.
-  // Evita exibir "Solicitação Concluída" enquanto Gestor/RH/TI ainda estiverem pendentes.
-  const statusAprovacoes = [
-    f[C.statusGestor],
-    f[C.statusRH],
-    f[C.statusTI]
-  ].map(s => (s || "").toString().toLowerCase());
-
-  let st = "Pendente";
-  if (statusAprovacoes.some(s => s.includes("reprov"))) {
-    st = "Reprovado";
-  } else if (statusAprovacoes.every(s => s.includes("aprov"))) {
-    st = "Concluído";
-  }
-
+  const st = f[C.statusAtual]||"Concluído";
   const stCls = st.toLowerCase().includes("conclu") ? "badge-concluido"
               : st.toLowerCase().includes("reprov") ? "badge-reprovado" : "badge-pendente";
   $("f-status").innerHTML = '<span class="badge '+stCls+'">'+st+'</span>';
-
-  const statusTitle = document.querySelector(".status-title");
-  const statusSub   = document.querySelector(".status-sub");
-  const statusIcon  = document.querySelector(".status-icon");
-
-  if (st === "Concluído") {
-    statusTitle.textContent = "Solicitação Concluída";
-    statusSub.textContent = "Todas as aprovações foram realizadas com sucesso.";
-    statusTitle.style.color = "#16a34a";
-    statusIcon.style.background = "#16a34a";
-    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
-  } else if (st === "Reprovado") {
-    statusTitle.textContent = "Solicitação Reprovada";
-    statusSub.textContent = "A solicitação foi reprovada em uma das etapas.";
-    statusTitle.style.color = "#dc2626";
-    statusIcon.style.background = "#dc2626";
-    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-  } else {
-    statusTitle.textContent = "Solicitação Pendente";
-    statusSub.textContent = "A solicitação ainda possui aprovações pendentes.";
-    statusTitle.style.color = "#d97706";
-    statusIcon.style.background = "#d97706";
-    statusIcon.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
-  }
 
   renderAprovacao("gestor",1, f[C.statusGestor], f[C.nomeAprovGestor], f[C.obsGestor], f[C.dataAprovGestor]);
   renderAprovacao("rh",    2, f[C.statusRH],     f[C.nomeAprovRH],     f[C.obsRH],     f[C.dataAprovRH]);
