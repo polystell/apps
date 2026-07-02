@@ -210,6 +210,8 @@ const C = {
   dataAprov:"DATA_APROVACAO_GESTOR"          // data/hora da decisão (carimbada ao salvar)
 };
 const MOTIVOS = ["Sem comprovante fiscal","Valor acima da política","Despesa não elegível","Comprovante ilegível","Duplicidade","Outro"];
+// E-mails que podem ver/aprovar QUALQUER prestação (suporte TI / supervisão)
+const SUPERVISORES = ["leonardo@polystell.com.br","samarcarvalho@polystell.com.br"];
 
 const params  = new URLSearchParams(location.search);
 const PRESTID = params.get("prest") || "";
@@ -291,8 +293,24 @@ async function loadItems(){
     ITEMS = (data.value||[]).map(it=>({
       id:it.id, title:it.fields[C.titulo]||"", categoria:it.fields[C.categoria]||"", tipo:it.fields[C.tipo]||"",
       valor:it.fields[C.valor]||0, prestacao:it.fields[C.prestacao]||"", nome:it.fields[C.nome]||"",
-      departamento:it.fields[C.departamento]||"", data:it.fields[C.data]||"", decision:null, motivo:"", obs:""
+      departamento:it.fields[C.departamento]||"", data:it.fields[C.data]||"",
+      gestorEmail:pickEmail(it.fields[C.gestorEmail]), gestorNome:pickName(it.fields[C.gestorEmail]),
+      decision:null, motivo:"", obs:""
     }));
+    // ---- validação de dono: só o gestor da prestação (ou supervisores) pode aprovar ----
+    if (ITEMS.length){
+      const me   = (account.username||"").toLowerCase().trim();
+      const meNm = (account.name||"").toLowerCase().trim();
+      const sup  = SUPERVISORES.map(s=>s.toLowerCase());
+      const g = ITEMS[0];
+      const isSuper = sup.includes(me);
+      const isOwner = (g.gestorEmail && g.gestorEmail===me) || (g.gestorNome && g.gestorNome.toLowerCase()===meNm);
+      console.log("[auth] logado:", me, "| gestor:", g.gestorEmail||g.gestorNome, "| super:", isSuper, "| dono:", isOwner);
+      if(!isSuper && !isOwner){
+        showError("Acesso não autorizado", "Você não é o gestor responsável por esta prestação de contas. Se precisar de acesso, contate a TI.");
+        return;
+      }
+    }
     showApp(); render();
   }catch(e){ showError("Não foi possível carregar as despesas", e.message); }
 }
@@ -378,6 +396,22 @@ $("#saveBtn").addEventListener("click", async ()=>{
 });
 
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+function pickEmail(v){
+  if(!v) return "";
+  if(Array.isArray(v)) return pickEmail(v[0]);
+  if(typeof v==="string"){
+    var parts=v.split(",#");                       // formato Pessoa: "Nome,#email"
+    var cand=(parts.length>1?parts[1]:v).trim();
+    return cand.indexOf("@")>-1 ? cand.toLowerCase() : "";
+  }
+  return String(v.Email||v.email||v.userPrincipalName||"").toLowerCase();
+}
+function pickName(v){
+  if(!v) return "";
+  if(Array.isArray(v)) return pickName(v[0]);
+  if(typeof v==="string") return v.split(",#")[0].trim();
+  return String(v.LookupValue||v.DisplayName||v.displayName||v.title||"").trim();
+}
 function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(kind==="err"?" err":""); setTimeout(()=>t.className="toast",3200); }
 function demoItems(){
   return [
