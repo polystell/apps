@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
   body{font-family:'Inter',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
   #loading-screen{position:fixed;inset:0;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
   .spinner{width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#1e3a5f;border-radius:50%;animation:spin .8s linear infinite}
@@ -219,6 +220,15 @@ const brl = n => (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currenc
 const fmtD = v => v ? new Date(v).toLocaleDateString("pt-BR") : "—";
 
 let ITEMS = [], msalApp = null, account = null;
+let SITEID = null, COLMAP = {};   // COLMAP: nome de exibição/interno -> nome interno real
+
+async function resolveColumns(){
+  try{
+    const data = await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/columns?$select=name,displayName`);
+    (data.value||[]).forEach(c=>{ COLMAP[c.name]=c.name; if(c.displayName) COLMAP[c.displayName]=c.name; });
+  }catch(e){ /* se falhar, usa os nomes configurados como estão */ }
+}
+function ci(x){ return COLMAP[x] || x; }   // resolve nome interno da coluna
 
 function showApp(){ $("#loading-screen").style.display="none"; $("#app").style.display="block"; }
 function showError(t,m){ $("#loading-screen").style.display="none"; $("#error-title").textContent=t; $("#error-msg").textContent=m||""; $("#error-screen").style.display="flex"; }
@@ -272,6 +282,8 @@ async function graph(url, opt={}){
 async function loadItems(){
   try{
     const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
+    SITEID = site.id;
+    await resolveColumns();
     let url = `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items`
             + `?$expand=fields&$top=200&$filter=fields/${C.status} eq 'Pendente'`
             + (PRESTID ? ` and fields/${C.prestacao} eq '${PRESTID.replace(/'/g,"''")}'` : "");
@@ -286,15 +298,15 @@ async function loadItems(){
 }
 
 async function persist(){
-  const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
+  if(!SITEID){ const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`); SITEID = site.id; await resolveColumns(); }
   for(const it of ITEMS){
     const fields = {
-      [C.status]: it.decision==="approve" ? "Aprovado" : "Rejeitado",
-      [C.motivo]: it.decision==="reject" ? it.motivo : "",
-      [C.obs]:    it.obs || "",
-      [C.dataAprov]: new Date().toISOString()
+      [ci(C.status)]: it.decision==="approve" ? "Aprovado" : "Rejeitado",
+      [ci(C.motivo)]: it.decision==="reject" ? it.motivo : "",
+      [ci(C.obs)]:    it.obs || "",
+      [ci(C.dataAprov)]: new Date().toISOString()
     };
-    await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items/${it.id}/fields`,
+    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
       {method:"PATCH", body:JSON.stringify(fields)});
   }
 }
