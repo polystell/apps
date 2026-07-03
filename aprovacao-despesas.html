@@ -14,24 +14,21 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
   .loading-text{font-size:14px;color:#6b7280}
-  #error-screen{position:fixed;inset:0;background:#f3f4f6;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  #error-screen{position:fixed;inset:0;background:#f3f4f6;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
   .error-icon{font-size:48px}.error-title{font-size:18px;font-weight:600;color:#dc2626}
-  .error-msg{font-size:13px;color:#6b7280;text-align:center;max-width:400px}
+  .error-msg{font-size:13px;color:#6b7280;max-width:420px}
   #app{display:none}
   .header{background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100}
   .header-left{display:flex;align-items:center;gap:14px}
   .header-title{font-size:16px;font-weight:700}.header-subtitle{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
-  .header-home{display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.85);text-decoration:none;padding:6px 12px;border-radius:6px;transition:background .15s}
-  .header-home:hover{background:rgba(255,255,255,.12)}
-  .header-home svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
   .header-user{font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:8px}
   .header-user .udot{width:8px;height:8px;border-radius:50%;background:#4ade80}
   .header-user button{font:inherit;font-size:12px;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:none;padding:5px 10px;border-radius:6px;cursor:pointer}
   .header-user button:hover{background:rgba(255,255,255,.2)}
-  .main{max-width:820px;margin:0 auto;padding:28px 16px 120px}
+  .role-chip{font-size:11px;font-weight:600;background:rgba(255,255,255,.15);padding:3px 9px;border-radius:999px;letter-spacing:.3px}
+  .main{max-width:860px;margin:0 auto;padding:28px 16px 130px}
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:16px}
-  .status-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  .status-left{display:flex;align-items:center;gap:16px}
+  .status-card{display:flex;align-items:center;gap:16px}
   .status-icon{width:48px;height:48px;background:#1e3a5f;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .status-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   .status-title{font-size:20px;font-weight:700;color:#111827}
@@ -47,43 +44,50 @@
   .info-item span{font-size:13px;color:#1f2937}
   .info-item span.money{font-variant-numeric:tabular-nums;font-weight:600}
 
-  /* ---- tabela de despesas ---- */
-  .desp-table{width:100%;border-collapse:collapse}
-  .desp-table thead th{text-align:left;font-size:11px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:.4px;padding:0 12px 12px;border-bottom:1px solid #f0f0f0}
-  .desp-table th.num,.desp-table td.num{text-align:right;font-variant-numeric:tabular-nums}
-  .desp-table tbody td{padding:14px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-  .desp-table tbody tr:last-child td{border-bottom:none}
-  .desp-table tbody tr[data-state="approve"]{background:#f0fdf4}
-  .desp-table tbody tr[data-state="reject"]{background:#fef2f2}
-  .desp-name{font-size:14px;font-weight:600;color:#111827}
-  .desp-tag{font-size:12px;color:#6b7280;margin-top:2px}
-  td.num .val{font-size:14px;font-weight:600;color:#111827}
-
-  .seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;background:#fff}
-  .seg button{font:inherit;font-size:13px;font-weight:600;border:none;background:transparent;padding:8px 14px;cursor:pointer;color:#6b7280}
-  .seg button+button{border-left:1px solid #e5e7eb}
-  .seg button[aria-pressed="true"][data-act="approve"]{background:#16a34a;color:#fff}
-  .seg button[aria-pressed="true"][data-act="reject"]{background:#dc2626;color:#fff}
-  .seg button:not([aria-pressed="true"]):hover{background:#f3f4f6;color:#1f2937}
-
-  select,input[type="text"]{font:inherit;font-size:13px;width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#1f2937}
-  select:disabled,input:disabled{background:#f3f4f6;color:#9ca3af;cursor:not-allowed}
-  select[data-invalid="true"]{border-color:#dc2626;background:#fef2f2}
+  /* ---- despesa cards ---- */
+  .dcard{border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#fff}
+  .dcard.act[data-dec="aprovar"]{background:#f0fdf4;border-color:#bbf7d0}
+  .dcard.act[data-dec="reprovar"]{background:#fef2f2;border-color:#fecaca}
+  .dcard.act[data-dec="reenviar"]{background:#f5f3ff;border-color:#ddd6fe}
+  .dcard.act[data-dec="diretoria"]{background:#eff6ff;border-color:#bfdbfe}
+  .dcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .dcard-name{font-size:14.5px;font-weight:600;color:#111827}
+  .dcard-tag{font-size:12px;color:#6b7280;margin-top:2px}
+  .dcard-right{text-align:right;white-space:nowrap}
+  .dcard-val{font-size:14.5px;font-weight:600;color:#111827;font-variant-numeric:tabular-nums}
+  .dcard-val small{display:block;font-size:11px;color:#15803d;font-weight:600;margin-top:2px}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;margin-top:6px}
+  .badge.wait{background:#fef9c3;color:#854d0e}
+  .badge.rev{background:#e0e7ff;color:#3730a3}
+  .badge.ok{background:#dcfce7;color:#15803d}
+  .badge.no{background:#fee2e2;color:#991b1b}
+  .dcard-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .abtn{font:inherit;font-size:13px;font-weight:600;border:1px solid #d1d5db;background:#fff;color:#374151;padding:8px 16px;border-radius:8px;cursor:pointer}
+  .abtn:hover{background:#f3f4f6}
+  .abtn[aria-pressed="true"].ap{background:#16a34a;color:#fff;border-color:#16a34a}
+  .abtn[aria-pressed="true"].rp{background:#dc2626;color:#fff;border-color:#dc2626}
+  .abtn[aria-pressed="true"].rv{background:#7c3aed;color:#fff;border-color:#7c3aed}
+  .abtn[aria-pressed="true"].dir{background:#1e3a5f;color:#fff;border-color:#1e3a5f}
+  .dcard-details{margin-top:14px;display:grid;gap:12px}
+  .field label{display:block;font-size:11px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+  select,input[type="text"],input[type="number"],textarea{font:inherit;font-size:13.5px;width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#1f2937}
+  textarea{min-height:64px;resize:vertical}
+  select[data-invalid="true"],textarea[data-invalid="true"]{border-color:#dc2626;background:#fff5f5}
   :focus-visible{outline:2px solid #3b82f6;outline-offset:1px}
+  .ro-info{margin-top:10px;font-size:13px;color:#4b5563;line-height:1.5}
+  .ro-info b{color:#374151}
 
-  .state{padding:48px 20px;text-align:center;color:#6b7280}
+  .state{padding:40px 20px;text-align:center;color:#6b7280}
   .state h2{color:#111827;font-size:16px;margin:0 0 6px}
 
-  .actionbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e5e7eb;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;z-index:90}
-  .actionbar .inner{max-width:820px;margin:0 auto;width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .actionbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e5e7eb;padding:14px 24px;z-index:90}
+  .actionbar .inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .tally{font-size:13px;color:#6b7280}.tally b{color:#111827;font-weight:600}
-  .tally .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;margin-left:4px}
-  .tally .pill.ap{background:#dcfce7;color:#15803d}.tally .pill.rp{background:#fee2e2;color:#991b1b}
   .btn{font:inherit;font-size:14px;font-weight:600;color:#fff;background:#1e3a5f;border:none;padding:11px 24px;border-radius:8px;cursor:pointer}
   .btn:hover{background:#16304f}
   .btn:disabled{background:#cbd5e1;cursor:not-allowed}
 
-  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200}
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90%}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.err{background:#dc2626}
 
@@ -92,29 +96,17 @@
   .lock-icon svg{width:14px;height:14px;stroke:#9ca3af;fill:none;stroke-width:1.8}
   .powered-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;font-weight:500}
   .sp-icon{width:22px;height:22px;background:#0078d4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
-  .pa-icon{width:22px;height:22px;background:#0066ff;border-radius:4px;display:flex;align-items:center;justify-content:center}
-  .pa-icon svg{width:14px;height:14px;fill:white}
 
-  @media(max-width:640px){
-    .desp-table thead{display:none}
-    .desp-table tbody td{display:block;padding:6px 12px;border:none}
-    .desp-table tbody tr{display:block;border-bottom:1px solid #f0f0f0;padding:12px 0}
-    .desp-table td.num{text-align:left}
-    .desp-table td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
-    .btn{width:100%}
-  }
+  @media(max-width:640px){ .btn{width:100%} .actionbar .inner{flex-direction:column;align-items:stretch} }
 </style>
 </head>
 <body>
 
-<div id="loading-screen">
-  <div class="spinner"></div>
-  <div class="loading-text">Carregando prestação de contas...</div>
-</div>
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Carregando prestação de contas...</div></div>
 <div id="error-screen">
   <div class="error-icon">&#9888;&#65039;</div>
   <div class="error-title" id="error-title">Não foi possível carregar</div>
-  <div class="error-msg" id="error-msg">Verifique o link e tente novamente.</div>
+  <div class="error-msg" id="error-msg"></div>
 </div>
 
 <div id="app">
@@ -126,25 +118,16 @@
         <div class="header-subtitle">Aprovação de Prestação de Contas</div>
       </div>
     </div>
-    <div id="header-right">
-      <a href="https://www.polystell.com.br" class="header-home">
-        <svg viewBox="0 0 24 24"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>
-        Início
-      </a>
-    </div>
+    <div id="header-right"></div>
   </header>
 
   <main class="main">
     <div class="card">
       <div class="status-card">
-        <div class="status-left">
-          <div class="status-icon">
-            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <div>
-            <div class="status-title">Aprovação de Prestação de Contas <span id="demoFlag" class="demo-flag" hidden>modo demonstração</span></div>
-            <div class="status-sub">Aprove ou reprove cada despesa individualmente. O motivo é obrigatório apenas nas reprovadas.</div>
-          </div>
+        <div class="status-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div>
+          <div class="status-title">Aprovação de Prestação de Contas <span id="demoFlag" class="demo-flag" hidden>modo demonstração</span></div>
+          <div class="status-sub" id="statusSub">Analise cada despesa conforme sua etapa.</div>
         </div>
       </div>
     </div>
@@ -169,49 +152,68 @@
   <footer class="page-footer">
     <div class="footer-left">
       <div class="lock-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-      <span>Acesso restrito aos aprovadores da prestação. Decisões registradas com sua identidade Microsoft 365.</span>
+      <span>Acesso restrito. Cada etapa é validada pela identidade Microsoft 365 e pela permissão da lista.</span>
     </div>
-    <div class="powered-badge">
-      Powered by Power Automate + SharePoint
-      <div class="sp-icon">S</div>
-      <div class="pa-icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-    </div>
+    <div class="powered-badge">Powered by Power Automate + SharePoint <div class="sp-icon">S</div></div>
   </footer>
 </div>
 
-<div class="actionbar" id="actionbar" hidden>
-  <div class="inner">
-    <div class="tally" id="tally"></div>
-    <button class="btn" id="saveBtn" disabled>Salvar decisões</button>
-  </div>
-</div>
+<div class="actionbar" id="actionbar" hidden><div class="inner">
+  <div class="tally" id="tally"></div>
+  <button class="btn" id="saveBtn" disabled>Salvar decisões</button>
+</div></div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ════════════════════════════════════════════════════
-//  CONFIGURAÇÕES  — preencher antes de publicar
-//  Enquanto clientId estiver como PLACEHOLDER (ou ?demo=1), roda em MODO DEMO.
-// ════════════════════════════════════════════════════
+/* ===================== CONFIGURAÇÃO ===================== */
 const CONFIG = {
-  clientId: "c066630d-9dc2-4c4a-8c60-8f0056e9e5e2",   // mesmo App Registration do portal de notebook
+  clientId: "c066630d-9dc2-4c4a-8c60-8f0056e9e5e2",
   tenantId: "fdb7cb21-cc9d-4f32-bb70-e71cad1eb164",
   siteHost: "polystellcombr.sharepoint.com",
   sitePath: "/sites/GESTODEDESPESAS",
-  listId:   "0648a97a-1043-4ecd-b358-956bed70b140",   // lista de despesas
+  listId:   "0648a97a-1043-4ecd-b358-956bed70b140",
 };
+// Papéis globais
+const FINANCEIRO   = "priscila@polystell.com.br";
+const DIRETORIA    = "samarcarvalho@polystell.com.br";
+const SUPERVISORES = ["leonardo@polystell.com.br","samarcarvalho@polystell.com.br"]; // veem tudo
+
 const C = {
   prestacao:"ID_PRESTACAO", titulo:"Title", nome:"NOME", departamento:"DEPARTAMENTO",
-  categoria:"CATEGORIA", tipo:"TIPO", valor:"VALOR", data:"DATA_DESPESA",
-  solicitanteEmail:"Solicitante", gestorEmail:"Gestor",
-  status:"APROVACAO_GESTOR",                 // Pendente | Aprovado | Rejeitado
-  motivo:"MOTIVO_REPROVACAO",                // >>> criar coluna (Escolha)
-  obs:"COMENTARIO_APROVACAO_GESTOR",         // observação livre do gestor
-  dataAprov:"DATA_APROVACAO_GESTOR"          // data/hora da decisão (carimbada ao salvar)
+  categoria:"CATEGORIA", tipo:"TIPO", valor:"VALOR", data:"DATA_DESPESA", gestorEmail:"Gestor",
+  etapa:"STATUS_ETAPA",
+  // gestor
+  status:"APROVACAO_GESTOR", motivo:"MOTIVO_REPROVACAO", obs:"COMENTARIO_APROVACAO_GESTOR", dataAprov:"DATA_APROVACAO_GESTOR",
+  // financeiro
+  decFin:"DECISAO_FINANCEIRO", motFin:"MOTIVO_FINANCEIRO", obsFin:"COMENTARIO_FINANCEIRO", dataFin:"DATA_FINANCEIRO",
+  // diretoria
+  decDir:"DECISAO_DIRETORIA", obsDir:"COMENTARIO_DIRETORIA", dataDir:"DATA_DIRETORIA", valorAprov:"VALOR_APROVADO",
+  // reenvio
+  motReenvio:"MOTIVO_REENVIO", contReenvio:"CONTADOR_REENVIO"
 };
+
 const MOTIVOS = ["Sem comprovante fiscal","Valor acima da política","Despesa não elegível","Comprovante ilegível","Duplicidade","Outro"];
-// E-mails que podem ver/aprovar QUALQUER prestação (suporte TI / supervisão)
-const SUPERVISORES = ["leonardo@polystell.com.br","samarcarvalho@polystell.com.br"];
+
+// etapa -> papel que age + ações disponíveis
+const STAGES = {
+  AGUARDANDO_GESTOR:     {role:"gestor",     actions:["aprovar","reprovar","reenviar"]},
+  AGUARDANDO_FINANCEIRO: {role:"financeiro", actions:["aprovar","reprovar","reenviar","diretoria"]},
+  AGUARDANDO_DIRETORIA:  {role:"diretoria",  actions:["aprovar","reprovar"]}
+};
+const STATUS_META = {
+  AGUARDANDO_GESTOR:     {label:"Aguardando Gestor",           cls:"wait"},
+  AGUARDANDO_FINANCEIRO: {label:"Aguardando Financeiro",       cls:"wait"},
+  AGUARDANDO_DIRETORIA:  {label:"Aguardando Diretoria",        cls:"wait"},
+  REVISAO_SOLICITANTE:   {label:"Em revisão (solicitante)",    cls:"rev"},
+  CONCLUIDO_REEMBOLSAR:  {label:"Concluído – Reembolsar",      cls:"ok"},
+  REPROVADO_GESTOR:      {label:"Reprovado (Gestor)",          cls:"no"},
+  REPROVADO_FINANCEIRO:  {label:"Reprovado (Financeiro)",      cls:"no"},
+  REPROVADO_DIRETORIA:   {label:"Reprovado (Diretoria)",       cls:"no"}
+};
+const ACT_LABEL = {aprovar:"Aprovar", reprovar:"Reprovar", reenviar:"Reenviar", diretoria:"Enviar Diretoria"};
+const ACT_CLASS = {aprovar:"ap", reprovar:"rp", reenviar:"rv", diretoria:"dir"};
+const ROLE_LABEL = {gestor:"Gestor", financeiro:"Financeiro", diretoria:"Diretoria"};
 
 const params  = new URLSearchParams(location.search);
 const PRESTID = params.get("prest") || "";
@@ -222,117 +224,99 @@ const brl = n => (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currenc
 const fmtD = v => v ? new Date(v).toLocaleDateString("pt-BR") : "—";
 
 let ITEMS = [], msalApp = null, account = null;
-let SITEID = null, COLMAP = {};   // COLMAP: nome de exibição/interno -> nome interno real
-
-async function resolveColumns(){
-  try{
-    const data = await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/columns?$select=name,displayName`);
-    (data.value||[]).forEach(c=>{ COLMAP[c.name]=c.name; if(c.displayName) COLMAP[c.displayName]=c.name; });
-  }catch(e){ /* se falhar, usa os nomes configurados como estão */ }
-}
-function ci(x){ return COLMAP[x] || x; }   // resolve nome interno da coluna
+let SITEID = null, COLMAP = {};
+let ME = "", MENAME = "", ISSUPER = false;
 
 function showApp(){ $("#loading-screen").style.display="none"; $("#app").style.display="block"; }
 function showError(t,m){ $("#loading-screen").style.display="none"; $("#error-title").textContent=t; $("#error-msg").textContent=m||""; $("#error-screen").style.display="flex"; }
 
+/* ---------------- init / auth ---------------- */
 function loadScript(src){
   return new Promise((res,rej)=>{
-    const s=document.createElement("script");
-    s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error("Não foi possível carregar o componente de login (verifique a conexão/rede)."));
-    document.head.appendChild(s);
-    setTimeout(()=>rej(new Error("Tempo esgotado ao carregar o componente de login.")), 15000);
+    const s=document.createElement("script"); s.src=src; s.onload=()=>res();
+    s.onerror=()=>rej(new Error("Não foi possível carregar o componente de login.")); document.head.appendChild(s);
+    setTimeout(()=>rej(new Error("Tempo esgotado ao carregar o login.")),15000);
   });
 }
-
 async function init(){
   try{
-    if (DEMO){
-      $("#demoFlag").hidden=false;
-      $("#header-right").innerHTML = '<span class="header-user"><span class="udot"></span>sessão fictícia · dados de exemplo</span>';
-      ITEMS = demoItems(); showApp(); render(); return;
-    }
-    if (location.protocol === "file:"){
-      showError("Abra por http/https", "A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página (ou rode um servidor local em http://localhost)."); return;
-    }
+    if(DEMO){ $("#demoFlag").hidden=false; ME="leonardo@polystell.com.br"; ISSUPER=true;
+      $("#header-right").innerHTML='<span class="header-user"><span class="udot"></span>sessão fictícia</span>';
+      ITEMS=demoItems(); showApp(); render(); return; }
+    if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp = new msal.PublicClientApplication({
-      auth:{ clientId:CONFIG.clientId, authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`, redirectUri:location.origin+location.pathname },
-      cache:{ cacheLocation:"localStorage" }
-    });
-    const resp = await msalApp.handleRedirectPromise();
-    account = resp?.account || msalApp.getAllAccounts()[0] || null;
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
+    const resp=await msalApp.handleRedirectPromise();
+    account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
-    $("#header-right").innerHTML = `<span class="header-user"><span class="udot"></span>${account.name||account.username}
-       <button onclick="msalApp.logoutRedirect()">Sair</button></span>`;
+    ME=(account.username||"").toLowerCase().trim(); MENAME=(account.name||"").toLowerCase().trim();
+    ISSUPER=SUPERVISORES.map(s=>s.toLowerCase()).includes(ME);
     await loadItems();
   }catch(e){ showError("Não foi possível iniciar a página", e.message); }
 }
 init();
 
-async function token(){
-  const req = {scopes:["Sites.ReadWrite.All"], account};
-  try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }
-  catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; }
-}
-async function graph(url, opt={}){
-  const t = await token();
-  const r = await fetch(url,{...opt, headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json",...(opt.headers||{})}});
-  if(!r.ok) throw new Error(`Graph ${r.status}: ${await r.text()}`);
-  return r.status===204 ? null : r.json();
-}
+async function token(){ const req={scopes:["Sites.ReadWrite.All"],account}; try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; } }
+async function graph(url,opt={}){ const t=await token(); const r=await fetch(url,{...opt,headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json",...(opt.headers||{})}}); if(!r.ok) throw new Error(`Graph ${r.status}: ${await r.text()}`); return r.status===204?null:r.json(); }
+async function resolveColumns(){ try{ const d=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/columns?$select=name,displayName`); (d.value||[]).forEach(c=>{COLMAP[c.name]=c.name; if(c.displayName)COLMAP[c.displayName]=c.name;}); }catch(e){} }
+function ci(x){ return COLMAP[x]||x; }
 
+/* ---------------- data ---------------- */
 async function loadItems(){
   try{
-    const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
-    SITEID = site.id;
-    await resolveColumns();
-    let url = `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items`
-            + `?$expand=fields&$top=200&$filter=fields/${C.status} eq 'Pendente'`
-            + (PRESTID ? ` and fields/${C.prestacao} eq '${PRESTID.replace(/'/g,"''")}'` : "");
-    const data = await graph(url, {headers:{Prefer:"HonorNonIndexedQueriesWarningMayFailRandomly"}});
-    ITEMS = (data.value||[]).map(it=>({
-      id:it.id, title:it.fields[C.titulo]||"", categoria:it.fields[C.categoria]||"", tipo:it.fields[C.tipo]||"",
-      valor:it.fields[C.valor]||0, prestacao:it.fields[C.prestacao]||"", nome:it.fields[C.nome]||"",
-      departamento:it.fields[C.departamento]||"", data:it.fields[C.data]||"",
-      gestorEmail:pickEmail(it.fields[C.gestorEmail]), gestorNome:pickName(it.fields[C.gestorEmail]),
-      decision:null, motivo:"", obs:""
-    }));
-    // ---- validação de dono: só o gestor da prestação (ou supervisores) pode aprovar ----
-    if (ITEMS.length){
-      const me   = (account.username||"").toLowerCase().trim();
-      const meNm = (account.name||"").toLowerCase().trim();
-      const sup  = SUPERVISORES.map(s=>s.toLowerCase());
-      const g = ITEMS[0];
-      const isSuper = sup.includes(me);
-      const isOwner = (g.gestorEmail && g.gestorEmail===me) || (g.gestorNome && g.gestorNome.toLowerCase()===meNm);
-      console.log("[auth] logado:", me, "| gestor:", g.gestorEmail||g.gestorNome, "| super:", isSuper, "| dono:", isOwner);
-      if(!isSuper && !isOwner){
-        showError("Acesso não autorizado", "Você não é o gestor responsável por esta prestação de contas. Se precisar de acesso, contate a TI.");
-        return;
-      }
+    const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
+    SITEID=site.id; await resolveColumns();
+    const url=`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items`
+      +`?$expand=fields&$top=200`
+      +(PRESTID?`&$filter=fields/${C.prestacao} eq '${PRESTID.replace(/'/g,"''")}'`:"");
+    const data=await graph(url,{headers:{Prefer:"HonorNonIndexedQueriesWarningMayFailRandomly"}});
+    ITEMS=(data.value||[]).map(it=>{
+      const f=it.fields||{};
+      return {
+        id:it.id, title:f[C.titulo]||"", categoria:f[C.categoria]||"", tipo:f[C.tipo]||"",
+        valor:Number(f[C.valor]||0), prestacao:f[C.prestacao]||"", nome:f[C.nome]||"",
+        departamento:f[C.departamento]||"", data:f[C.data]||"",
+        gestorEmail:pickEmail(f[C.gestorEmail]), gestorNome:pickName(f[C.gestorEmail]),
+        etapa:f[C.etapa]||"AGUARDANDO_GESTOR",
+        motivoGestor:f[C.motivo]||"", obsGestor:f[C.obs]||"",
+        decFin:f[C.decFin]||"", motFin:f[C.motFin]||"", obsFin:f[C.obsFin]||"",
+        decDir:f[C.decDir]||"", obsDir:f[C.obsDir]||"", valorAprovSaved:f[C.valorAprov],
+        motReenvio:f[C.motReenvio]||"", contReenvio:Number(f[C.contReenvio]||0),
+        // estado de edição na tela:
+        decision:null, obs:"", motivo:"", motivoReenvio:"", valorAprov:null
+      };
+    }).sort((a,b)=> (a.title||"").localeCompare(b.title||""));
+
+    // ---- gate de acesso ----
+    if(ITEMS.length){
+      const isGestor=ITEMS.some(it=> (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME));
+      const allowed = ISSUPER || ME===FINANCEIRO.toLowerCase() || ME===DIRETORIA.toLowerCase() || isGestor;
+      console.log("[auth] logado:",ME,"| super:",ISSUPER,"| financeiro:",ME===FINANCEIRO.toLowerCase(),"| gestor:",isGestor);
+      if(!allowed){ showError("Acesso não autorizado","Você não participa da aprovação desta prestação de contas. Se precisar de acesso, contate a TI."); return; }
     }
     showApp(); render();
   }catch(e){ showError("Não foi possível carregar as despesas", e.message); }
 }
 
-async function persist(){
-  if(!SITEID){ const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`); SITEID = site.id; await resolveColumns(); }
-  for(const it of ITEMS){
-    const fields = {
-      [ci(C.status)]: it.decision==="approve" ? "Aprovado" : "Rejeitado",
-      [ci(C.motivo)]: it.decision==="reject" ? it.motivo : "",
-      [ci(C.obs)]:    it.obs || "",
-      [ci(C.dataAprov)]: new Date().toISOString()
-    };
-    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
-      {method:"PATCH", body:JSON.stringify(fields)});
-  }
+/* papel de quem está logado PARA um item (prioridade: financeiro/diretoria globais, depois gestor do item) */
+function roleFor(it){
+  if(ME===FINANCEIRO.toLowerCase()) return "financeiro";
+  if(ME===DIRETORIA.toLowerCase())  return "diretoria";
+  if((it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME)) return "gestor";
+  return null;
+}
+/* retorna o STAGE se o usuário pode agir nesta linha agora, senão null */
+function canAct(it){
+  const stage=STAGES[it.etapa]; if(!stage) return null;   // estados terminais / revisão -> sem ação aqui
+  if(ISSUPER) return stage;                               // supervisor age em qualquer etapa ativa
+  return roleFor(it)===stage.role ? stage : null;
 }
 
+/* ---------------- render ---------------- */
 function render(){
-  const total = ITEMS.reduce((s,i)=>s+Number(i.valor||0),0);
-  const f = ITEMS[0]||{};
-  $("#meta").innerHTML = `
+  const total=ITEMS.reduce((s,i)=>s+i.valor,0);
+  const f=ITEMS[0]||{};
+  $("#meta").innerHTML=`
     <div class="info-item"><label>Prestação</label><span>${esc(PRESTID||f.prestacao||"—")}</span></div>
     <div class="info-item"><label>Solicitante</label><span>${esc(f.nome||"—")}</span></div>
     <div class="info-item"><label>Departamento</label><span>${esc(f.departamento||"—")}</span></div>
@@ -340,84 +324,138 @@ function render(){
     <div class="info-item"><label>Valor Total</label><span class="money">${brl(total)}</span></div>
     <div class="info-item"><label>Data</label><span>${fmtD(f.data)}</span></div>`;
 
-  if(!ITEMS.length){
-    $("#content").innerHTML = `<div class="state"><h2>Nenhuma despesa pendente</h2>Esta prestação já foi decidida ou não há itens aguardando você.</div>`;
-    $("#actionbar").hidden = true; return;
+  if(!ITEMS.length){ $("#content").innerHTML=`<div class="state"><h2>Nenhuma despesa encontrada</h2>Verifique o link da prestação.</div>`; $("#actionbar").hidden=true; return; }
+
+  $("#content").innerHTML = ITEMS.map((it,idx)=>`<div class="dcard" id="card-${idx}">${cardInner(it,idx)}</div>`).join("");
+  updateActionbar();
+}
+
+function cardInner(it,idx){
+  const st=STATUS_META[it.etapa]||{label:it.etapa,cls:"wait"};
+  const valExtra = (it.valorAprovSaved!=null && it.valorAprovSaved!=="") ? `<small>Aprovado: ${brl(it.valorAprovSaved)}</small>` : "";
+  const head=`<div class="dcard-head">
+      <div><div class="dcard-name">${esc(it.title)}</div><div class="dcard-tag">${[it.categoria,it.tipo].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div>
+      <div class="dcard-right"><div class="dcard-val">${brl(it.valor)}${valExtra}</div><span class="badge ${st.cls}">${st.label}</span></div>
+    </div>`;
+
+  const stage=canAct(it);
+  if(!stage) return head + readonlyInfo(it);
+
+  const btns=stage.actions.map(a=>`<button type="button" class="abtn ${ACT_CLASS[a]}" aria-pressed="${it.decision===a}" onclick="setDecision(${idx},'${a}')">${ACT_LABEL[a]}</button>`).join("");
+  return head + `<div class="dcard-actions">${btns}</div><div class="dcard-details" id="det-${idx}">${detailsInner(it,idx,stage)}</div>`;
+}
+
+function detailsInner(it,idx,stage){
+  if(!it.decision) return "";
+  const obsField=`<div class="field"><label>Observação</label><input type="text" placeholder="opcional" value="${esc(it.obs)}" oninput="setObs(${idx},this.value)"></div>`;
+  if(it.decision==="reprovar"){
+    const opts=MOTIVOS.map(m=>`<option value="${m}" ${it.motivo===m?"selected":""}>${m}</option>`).join("");
+    return `<div class="field"><label>Motivo da reprovação *</label><select onchange="setMotivo(${idx},this.value)"><option value="">— selecione —</option>${opts}</select></div>${obsField}`;
   }
-  const opts = MOTIVOS.map(m=>`<option value="${m}">${m}</option>`).join("");
-  const rows = ITEMS.map((it,idx)=>`
-    <tr data-idx="${idx}" data-state="${it.decision||''}">
-      <td data-label="Despesa"><div class="desp-name">${esc(it.title)}</div><div class="desp-tag">${[it.categoria,it.tipo].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></td>
-      <td class="num" data-label="Valor"><span class="val">${brl(it.valor)}</span></td>
-      <td data-label="Decisão">
-        <div class="seg" role="group" aria-label="Decisão despesa ${idx+1}">
-          <button type="button" data-act="approve" aria-pressed="${it.decision==='approve'}" onclick="decide(${idx},'approve')">Aprovar</button>
-          <button type="button" data-act="reject"  aria-pressed="${it.decision==='reject'}"  onclick="decide(${idx},'reject')">Reprovar</button>
-        </div>
-      </td>
-      <td data-label="Motivo da reprovação"><select onchange="setMotivo(${idx},this.value)" ${it.decision==='reject'?'':'disabled'}><option value="">— selecione —</option>${opts}</select></td>
-      <td data-label="Observação"><input type="text" placeholder="opcional" value="${esc(it.obs)}" oninput="setObs(${idx},this.value)"></td>
-    </tr>`).join("");
-  $("#content").innerHTML = `<table class="desp-table">
-    <thead><tr><th>Despesa</th><th class="num">Valor</th><th>Decisão</th><th>Motivo da reprovação</th><th>Observação</th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
-  $("#actionbar").hidden = false;
-  updateTally();
+  if(it.decision==="reenviar"){
+    return `<div class="field"><label>O que o solicitante deve corrigir *</label><textarea placeholder="Descreva o que precisa ser ajustado para reenvio" oninput="setReenvio(${idx},this.value)">${esc(it.motivoReenvio)}</textarea></div>${obsField}`;
+  }
+  if(it.decision==="diretoria"){
+    return obsField;
+  }
+  if(it.decision==="aprovar" && stage.role==="diretoria"){
+    const v = it.valorAprov!=null ? it.valorAprov : it.valor;
+    return `<div class="field"><label>Valor a reembolsar (R$)</label><input type="number" step="0.01" min="0" value="${v}" oninput="setValor(${idx},this.value)"></div>${obsField}`;
+  }
+  return obsField; // aprovar (gestor/financeiro)
 }
 
-function decide(idx,act){
-  ITEMS[idx].decision=act; if(act==="approve") ITEMS[idx].motivo="";
-  const tr=document.querySelector(`tr[data-idx="${idx}"]`); tr.dataset.state=act;
-  tr.querySelectorAll('.seg button').forEach(b=>b.setAttribute("aria-pressed", b.dataset.act===act));
-  const sel=tr.querySelector("select"); sel.disabled=act!=="reject";
-  if(act!=="reject"){ sel.value=""; sel.dataset.invalid="false"; }
-  updateTally();
+function readonlyInfo(it){
+  let linhas=[];
+  if(it.motivoGestor) linhas.push(`<b>Gestor:</b> reprovado — ${esc(it.motivoGestor)}`);
+  else if(["AGUARDANDO_FINANCEIRO","AGUARDANDO_DIRETORIA","CONCLUIDO_REEMBOLSAR","REPROVADO_FINANCEIRO","REPROVADO_DIRETORIA"].includes(it.etapa)) linhas.push(`<b>Gestor:</b> aprovado`);
+  if(it.decFin) linhas.push(`<b>Financeiro:</b> ${esc(it.decFin)}${it.motFin?" — "+esc(it.motFin):""}`);
+  if(it.decDir) linhas.push(`<b>Diretoria:</b> ${esc(it.decDir)}`);
+  if(it.etapa==="REVISAO_SOLICITANTE" && it.motReenvio) linhas.push(`<b>Aguardando correção do solicitante:</b> ${esc(it.motReenvio)}`);
+  if(it.etapa==="CONCLUIDO_REEMBOLSAR"){ const v=(it.valorAprovSaved!=null&&it.valorAprovSaved!=="")?it.valorAprovSaved:it.valor; linhas.push(`<b>Reembolsar:</b> ${brl(v)}`); }
+  if(!linhas.length) return "";
+  return `<div class="ro-info">${linhas.join("<br>")}</div>`;
 }
-function setMotivo(idx,v){ ITEMS[idx].motivo=v; const s=document.querySelector(`tr[data-idx="${idx}"] select`); if(v) s.dataset.invalid="false"; updateTally(); }
+
+/* ---------------- interações ---------------- */
+function setDecision(idx,act){ const it=ITEMS[idx]; it.decision=(it.decision===act?null:act);
+  if(it.decision!=="reprovar") it.motivo="";
+  if(it.decision!=="reenviar") it.motivoReenvio="";
+  const card=$("#card-"+idx); card.classList.toggle("act", !!it.decision); card.dataset.dec=it.decision||"";
+  card.innerHTML=cardInner(it,idx);   // re-render botões + detalhes juntos
+  updateActionbar();
+}
 function setObs(idx,v){ ITEMS[idx].obs=v; }
+function setMotivo(idx,v){ ITEMS[idx].motivo=v; updateActionbar(); }
+function setReenvio(idx,v){ ITEMS[idx].motivoReenvio=v; updateActionbar(); }
+function setValor(idx,v){ const n=parseFloat(v); ITEMS[idx].valorAprov=isNaN(n)?null:n; }
 
-function updateTally(){
-  const dec=ITEMS.filter(i=>i.decision), ap=ITEMS.filter(i=>i.decision==="approve").length, rp=ITEMS.filter(i=>i.decision==="reject").length;
-  $("#tally").innerHTML = `<b>${dec.length}/${ITEMS.length}</b> decididas <span class="pill ap">${ap} aprovadas</span> <span class="pill rp">${rp} reprovadas</span>`;
-  const ok = dec.length===ITEMS.length && ITEMS.filter(i=>i.decision==="reject").every(i=>i.motivo);
-  $("#saveBtn").disabled = !ok;
+function validDecision(it){
+  if(it.decision==="reprovar") return !!it.motivo;
+  if(it.decision==="reenviar") return !!(it.motivoReenvio && it.motivoReenvio.trim());
+  return true;
+}
+function updateActionbar(){
+  const actionable=ITEMS.filter(canAct);
+  if(!actionable.length){ $("#actionbar").hidden=true; $("#statusSub").textContent="Nenhuma despesa aguardando a sua ação nesta etapa."; return; }
+  $("#actionbar").hidden=false;
+  const decided=actionable.filter(it=>it.decision);
+  $("#tally").innerHTML=`<b>${decided.length}/${actionable.length}</b> decididas nesta etapa`;
+  const ok = decided.length===actionable.length && decided.every(validDecision);
+  $("#saveBtn").disabled=!ok;
 }
 
+/* ---------------- salvar ---------------- */
+function fieldsFor(it){
+  const now=new Date().toISOString(); const stage=canAct(it); const r=stage.role; const d=it.decision;
+  if(r==="gestor"){
+    if(d==="aprovar")  return {[ci(C.status)]:"Aprovado",[ci(C.motivo)]:"",[ci(C.obs)]:it.obs||"",[ci(C.dataAprov)]:now,[ci(C.etapa)]:"AGUARDANDO_FINANCEIRO"};
+    if(d==="reprovar") return {[ci(C.status)]:"Rejeitado",[ci(C.motivo)]:it.motivo,[ci(C.obs)]:it.obs||"",[ci(C.dataAprov)]:now,[ci(C.etapa)]:"REPROVADO_GESTOR"};
+    if(d==="reenviar") return {[ci(C.obs)]:it.obs||"",[ci(C.dataAprov)]:now,[ci(C.motReenvio)]:it.motivoReenvio,[ci(C.etapa)]:"REVISAO_SOLICITANTE"};
+  }
+  if(r==="financeiro"){
+    if(d==="aprovar")   return {[ci(C.decFin)]:"Aprovado",[ci(C.obsFin)]:it.obs||"",[ci(C.dataFin)]:now,[ci(C.valorAprov)]:it.valor,[ci(C.etapa)]:"CONCLUIDO_REEMBOLSAR"};
+    if(d==="reprovar")  return {[ci(C.decFin)]:"Rejeitado",[ci(C.motFin)]:it.motivo,[ci(C.obsFin)]:it.obs||"",[ci(C.dataFin)]:now,[ci(C.etapa)]:"REPROVADO_FINANCEIRO"};
+    if(d==="reenviar")  return {[ci(C.obsFin)]:it.obs||"",[ci(C.dataFin)]:now,[ci(C.motReenvio)]:it.motivoReenvio,[ci(C.etapa)]:"REVISAO_SOLICITANTE"};
+    if(d==="diretoria") return {[ci(C.decFin)]:"Enviar Diretoria",[ci(C.obsFin)]:it.obs||"",[ci(C.dataFin)]:now,[ci(C.etapa)]:"AGUARDANDO_DIRETORIA"};
+  }
+  if(r==="diretoria"){
+    if(d==="aprovar")  return {[ci(C.decDir)]:"Aprovado",[ci(C.obsDir)]:it.obs||"",[ci(C.dataDir)]:now,[ci(C.valorAprov)]:(it.valorAprov!=null?it.valorAprov:it.valor),[ci(C.etapa)]:"CONCLUIDO_REEMBOLSAR"};
+    if(d==="reprovar") return {[ci(C.decDir)]:"Rejeitado",[ci(C.obsDir)]:it.obs||"",[ci(C.dataDir)]:now,[ci(C.etapa)]:"REPROVADO_DIRETORIA"};
+  }
+  return null;
+}
+async function persist(){
+  if(!SITEID){ const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`); SITEID=site.id; await resolveColumns(); }
+  const toSave=ITEMS.filter(it=>canAct(it)&&it.decision);
+  for(const it of toSave){
+    const fields=fieldsFor(it); if(!fields) continue;
+    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
+  }
+}
 $("#saveBtn").addEventListener("click", async ()=>{
-  let bad=false;
-  ITEMS.forEach((it,idx)=>{ if(it.decision==="reject" && !it.motivo){ bad=true; document.querySelector(`tr[data-idx="${idx}"] select`).dataset.invalid="true"; }});
-  if(bad){ toast("Selecione o motivo das despesas reprovadas.","err"); return; }
+  const actionable=ITEMS.filter(canAct); const decided=actionable.filter(it=>it.decision);
+  let bad=false; decided.forEach(it=>{ if(!validDecision(it)) bad=true; });
+  if(bad){ toast("Preencha o motivo (reprovação) ou o texto de correção (reenvio).","err"); return; }
   const btn=$("#saveBtn"); btn.disabled=true; btn.textContent="Salvando...";
   try{
-    if(DEMO){ await new Promise(r=>setTimeout(r,700)); } else { await persist(); }
-    toast("Decisões salvas com sucesso.");
-    setTimeout(()=>{ if(!DEMO) loadItems(); }, 900);
+    if(DEMO){ await new Promise(r=>setTimeout(r,700)); toast("Decisões salvas (demonstração)."); btn.textContent="Salvar decisões"; }
+    else { await persist(); toast("Decisões salvas com sucesso."); setTimeout(loadItems,900); }
   }catch(e){ toast("Erro ao salvar: "+e.message,"err"); btn.disabled=false; btn.textContent="Salvar decisões"; }
 });
 
+/* ---------------- helpers ---------------- */
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
-function pickEmail(v){
-  if(!v) return "";
-  if(Array.isArray(v)) return pickEmail(v[0]);
-  if(typeof v==="string"){
-    var parts=v.split(",#");                       // formato Pessoa: "Nome,#email"
-    var cand=(parts.length>1?parts[1]:v).trim();
-    return cand.indexOf("@")>-1 ? cand.toLowerCase() : "";
-  }
-  return String(v.Email||v.email||v.userPrincipalName||"").toLowerCase();
-}
-function pickName(v){
-  if(!v) return "";
-  if(Array.isArray(v)) return pickName(v[0]);
-  if(typeof v==="string") return v.split(",#")[0].trim();
-  return String(v.LookupValue||v.DisplayName||v.displayName||v.title||"").trim();
-}
-function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(kind==="err"?" err":""); setTimeout(()=>t.className="toast",3200); }
+function pickEmail(v){ if(!v) return ""; if(Array.isArray(v)) return pickEmail(v[0]); if(typeof v==="string"){ var p=v.split(",#"); var c=(p.length>1?p[1]:v).trim(); return c.indexOf("@")>-1?c.toLowerCase():""; } return String(v.Email||v.email||v.userPrincipalName||"").toLowerCase(); }
+function pickName(v){ if(!v) return ""; if(Array.isArray(v)) return pickName(v[0]); if(typeof v==="string") return v.split(",#")[0].trim(); return String(v.LookupValue||v.DisplayName||v.displayName||v.title||"").trim(); }
+function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(kind==="err"?" err":""); setTimeout(()=>t.className="toast",3400); }
 function demoItems(){
+  const base={prestacao:"PREST-DEMO",nome:"Leonardo Carolino",departamento:"TECNOLOGIA DA INFORMACAO",data:"2026-07-01",gestorEmail:"leonardo@polystell.com.br",gestorNome:"Leonardo Carolino",motivoGestor:"",obsGestor:"",decFin:"",motFin:"",obsFin:"",decDir:"",obsDir:"",valorAprovSaved:null,motReenvio:"",contReenvio:0,decision:null,obs:"",motivo:"",motivoReenvio:"",valorAprov:null};
   return [
-    {id:"d1",title:"Despesa I",  categoria:"ALIMENTAÇÃO",            tipo:"Refeição",   valor:10, prestacao:"PREST-DEMO", nome:"Jaqueline Scapolatempore", departamento:"Comercial", data:"2026-05-25", decision:null,motivo:"",obs:""},
-    {id:"d2",title:"Despesa II", categoria:"VIAGENS E DESLOCAMENTOS",tipo:"Combustível",valor:20, prestacao:"PREST-DEMO", nome:"Jaqueline Scapolatempore", departamento:"Comercial", data:"2026-05-25", decision:null,motivo:"",obs:""},
-    {id:"d3",title:"Despesa III",categoria:"MATERIAIS E SUPRIMENTOS",tipo:"Escritório", valor:30, prestacao:"PREST-DEMO", nome:"Jaqueline Scapolatempore", departamento:"Comercial", data:"2026-05-25", decision:null,motivo:"",obs:""}
+    {...base,id:"d1",title:"Despesa I",categoria:"ALIMENTACAO",tipo:"COFFEE BREAK",valor:10,etapa:"AGUARDANDO_GESTOR"},
+    {...base,id:"d2",title:"Despesa II",categoria:"VIAGENS E DESLOCAMENTOS",tipo:"PEDAGIO",valor:50,etapa:"AGUARDANDO_FINANCEIRO"},
+    {...base,id:"d3",title:"Despesa III",categoria:"MARKETING E COMUNICACAO",tipo:"GRAFICA",valor:100,etapa:"AGUARDANDO_DIRETORIA"},
+    {...base,id:"d4",title:"Despesa IV",categoria:"MATERIAIS",tipo:"ESCRITORIO",valor:80,etapa:"CONCLUIDO_REEMBOLSAR",decFin:"Aprovado",valorAprovSaved:80}
   ];
 }
 </script>
