@@ -190,7 +190,9 @@ const C = {
   // diretoria
   decDir:"DECISAO_DIRETORIA", obsDir:"COMENTARIO_DIRETORIA", dataDir:"DATA_DIRETORIA", valorAprov:"VALOR_APROVADO",
   // reenvio
-  motReenvio:"MOTIVO_REENVIO", contReenvio:"CONTADOR_REENVIO"
+  motReenvio:"MOTIVO_REENVIO", contReenvio:"CONTADOR_REENVIO",
+  // controle de notificação (trava do e-mail agrupado)
+  notifEtapa:"NOTIFICADO_ETAPA"
 };
 
 const MOTIVOS = ["Sem comprovante fiscal","Valor acima da política","Despesa não elegível","Comprovante ilegível","Duplicidade","Outro"];
@@ -430,6 +432,7 @@ async function persist(){
   const toSave=ITEMS.filter(it=>canAct(it)&&it.decision);
   for(const it of toSave){
     const fields=fieldsFor(it); if(!fields) continue;
+    fields[ci(C.notifEtapa)]="";   // mudou de etapa -> rearma a trava do e-mail agrupado
     await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
   }
 }
