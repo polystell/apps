@@ -367,35 +367,39 @@ async function persist(){
   if(!SITEID){ const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`); SITEID=site.id; await resolveColumns(); }
   for(const it of ITEMS){
     const prox=(it.contReenvio||0)+1;
-    const fields={
-      [ci(C.categoria)]: it.categoria,
-      [ci(C.tipo)]:      it.tipo,
-      [ci(C.valor)]:     Number(it.valor),
-      [ci(C.descricao)]: it.descricao||"",
-      [ci(C.etapa)]:     "AGUARDANDO_GESTOR",           // volta pro gestor
-      [ci(C.contReenvio)]: prox,                        // incrementa reenvio
-      [ci(C.notifEtapa)]:  "",                          // rearma trava de notificação
-      [ci(C.motReenvio)]:  ""                           // limpa o motivo (foi corrigido)
-    };
-    // 1) grava dados + status (isso é o essencial do reenvio)
-    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
-    // 2) Opção B: sobe novo comprovante (mantém original) e atualiza o link em PATCH separado
-    if(it.novoArquivo){
-      const novoLink = await uploadComprovante(it, prox);
-      if(novoLink){
-        try{
-          await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
-            {method:"PATCH",body:JSON.stringify({ [ci(C.linkArquivo)]: novoLink })});
-        }catch(e1){
-          // fallback: alguns tenants exigem o objeto {Url, Description} para coluna Hiperlink
-          await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
-            {method:"PATCH",body:JSON.stringify({ [ci(C.linkArquivo)]: { Url: novoLink, Description: it.novoArquivo.name } })});
-        }
+    const base=`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`;
+    // grava campo por campo, parando (e reportando) no primeiro que o SharePoint recusar
+    const pares=[
+      ["CATEGORIA",      ci(C.categoria), it.categoria],
+      ["TIPO",           ci(C.tipo),      it.tipo],
+      ["VALOR",          ci(C.valor),     Number(it.valor)],
+      ["DESCRICAO",      ci(C.descricao), String(it.descricao||"")],
+      ["STATUS_ETAPA",   ci(C.etapa),     "AGUARDANDO_GESTOR"],
+      ["CONTADOR_REENVIO",ci(C.contReenvio), Number(prox)],
+      ["NOTIFICADO_ETAPA",ci(C.notifEtapa), ""],
+      ["MOTIVO_REENVIO", ci(C.motReenvio), ""]
+    ];
+    for(const [rotulo,campo,valor] of pares){
+      try{
+        await graph(base,{method:"PATCH",body:JSON.stringify({[campo]:valor})});
+        console.log("[reenvio] OK:",rotulo,"("+campo+")");
+      }catch(e){
+        console.error("[reenvio] FALHOU:",rotulo,"("+campo+") =",JSON.stringify(valor),"->",e.message);
+        throw new Error("Campo recusado: "+rotulo+" (coluna interna: "+campo+")");
       }
+    }
+    // comprovante novo (opcional): sobe em DESPESA-XX/REVISAO/rev{n} e atualiza o link em PATCH próprio
+    if(it.novoArquivo){
+      try{
+        const novoLink=await uploadComprovante(it,prox);
+        if(novoLink){
+          try{ await graph(base,{method:"PATCH",body:JSON.stringify({[ci(C.linkArquivo)]:novoLink})}); }
+          catch(_){ await graph(base,{method:"PATCH",body:JSON.stringify({[ci(C.linkArquivo)]:{Url:novoLink,Description:it.novoArquivo.name}})}); }
+        }
+      }catch(eArq){ console.error("[reenvio] comprovante:",eArq.message); throw new Error("Erro no comprovante: "+eArq.message); }
     }
   }
 }
-
 $("#saveBtn").addEventListener("click", async ()=>{
   if(!ITEMS.every(validItem)){ toast("Preencha categoria, tipo e valor (maior que zero) em todas as despesas.","err"); return; }
   const btn=$("#saveBtn"); btn.disabled=true; btn.textContent="Reenviando...";
