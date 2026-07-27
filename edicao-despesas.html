@@ -335,20 +335,26 @@ function updateTally(){
   $("#saveBtn").disabled=!ok || !ITEMS.length;
 }
 
-function baseDespesa(it){
-  // "PREST-44-D01" -> "DESPESA-01"  |  fallback: usa o Title
-  const m=(it.title||"").match(/D(\d+)\s*$/i);
-  return m ? ("DESPESA-"+m[1]) : (it.title||"DESPESA");
+// Extrai a pasta da despesa (ex.: "Despesas/PREST-51/DESPESA-01") a partir do LINK_ARQUIVO atual.
+function pastaDaDespesa(it){
+  const link = it.linkAtual || "";
+  // procura ".../Despesas/PREST-XX/DESPESA-YY" no link (com ou sem %20)
+  const m = decodeURIComponent(link).match(/Despesas\/[^\/]+\/DESPESA-\d+/i);
+  if(m) return m[0];
+  // fallback: tenta pelo Title "PREST-51-D01" -> Despesas/PREST-51/DESPESA-01
+  const prest = (PRESTID||it.prestacao);
+  const md = (it.title||"").match(/D(\d+)\s*$/i);
+  if(md) return `Despesas/${prest}/DESPESA-${md[1]}`;
+  // último fallback: raiz da prestação
+  return `Despesas/${prest}`;
 }
 function extDe(nome){ const p=(nome||"").split("."); return p.length>1 ? "."+p.pop().toLowerCase() : ""; }
 
 async function uploadComprovante(it, revisao){
-  // sobe em: /Documentos/Despesas/PREST-XX/DESPESA-01-rev{n}.ext  (mantém o original)
-  const prest=(PRESTID||it.prestacao);
-  const nomeBase=baseDespesa(it);
-  const ext=extDe(it.novoArquivo.name);
-  const nomeFinal=`${nomeBase}-rev${revisao}${ext}`;
-  const caminho=`Despesas/${prest}/${nomeFinal}`;
+  // Opção B: cria subpasta REVISAO dentro da pasta da despesa e sobe rev{n}.ext (mantém o original)
+  const pasta   = pastaDaDespesa(it);
+  const ext     = extDe(it.novoArquivo.name);
+  const caminho = `${pasta}/REVISAO/rev${revisao}${ext}`;
   const t=await token();
   const url=`https://graph.microsoft.com/v1.0/sites/${SITEID}/drive/root:/${encodeURI(caminho)}:/content`;
   const r=await fetch(url,{method:"PUT",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/octet-stream"},body:it.novoArquivo});
@@ -371,12 +377,22 @@ async function persist(){
       [ci(C.notifEtapa)]:  "",                          // rearma trava de notificação
       [ci(C.motReenvio)]:  ""                           // limpa o motivo (foi corrigido)
     };
-    // Opção B: sobe novo comprovante como nova versão (mantém o original), atualiza o link
+    // 1) grava dados + status (isso é o essencial do reenvio)
+    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
+    // 2) Opção B: sobe novo comprovante (mantém original) e atualiza o link em PATCH separado
     if(it.novoArquivo){
       const novoLink = await uploadComprovante(it, prox);
-      if(novoLink){ fields[ci(C.linkArquivo)] = { "Url": novoLink, "Description": it.novoArquivo.name }; }
+      if(novoLink){
+        try{
+          await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
+            {method:"PATCH",body:JSON.stringify({ [ci(C.linkArquivo)]: novoLink })});
+        }catch(e1){
+          // fallback: alguns tenants exigem o objeto {Url, Description} para coluna Hiperlink
+          await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,
+            {method:"PATCH",body:JSON.stringify({ [ci(C.linkArquivo)]: { Url: novoLink, Description: it.novoArquivo.name } })});
+        }
+      }
     }
-    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
   }
 }
 
