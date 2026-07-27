@@ -393,10 +393,26 @@ async function persist(){
       try{
         const novoLink=await uploadComprovante(it,prox);
         if(novoLink){
-          try{ await graph(base,{method:"PATCH",body:JSON.stringify({[ci(C.linkArquivo)]:novoLink})}); }
-          catch(_){ await graph(base,{method:"PATCH",body:JSON.stringify({[ci(C.linkArquivo)]:{Url:novoLink,Description:it.novoArquivo.name}})}); }
+          const campo=ci(C.linkArquivo);
+          // coluna "Hiperlink ou Imagem": o Graph aceita o objeto {Url, Description}.
+          // tentamos algumas formas conhecidas; se todas falharem, o reenvio (dados) já foi gravado.
+          const tentativas=[
+            { [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
+            { [campo+"@odata.type"]: "microsoft.graph.SharePointFieldValue", [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
+            { [campo]: novoLink }
+          ];
+          let linkOk=false, ultimoErro="";
+          for(const corpo of tentativas){
+            try{ await graph(base,{method:"PATCH",body:JSON.stringify(corpo)}); linkOk=true; break; }
+            catch(e){ ultimoErro=e.message; }
+          }
+          if(!linkOk){
+            // não trava o reenvio: dados já foram salvos e o arquivo já está na pasta REVISAO
+            console.warn("[reenvio] link não atualizado (arquivo salvo na pasta mesmo assim):",ultimoErro);
+            toast("Despesa reenviada. O novo comprovante foi salvo na pasta, mas o link não atualizou automaticamente.","");
+          }
         }
-      }catch(eArq){ console.error("[reenvio] comprovante:",eArq.message); throw new Error("Erro no comprovante: "+eArq.message); }
+      }catch(eArq){ console.error("[reenvio] upload comprovante:",eArq.message); throw new Error("Erro ao subir o comprovante: "+eArq.message); }
     }
   }
 }
