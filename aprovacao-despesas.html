@@ -289,6 +289,18 @@ async function loadItems(){
       };
     }).sort((a,b)=> (a.title||"").localeCompare(b.title||""));
 
+    // ---- diagnóstico do campo Gestor (temporário) ----
+    if(ITEMS.length){
+      const g0=ITEMS[0];
+      console.log("[gestor-diag] ME:",ME,"| MENAME:",MENAME);
+      console.log("[gestor-diag] extraído -> gestorEmail:",JSON.stringify(g0.gestorEmail)," gestorNome:",JSON.stringify(g0.gestorNome));
+      // dump bruto do campo Gestor e variações que o Graph pode retornar
+      try{
+        const raw=(data.value&&data.value[0]&&data.value[0].fields)||{};
+        const chaves=Object.keys(raw).filter(k=>k.toLowerCase().indexOf("gestor")>-1);
+        chaves.forEach(k=>console.log("[gestor-diag] campo bruto",k,"=",JSON.stringify(raw[k])));
+      }catch(e){}
+    }
     // ---- gate de acesso ----
     if(ITEMS.length){
       const isGestor=ITEMS.some(it=> (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME));
