@@ -227,6 +227,20 @@ async function graph(url,opt={}){ const t=await token(); const r=await fetch(url
 async function resolveColumns(){ try{ const d=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/columns?$select=name,displayName`); (d.value||[]).forEach(c=>{COLMAP[c.name]=c.name; if(c.displayName)COLMAP[c.displayName]=c.name;}); }catch(e){} }
 function ci(x){ return COLMAP[x]||x; }
 
+async function resolveSolicitantes(){
+  const ids=[...new Set(ITEMS.map(i=>i.solicitanteLookupId).filter(Boolean))];
+  const cache={};
+  for(const id of ids){
+    if(cache[id]) continue;
+    let u=null;
+    for(const nome of ["User Information List","Usuários do Site"]){
+      try{ u=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${encodeURIComponent(nome)}/items/${id}?$expand=fields`); if(u) break; }catch(e){}
+    }
+    if(u&&u.fields){ cache[id]={ email:String(u.fields.EMail||u.fields.Email||u.fields.UserName||"").toLowerCase(), nome:String(u.fields.Title||"").trim() }; }
+  }
+  ITEMS.forEach(it=>{ const c=cache[it.solicitanteLookupId]; if(c){ if(!it.solicitanteEmail) it.solicitanteEmail=c.email; if(!it.solicitanteNome) it.solicitanteNome=c.nome; } });
+}
+
 async function loadItems(){
   try{
     const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
@@ -240,6 +254,7 @@ async function loadItems(){
       return {
         id:it.id, title:f[C.titulo]||"", prestacao:f[C.prestacao]||"", nome:f[C.nome]||"", departamento:f[C.departamento]||"", data:f[C.data]||"",
         solicitanteEmail:pickEmail(f[C.solicitanteEmail]), solicitanteNome:pickName(f[C.solicitanteEmail]),
+        solicitanteLookupId:(f["SolicitanteLookupId"]!=null?String(f["SolicitanteLookupId"]):(f[ci(C.solicitanteEmail)+"LookupId"]!=null?String(f[ci(C.solicitanteEmail)+"LookupId"]):"")),
         motReenvio:f[C.motReenvio]||"", contReenvio:Number(f[C.contReenvio]||0),
         // editáveis:
         categoria:f[C.categoria]||"", tipo:f[C.tipo]||"", valor:Number(f[C.valor]||0), descricao:f[C.descricao]||"",
@@ -248,6 +263,7 @@ async function loadItems(){
       };
     }).sort((a,b)=>(a.title||"").localeCompare(b.title||""));
 
+    await resolveSolicitantes();   // resolve LookupId do campo Pessoa "Solicitante" -> e-mail/nome
     // gate: só o solicitante (ou supervisores)
     if(ITEMS.length){
       const isDono=ITEMS.some(it=>(it.solicitanteEmail&&it.solicitanteEmail===ME)||(it.solicitanteNome&&it.solicitanteNome.toLowerCase()===MENAME));
