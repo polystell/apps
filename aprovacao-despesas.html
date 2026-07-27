@@ -301,17 +301,19 @@ async function loadItems(){
 }
 
 /* papel de quem está logado PARA um item (prioridade: financeiro/diretoria globais, depois gestor do item) */
-function roleFor(it){
-  if(ME===FINANCEIRO.toLowerCase()) return "financeiro";
-  if(ME===DIRETORIA.toLowerCase())  return "diretoria";
-  if((it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME)) return "gestor";
-  return null;
+function ehGestorDe(it){
+  return (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME);
 }
-/* retorna o STAGE se o usuário pode agir nesta linha agora, senão null */
+/* Cada um age SOMENTE no seu papel real, decidido PELA ETAPA da despesa.
+   Assim quem acumula papéis (ex.: Samar = diretoria E gestora) age no papel certo
+   conforme a etapa: como gestora numa despesa AGUARDANDO_GESTOR onde é a gestora,
+   e como diretoria numa AGUARDANDO_DIRETORIA. Supervisor vê tudo, mas não age fora do papel. */
 function canAct(it){
-  const stage=STAGES[it.etapa]; if(!stage) return null;   // estados terminais / revisão -> sem ação aqui
-  if(ISSUPER) return stage;                               // supervisor age em qualquer etapa ativa
-  return roleFor(it)===stage.role ? stage : null;
+  const stage=STAGES[it.etapa]; if(!stage) return null;   // terminais / revisão -> sem ação
+  if(stage.role==="gestor")     return ehGestorDe(it) ? stage : null;
+  if(stage.role==="financeiro") return ME===FINANCEIRO.toLowerCase() ? stage : null;
+  if(stage.role==="diretoria")  return ME===DIRETORIA.toLowerCase()  ? stage : null;
+  return null;
 }
 
 /* ---------------- render ---------------- */
