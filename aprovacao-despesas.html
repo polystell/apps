@@ -264,6 +264,31 @@ async function resolveColumns(){ try{ const d=await graph(`https://graph.microso
 function ci(x){ return COLMAP[x]||x; }
 
 /* ---------------- data ---------------- */
+async function resolveGestores(){
+  // O Graph devolve o campo Pessoa "Gestor" apenas como GestorLookupId (número).
+  // Aqui resolvemos cada ID único para e-mail/nome usando a lista de usuários do site.
+  const ids=[...new Set(ITEMS.map(i=>i.gestorLookupId).filter(Boolean))];
+  const cache={};
+  for(const id of ids){
+    if(cache[id]) continue;
+    let u=null;
+    // tenta pela lista "User Information List" (padrão em inglês) e depois "Usuários do Site"
+    for(const nome of ["User Information List","Usuários do Site"]){
+      try{
+        u=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${encodeURIComponent(nome)}/items/${id}?$expand=fields`);
+        if(u) break;
+      }catch(e){}
+    }
+    if(u&&u.fields){
+      cache[id]={ email:String(u.fields.EMail||u.fields.Email||u.fields.UserName||"").toLowerCase(), nome:String(u.fields.Title||"").trim() };
+    }
+  }
+  ITEMS.forEach(it=>{
+    const c=cache[it.gestorLookupId];
+    if(c){ if(!it.gestorEmail) it.gestorEmail=c.email; if(!it.gestorNome) it.gestorNome=c.nome; }
+  });
+}
+
 async function loadItems(){
   try{
     const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
@@ -279,6 +304,7 @@ async function loadItems(){
         valor:Number(f[C.valor]||0), prestacao:f[C.prestacao]||"", nome:f[C.nome]||"",
         departamento:f[C.departamento]||"", data:f[C.data]||"",
         gestorEmail:pickEmail(f[C.gestorEmail]), gestorNome:pickName(f[C.gestorEmail]),
+        gestorLookupId:(f["GestorLookupId"]!=null?String(f["GestorLookupId"]):(f[ci(C.gestorEmail)+"LookupId"]!=null?String(f[ci(C.gestorEmail)+"LookupId"]):"")),
         etapa:f[C.etapa]||"AGUARDANDO_GESTOR",
         motivoGestor:f[C.motivo]||"", obsGestor:f[C.obs]||"",
         decFin:f[C.decFin]||"", motFin:f[C.motFin]||"", obsFin:f[C.obsFin]||"",
@@ -289,6 +315,7 @@ async function loadItems(){
       };
     }).sort((a,b)=> (a.title||"").localeCompare(b.title||""));
 
+    await resolveGestores();   // resolve o LookupId do campo Pessoa -> e-mail/nome real
     // ---- diagnóstico do campo Gestor (temporário) ----
     if(ITEMS.length){
       const g0=ITEMS[0];
