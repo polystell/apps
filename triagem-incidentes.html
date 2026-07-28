@@ -205,8 +205,7 @@ const CONFIG = {
   tenantId: "fdb7cb21-cc9d-4f32-bb70-e71cad1eb164",
   siteHost: "polystellcombr.sharepoint.com",
   sitePath: "/sites/Apps",
-  listId:   "e67185c1-7d9f-43fb-8c55-38c200fa9d54",
-  flowUrl:  "COLAR_URL_DO_FLUXO_AQUI"
+  listId:   "e67185c1-7d9f-43fb-8c55-38c200fa9d54"
 };
 
 const TIPOS = [
@@ -345,10 +344,7 @@ async function confirmar(){
   btn.disabled=true; btn.textContent="Enviando…";
   try{
     await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${ITEMID}/fields`,{method:"PATCH",body:JSON.stringify(payload)});
-    if(CONFIG.flowUrl && !CONFIG.flowUrl.startsWith("COLAR")){
-      await fetch(CONFIG.flowUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:ITEMID,tipoValidado:$("#v_tipo").value})});
-    }
-    toast("Triagem registrada e orientação enviada.");
+    toast("Triagem registrada. A orientação será enviada ao usuário.");
     btn.textContent="Concluído ✓";
   }catch(e){ toast("Erro ao salvar: "+e.message,"err"); btn.disabled=false; btn.textContent="Confirmar e enviar orientação"; }
 }
