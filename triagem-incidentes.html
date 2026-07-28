@@ -305,13 +305,13 @@ function render(f){
   $("#u_dp").textContent=dpU.join("; ")||"—";
   $("#u_desc").textContent=f.DESCRICAO||"—";
 
-  setSel("#v_grav", val(f.GRAVIDADE_VALIDADA)||val(f.GRAVIDADE_USUARIO));
+  setSel("#v_grav", raw(f.GRAVIDADE_VALIDADA)||raw(f.GRAVIDADE_USUARIO));
   const impV=toArr(f.IMPACTO_VALIDADO);
   setMulti("#v_imp", impV.length?impV:impU);
-  setSel("#v_resp", val(f.RESPONSAVEL_TRIAGEM)||RESPONSAVEIS[0]);
+  setSel("#v_resp", raw(f.RESPONSAVEL_TRIAGEM)||RESPONSAVEIS[0]);
 
-  const tv=val(f.TIPO_VALIDADO), tu=val(f.TIPO_USUARIO);
-  if(tv && tv!=="—"){ setSel("#v_tipo",tv); }
+  const tv=raw(f.TIPO_VALIDADO), tu=raw(f.TIPO_USUARIO);
+  if(tv){ setSel("#v_tipo",tv); }
   else{
     const sug=sugerir((f.DESCRICAO||"")+" "+(tu||""));
     setSel("#v_tipo", sug||tu);
@@ -355,6 +355,7 @@ async function confirmar(){
 
 /* helpers */
 function val(f){ return (f&&typeof f==="object"&&"Value"in f)?f.Value:(f??"—"); }
+function raw(f){ const v=(f&&typeof f==="object"&&"Value"in f)?f.Value:f; return (v==null||v==="")?"":v; }
 function toArr(f){ if(!f)return[]; if(Array.isArray(f))return f.map(x=>(x&&x.Value)?x.Value:x); return String(f).split(";").map(s=>s.trim()).filter(Boolean); }
 function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(kind==="err"?" err":""); setTimeout(()=>t.className="toast",3400); }
 
