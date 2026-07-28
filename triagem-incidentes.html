@@ -333,12 +333,13 @@ async function confirmar(){
   const btn=$("#confirm");
   if(getMulti("#v_imp").length===0) return toast("Selecione ao menos um impacto validado.","err");
   const payload={
-    GRAVIDADE_VALIDADA:{Value:$("#v_grav").value},
-    TIPO_VALIDADO:{Value:$("#v_tipo").value},
-    RESPONSAVEL_TRIAGEM:{Value:$("#v_resp").value},
+    GRAVIDADE_VALIDADA:$("#v_grav").value,
+    TIPO_VALIDADO:$("#v_tipo").value,
+    RESPONSAVEL_TRIAGEM:$("#v_resp").value,
+    "IMPACTO_VALIDADO@odata.type":"Collection(Edm.String)",
     IMPACTO_VALIDADO:getMulti("#v_imp"),
     DATA_TRIAGEM:new Date().toISOString(),
-    STATUS:{Value:"Em Tratamento"}
+    STATUS:"Em Tratamento"
   };
   if(DEMO){ toast("Modo demo: triagem não é gravada."); return; }
   btn.disabled=true; btn.textContent="Enviando…";
