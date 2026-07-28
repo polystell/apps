@@ -178,6 +178,35 @@
         <div class="field" style="margin-top:12px"><label>Responsável pela triagem</label><select id="v_resp"></select></div>
       </div>
     </div>
+
+    <!-- ENCERRAMENTO (aparece quando status = Em Tratamento) -->
+    <div class="cols" id="colsEnc" hidden>
+      <div class="card">
+        <div class="section-header">
+          <div class="section-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+          <div class="section-title">Classificação validada</div>
+        </div>
+        <div class="kv"><label>Gravidade</label><span id="e_grav">—</span></div>
+        <div class="kv"><label>Impacto</label><span id="e_imp">—</span></div>
+        <div class="kv"><label>Tipo</label><span id="e_tipo">—</span></div>
+        <div class="kv"><label>Responsável triagem</label><span id="e_resptri">—</span></div>
+        <div class="kv"><label>Orientação enviada</label><span class="desc" id="e_orient">—</span></div>
+        <div class="kv"><label>Resposta do usuário</label><span class="desc" id="e_respuser">—</span></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="section-icon"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="section-title">Encerramento</div>
+        </div>
+        <div class="field"><label>Responsável pelo encerramento</label><select id="c_resp"></select></div>
+        <div class="field" style="margin-top:12px"><label>Causa raiz</label><textarea id="c_causa" rows="3"></textarea></div>
+        <div class="field" style="margin-top:12px"><label>Ações tomadas</label><textarea id="c_acoes" rows="3"></textarea></div>
+        <div class="field" style="margin-top:12px"><label>Recorrente?</label><select id="c_recorrente"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
+        <div class="field" style="margin-top:12px"><label>Resposta do usuário (se houve)</label><textarea id="c_respuser" rows="2"></textarea></div>
+        <div class="field" style="margin-top:12px"><label>Lições aprendidas</label><textarea id="c_licoes" rows="2"></textarea></div>
+      </div>
+    </div>
   </main>
 
   <div class="actionbar">
@@ -316,18 +345,84 @@ function render(f){
     setSel("#v_tipo", sug||tu);
     if(sug && sug!==tu){ const p=$("#sugpill"); p.hidden=false; p.textContent="sugerido pela descrição"; }
   }
+  aplicarFase(st, f);
+}
+
+function aplicarFase(st, f){
+  const enc = (st === "Em Tratamento");
+  const fim = (st === "Encerrado");
+  // triagem visível só quando Aberto
+  document.querySelector(".cols").hidden = enc || fim;
+  $("#colsEnc").hidden = !enc && !fim;
+
+  if(enc || fim){
+    // preenche o resumo da classificação validada
+    $("#e_grav").textContent = val(f.GRAVIDADE_VALIDADA) || "—";
+    $("#e_imp").textContent  = toArr(f.IMPACTO_VALIDADO).join("; ") || "—";
+    $("#e_tipo").textContent = val(f.TIPO_VALIDADO) || "—";
+    $("#e_resptri").textContent = val(f.RESPONSAVEL_TRIAGEM) || "—";
+    $("#e_orient").textContent  = (f.ORIENTACAO_ENVIADA||"—").replace(/<br\s*\/?>/gi, "\n");
+    $("#e_respuser").textContent = f.RESPOSTA_USUARIO || "—";
+    // pré-preenche campos de encerramento se já existirem
+    setSel("#c_resp", raw(f.RESPONSAVEL_ENCERRAMENTO) || RESPONSAVEIS[0]);
+    if(f.CAUSA_RAIZ) $("#c_causa").value = f.CAUSA_RAIZ;
+    if(f.ACOES_TOMADAS) $("#c_acoes").value = f.ACOES_TOMADAS;
+    setSel("#c_recorrente", raw(f.RECORRENTE) || "Não");
+    if(f.RESPOSTA_USUARIO) $("#c_respuser").value = f.RESPOSTA_USUARIO;
+    if(f.LICOES_APRENDIDAS) $("#c_licoes").value = f.LICOES_APRENDIDAS;
+  }
+
+  // ajusta o botão de ação conforme a fase
+  const btn = $("#confirm"); const tally = $("#tally");
+  if(fim){
+    btn.textContent = "Incidente encerrado";
+    btn.disabled = true;
+    tally.textContent = "Este incidente já foi encerrado.";
+  } else if(enc){
+    btn.textContent = "Registrar encerramento";
+    btn.onclick = encerrar;
+    tally.innerHTML = "Preencha causa raiz e ações para <b>encerrar</b> o incidente.";
+  } else {
+    btn.textContent = "Confirmar e enviar orientação";
+    btn.onclick = confirmar;
+    tally.innerHTML = "A orientação será enviada ao usuário com base no <b>tipo validado</b>.";
+  }
 }
 
 function buildControls(){
-  fill("#v_grav",GRAVIDADES); fill("#v_tipo",TIPOS); fill("#v_resp",RESPONSAVEIS);
+  fill("#v_grav",GRAVIDADES); fill("#v_tipo",TIPOS); fill("#v_resp",RESPONSAVEIS); fill("#c_resp",RESPONSAVEIS);
   $("#v_imp").innerHTML=IMPACTOS.map(o=>`<label><input type="checkbox" value="${o}"> ${o}</label>`).join("");
-  $("#confirm").addEventListener("click",confirmar);
+  /* botão definido dinamicamente em aplicarFase */
 }
 function fill(sel,opts){ $(sel).innerHTML=opts.map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join(""); }
 function setSel(sel,v){ if(v&&v!=="—") $(sel).value=v; }
 function setMulti(sel,arr){ $(sel).querySelectorAll("input").forEach(cb=>cb.checked=arr.includes(cb.value)); }
 function getMulti(sel){ return [...$(sel).querySelectorAll("input:checked")].map(cb=>cb.value); }
 function sugerir(txt){ const t=txt.toLowerCase(); for(const r of REGRAS){ if(r.kw.some(k=>t.includes(k))) return r.tipo; } return null; }
+
+async function encerrar(){
+  const btn = $("#confirm");
+  if(!$("#c_causa").value.trim() || !$("#c_acoes").value.trim())
+    return toast("Preencha causa raiz e ações tomadas.","err");
+  const payload = {
+    STATUS: "Encerrado",
+    RESPONSAVEL_ENCERRAMENTO: $("#c_resp").value,
+    DATA_ENCERRAMENTO: new Date().toISOString(),
+    CAUSA_RAIZ: $("#c_causa").value.trim(),
+    ACOES_TOMADAS: $("#c_acoes").value.trim(),
+    RECORRENTE: $("#c_recorrente").value,
+    RESPOSTA_USUARIO: $("#c_respuser").value.trim(),
+    LICOES_APRENDIDAS: $("#c_licoes").value.trim()
+  };
+
+  if(DEMO){ toast("Modo demo: encerramento não é gravado."); return; }
+  btn.disabled = true; btn.textContent = "Encerrando…";
+  try{
+    await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${ITEMID}/fields`,{method:"PATCH",body:JSON.stringify(payload)});
+    toast("Incidente encerrado com sucesso.");
+    btn.textContent = "Incidente encerrado ✓";
+  }catch(e){ toast("Erro ao encerrar: "+e.message,"err"); btn.disabled=false; btn.textContent="Registrar encerramento"; }
+}
 
 async function confirmar(){
   const btn=$("#confirm");
@@ -357,7 +452,10 @@ function toArr(f){ if(!f)return[]; if(Array.isArray(f))return f.map(x=>(x&&x.Val
 function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(kind==="err"?" err":""); setTimeout(()=>t.className="toast",3400); }
 
 function loadDemo(){
-  render({STATUS:{Value:"Aberto"},NOME_USUARIO:"Pamela",DEPARTAMENTO:{Value:"Financeiro"},DATA_INCIDENTE:"2026-06-24",GRAVIDADE_USUARIO:{Value:"Baixa"},IMPACTO_USUARIO:["Confidencialidade"],TIPO_USUARIO:{Value:"Vírus de Computador / Malware."},DADOS_PESSOAIS:["Cópias de documentos de identificação oficial."],DESCRICAO:'E-mail de fraude do "Santander" pedindo atualização de dados cadastrais.'});
+  const faseEnc = params.get("fase")==="enc";
+  render({STATUS:{Value: faseEnc?"Em Tratamento":"Aberto"},
+    GRAVIDADE_VALIDADA:{Value:"Baixa"}, IMPACTO_VALIDADO:["Confidencialidade"], TIPO_VALIDADO:{Value:"Roubo de credenciais / Engenharia Social."},
+    RESPONSAVEL_TRIAGEM:{Value:"Leonardo Carolino"}, ORIENTACAO_ENVIADA:"Identificamos que a mensagem é phishing.<br>- Não clique.<br>- Não responda.", RESPOSTA_USUARIO:"",NOME_USUARIO:"Pamela",DEPARTAMENTO:{Value:"Financeiro"},DATA_INCIDENTE:"2026-06-24",GRAVIDADE_USUARIO:{Value:"Baixa"},IMPACTO_USUARIO:["Confidencialidade"],TIPO_USUARIO:{Value:"Vírus de Computador / Malware."},DADOS_PESSOAIS:["Cópias de documentos de identificação oficial."],DESCRICAO:'E-mail de fraude do "Santander" pedindo atualização de dados cadastrais.'});
   $("#proto").textContent="(demo)";
   showApp();
 }
