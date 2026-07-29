@@ -210,7 +210,7 @@ async function init(){
       ITEMS=demoItems(); showApp(); render(); return; }
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
     const resp=await msalApp.handleRedirectPromise();
     account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
@@ -218,7 +218,7 @@ async function init(){
     ISSUPER=SUPERVISORES.map(s=>s.toLowerCase()).includes(ME);
     $("#header-right").innerHTML=`<span class="header-user"><span class="udot"></span>${account.name||account.username}<button onclick="msalApp.logoutRedirect()">Sair</button></span>`;
     await loadItems();
-  }catch(e){ showError("Não foi possível iniciar a página", e.message); }
+  }catch(e){ console.error(e); showError("Não foi possível iniciar a página", "Tente novamente ou contate a TI."); }
 }
 init();
 
@@ -267,11 +267,10 @@ async function loadItems(){
     // gate: só o solicitante (ou supervisores)
     if(ITEMS.length){
       const isDono=ITEMS.some(it=>(it.solicitanteEmail&&it.solicitanteEmail===ME)||(it.solicitanteNome&&it.solicitanteNome.toLowerCase()===MENAME));
-      console.log("[auth] logado:",ME,"| super:",ISSUPER,"| dono:",isDono);
       if(!ISSUPER && !isDono){ showError("Acesso não autorizado","Você não é o solicitante desta prestação de contas. Se precisar de acesso, contate a TI."); return; }
     }
     showApp(); render();
-  }catch(e){ showError("Não foi possível carregar as despesas", e.message); }
+  }catch(e){ console.error(e); showError("Não foi possível carregar as despesas", "Tente novamente ou contate a TI."); }
 }
 
 function render(){
@@ -318,7 +317,7 @@ function cardInner(it,idx){
         <textarea oninput="setField(${idx},'descricao',this.value)">${esc(it.descricao)}</textarea>
       </div>
       <div class="field full"><label>Comprovante (opcional — anexe se precisar corrigir a nota)</label>
-        ${it.linkAtual?`<a href="${esc(it.linkAtual)}" target="_blank" style="font-size:12.5px;color:#5b3a99;text-decoration:none;display:inline-block;margin-bottom:6px;">📎 Ver comprovante atual</a>`:``}
+        ${/^https?:\/\//i.test(it.linkAtual||"")?`<a href="${esc(it.linkAtual)}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px;color:#5b3a99;text-decoration:none;display:inline-block;margin-bottom:6px;">📎 Ver comprovante atual</a>`:``}
         <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange="setArquivo(${idx},this.files[0])">
         <div id="arq-${idx}" style="font-size:12px;color:#6b7280;margin-top:4px;"></div>
       </div>

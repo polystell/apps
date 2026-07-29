@@ -294,7 +294,7 @@ async function init(){
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     if(!ITEMID){ showError("Link inválido","Este link não traz o número do incidente (?id=). Abra pelo botão do e-mail."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
     const resp=await msalApp.handleRedirectPromise();
     account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
@@ -302,7 +302,7 @@ async function init(){
     $("#header-right").innerHTML=`<span class="header-user"><span class="udot"></span>${account.name||ME} <button id="logout">Sair</button></span>`;
     $("#logout").onclick=()=>{ sessionStorage.clear(); msalApp.logoutRedirect(); };
     await loadItem();
-  }catch(e){ showError("Não foi possível iniciar a página", e.message); }
+  }catch(e){ console.error(e); showError("Não foi possível iniciar a página", "Tente novamente ou contate a TI."); }
 }
 
 async function token(){ const req={scopes:["Sites.ReadWrite.All"],account}; try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; } }
