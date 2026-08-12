@@ -53,6 +53,8 @@
   .dcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .dcard-name{font-size:14.5px;font-weight:600;color:#111827}
   .dcard-tag{font-size:12px;color:#6b7280;margin-top:2px}
+  .comprov-link{display:inline-block;margin-top:8px;font-size:12.5px;color:#185fa5;text-decoration:none;font-weight:500}
+  .comprov-link:hover{text-decoration:underline}
   .dcard-right{text-align:right;white-space:nowrap}
   .dcard-val{font-size:14.5px;font-weight:600;color:#111827;font-variant-numeric:tabular-nums}
   .dcard-val small{display:block;font-size:11px;color:#15803d;font-weight:600;margin-top:2px}
@@ -192,7 +194,8 @@ const C = {
   // reenvio
   motReenvio:"MOTIVO_REENVIO", contReenvio:"CONTADOR_REENVIO",
   // controle de notificação (trava do e-mail agrupado)
-  notifEtapa:"NOTIFICADO_ETAPA"
+  notifEtapa:"NOTIFICADO_ETAPA",
+  linkArquivo:"LINK_ARQUIVO"
 };
 
 const MOTIVOS = ["Sem comprovante fiscal","Valor acima da política","Despesa não elegível","Comprovante ilegível","Duplicidade","Outro"];
@@ -247,14 +250,14 @@ async function init(){
       ITEMS=demoItems(); showApp(); render(); return; }
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
     const resp=await msalApp.handleRedirectPromise();
     account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
     ME=(account.username||"").toLowerCase().trim(); MENAME=(account.name||"").toLowerCase().trim();
     ISSUPER=SUPERVISORES.map(s=>s.toLowerCase()).includes(ME);
     await loadItems();
-  }catch(e){ console.error(e); showError("Não foi possível iniciar a página", "Tente novamente ou contate a TI."); }
+  }catch(e){ showError("Não foi possível iniciar a página", e.message); }
 }
 init();
 
@@ -306,6 +309,7 @@ async function loadItems(){
         gestorEmail:pickEmail(f[C.gestorEmail]), gestorNome:pickName(f[C.gestorEmail]),
         gestorLookupId:(f["GestorLookupId"]!=null?String(f["GestorLookupId"]):(f[ci(C.gestorEmail)+"LookupId"]!=null?String(f[ci(C.gestorEmail)+"LookupId"]):"")),
         etapa:f[C.etapa]||"AGUARDANDO_GESTOR",
+        linkArquivo:(f[C.linkArquivo] && (f[C.linkArquivo].Url||f[C.linkArquivo].url))||(typeof f[C.linkArquivo]==="string"?f[C.linkArquivo]:"")||"",
         motivoGestor:f[C.motivo]||"", obsGestor:f[C.obs]||"",
         decFin:f[C.decFin]||"", motFin:f[C.motFin]||"", obsFin:f[C.obsFin]||"",
         decDir:f[C.decDir]||"", obsDir:f[C.obsDir]||"", valorAprovSaved:f[C.valorAprov],
@@ -320,10 +324,11 @@ async function loadItems(){
     if(ITEMS.length){
       const isGestor=ITEMS.some(it=> (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME));
       const allowed = ISSUPER || ME===FINANCEIRO.toLowerCase() || ME===DIRETORIA.toLowerCase() || isGestor;
+      console.log("[auth] logado:",ME,"| super:",ISSUPER,"| financeiro:",ME===FINANCEIRO.toLowerCase(),"| gestor:",isGestor);
       if(!allowed){ showError("Acesso não autorizado","Você não participa da aprovação desta prestação de contas. Se precisar de acesso, contate a TI."); return; }
     }
     showApp(); render();
-  }catch(e){ console.error(e); showError("Não foi possível carregar as despesas", "Tente novamente ou contate a TI."); }
+  }catch(e){ showError("Não foi possível carregar as despesas", e.message); }
 }
 
 /* papel de quem está logado PARA um item (prioridade: financeiro/diretoria globais, depois gestor do item) */
@@ -363,8 +368,9 @@ function render(){
 function cardInner(it,idx){
   const st=STATUS_META[it.etapa]||{label:it.etapa,cls:"wait"};
   const valExtra = (it.valorAprovSaved!=null && it.valorAprovSaved!=="") ? `<small>Aprovado: ${brl(it.valorAprovSaved)}</small>` : "";
+  const comprovante = it.linkArquivo ? `<a href="${esc(it.linkArquivo)}" target="_blank" rel="noopener" class="comprov-link">&#128206; Ver comprovante</a>` : "";
   const head=`<div class="dcard-head">
-      <div><div class="dcard-name">${esc(it.title)}</div><div class="dcard-tag">${[it.categoria,it.tipo].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div>
+      <div><div class="dcard-name">${esc(it.title)}</div><div class="dcard-tag">${[it.categoria,it.tipo].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div>${comprovante}</div>
       <div class="dcard-right"><div class="dcard-val">${brl(it.valor)}${valExtra}</div><span class="badge ${st.cls}">${st.label}</span></div>
     </div>`;
 
