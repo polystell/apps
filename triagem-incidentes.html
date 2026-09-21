@@ -111,6 +111,20 @@
   .multi{display:flex;flex-direction:column;gap:6px;border:1px solid #d1d5db;border-radius:8px;padding:10px}
   .multi label{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:400;color:#1f2937;cursor:pointer;text-transform:none;letter-spacing:0}
   .sug{font-size:11px;font-weight:600;color:#854d0e;background:#fef9c3;border-radius:999px;padding:2px 9px;margin-left:6px;text-transform:none;letter-spacing:0}
+
+  /* ---- anexos ---- */
+  .attach-list{display:flex;flex-direction:column;gap:8px}
+  .attach-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fafbfc;flex-wrap:wrap}
+  .attach-item.alt{background:#fff;border-style:dashed}
+  .attach-name{font-size:13px;color:#1f2937;display:flex;align-items:center;gap:8px;word-break:break-word;min-width:0}
+  .attach-name svg{width:16px;height:16px;stroke:#6b7280;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+  .attach-btn{font:inherit;font-size:13px;font-weight:600;text-decoration:none;color:#fff;background:#1e3a5f;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+  .attach-btn:hover{background:#16304f}
+  .attach-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .attach-btn.ghost{background:#fff;color:#374151;border:1px solid #d1d5db}
+  .attach-btn.ghost:hover{background:#f3f4f6}
+  .attach-empty{font-size:13px;color:#6b7280;line-height:1.5}
+  @media(max-width:520px){.attach-item{flex-direction:column;align-items:stretch}.attach-btn{justify-content:center}}
 </style>
 </head>
 <body>
@@ -164,6 +178,7 @@
         <div class="kv"><label>Tipo</label><span id="u_tipo">—</span></div>
         <div class="kv"><label>Dados pessoais</label><span id="u_dp">—</span></div>
         <div class="kv"><label>Descrição</label><span class="desc" id="u_desc">—</span></div>
+        <div class="kv" style="margin-bottom:0"><label>Anexos e evidências</label><div class="attach-list js-anexos"></div></div>
       </div>
 
       <!-- DIREITA -->
@@ -192,6 +207,7 @@
         <div class="kv"><label>Responsável triagem</label><span id="e_resptri">—</span></div>
         <div class="kv"><label>Orientação enviada</label><span class="desc" id="e_orient">—</span></div>
         <div class="kv"><label>Resposta do usuário</label><span class="desc" id="e_respuser">—</span></div>
+        <div class="kv" style="margin-bottom:0"><label>Anexos e evidências</label><div class="attach-list js-anexos"></div></div>
       </div>
 
       <div class="card">
@@ -345,7 +361,54 @@ function render(f){
     setSel("#v_tipo", sug||tu);
     if(sug && sug!==tu){ const p=$("#sugpill"); p.hidden=false; p.textContent="sugerido pela descrição"; }
   }
+  renderAnexos(f);
   aplicarFase(st, f);
+}
+
+/* ---------------- anexos ---------------- */
+/* campos de texto livre: podem conter URLs que NÃO são anexos */
+const CAMPOS_TEXTO = ["DESCRICAO","ORIENTACAO_ENVIADA","RESPOSTA_USUARIO","CAUSA_RAIZ","ACOES_TOMADAS","LICOES_APRENDIDAS","Title","NOME_USUARIO"];
+const ICO_CLIP = '<svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+const ICO_EXT  = '<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>';
+
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function itemUrl(){ return `https://${CONFIG.siteHost}${CONFIG.sitePath}/_layouts/15/listform.aspx?PageType=4&ListId=%7B${CONFIG.listId}%7D&ID=${encodeURIComponent(ITEMID)}`; }
+function nomeDaUrl(u){ try{ const p=new URL(u).pathname.split("/").filter(Boolean).pop(); return decodeURIComponent(p||""); }catch{ return ""; } }
+
+function varrer(key,v,add){
+  if(v===null||v===undefined) return;
+  if(Array.isArray(v)){ v.forEach(x=>varrer(key,x,add)); return; }
+  if(typeof v==="object"){
+    const url=v.link||v.Url||v.url||v.serverRelativeUrl||v.webUrl;
+    if(url) add(v.name||v.fileName||v.Description||nomeDaUrl(url)||key,url);
+    return;
+  }
+  if(typeof v!=="string") return;
+  const s=v.trim(); if(!s) return;
+  if(s[0]==="["||s[0]==="{"){ try{ varrer(key,JSON.parse(s),add); return; }catch{} }
+  if(/^https?:\/\//i.test(s)) add(nomeDaUrl(s)||key,s);
+}
+
+function coletarAnexos(f){
+  const out=[], vistos=new Set();
+  const add=(nome,url)=>{ if(!url||vistos.has(url))return; vistos.add(url); out.push({nome:nome||"Anexo",url}); };
+  for(const [k,v] of Object.entries(f||{})){
+    if(k.startsWith("@")||CAMPOS_TEXTO.includes(k)) continue;
+    if(/^(id|ContentType|Author|Editor|Created|Modified|_|odata)/i.test(k)) continue;
+    varrer(k,v,add);
+  }
+  return out;
+}
+
+function renderAnexos(f){
+  const lista=coletarAnexos(f);
+  let html = lista.length
+    ? lista.map(a=>`<div class="attach-item"><span class="attach-name">${ICO_CLIP}${esc(a.nome)}</span><a class="attach-btn" href="${esc(a.url)}" target="_blank" rel="noopener">${ICO_EXT} Abrir</a></div>`).join("")
+    : `<div class="attach-empty">Nenhum arquivo identificado nos campos do registro.</div>`;
+  if(ITEMID && !DEMO){
+    html += `<div class="attach-item alt"><span class="attach-name">${ICO_CLIP}Item completo na lista</span><a class="attach-btn ghost" href="${esc(itemUrl())}" target="_blank" rel="noopener">${ICO_EXT} SharePoint</a></div>`;
+  }
+  document.querySelectorAll(".js-anexos").forEach(box=>box.innerHTML=html);
 }
 
 function aplicarFase(st, f){
@@ -455,7 +518,8 @@ function loadDemo(){
   const faseEnc = params.get("fase")==="enc";
   render({STATUS:{Value: faseEnc?"Em Tratamento":"Aberto"},
     GRAVIDADE_VALIDADA:{Value:"Baixa"}, IMPACTO_VALIDADO:["Confidencialidade"], TIPO_VALIDADO:{Value:"Roubo de credenciais / Engenharia Social."},
-    RESPONSAVEL_TRIAGEM:{Value:"Leonardo Carolino"}, ORIENTACAO_ENVIADA:"Identificamos que a mensagem é phishing.<br>- Não clique.<br>- Não responda.", RESPOSTA_USUARIO:"",NOME_USUARIO:"Pamela",DEPARTAMENTO:{Value:"Financeiro"},DATA_INCIDENTE:"2026-06-24",GRAVIDADE_USUARIO:{Value:"Baixa"},IMPACTO_USUARIO:["Confidencialidade"],TIPO_USUARIO:{Value:"Vírus de Computador / Malware."},DADOS_PESSOAIS:["Cópias de documentos de identificação oficial."],DESCRICAO:'E-mail de fraude do "Santander" pedindo atualização de dados cadastrais.'});
+    RESPONSAVEL_TRIAGEM:{Value:"Leonardo Carolino"}, ORIENTACAO_ENVIADA:"Identificamos que a mensagem é phishing.<br>- Não clique.<br>- Não responda.", RESPOSTA_USUARIO:"",NOME_USUARIO:"Pamela",DEPARTAMENTO:{Value:"Financeiro"},DATA_INCIDENTE:"2026-06-24",GRAVIDADE_USUARIO:{Value:"Baixa"},IMPACTO_USUARIO:["Confidencialidade"],TIPO_USUARIO:{Value:"Vírus de Computador / Malware."},DADOS_PESSOAIS:["Cópias de documentos de identificação oficial."],DESCRICAO:'E-mail de fraude do "Santander" pedindo atualização de dados cadastrais.',
+    ANEXO:'[{"name":"print-email-santander.png","link":"https://polystellcombr.sharepoint.com/sites/Apps/Documentos/print-email-santander.png"},{"name":"cabecalho-email.txt","link":"https://polystellcombr.sharepoint.com/sites/Apps/Documentos/cabecalho-email.txt"}]'});
   $("#proto").textContent="(demo)";
   showApp();
 }
