@@ -253,6 +253,13 @@ const CONFIG = {
   listId:   "e67185c1-7d9f-43fb-8c55-38c200fa9d54"
 };
 
+/* Pasta onde o Microsoft Forms grava os arquivos enviados pelo usuário */
+const ANEXOS = {
+  sitePath: "/sites/Projetos",
+  biblioteca: "Documentos Compartilhados",
+  pasta: "Aplicativos/Microsoft Forms/Formulário de Registro de Incidente de Segurança/Pergunta"
+};
+
 const TIPOS = [
   "Acesso não autorizado a sistemas de informação.",
   "Alteração/exclusão não autorizada de dados.",
@@ -329,8 +336,14 @@ async function loadItem(){
   SITEID=site.id;
   const data=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${ITEMID}?$expand=fields`);
   FIELDS=data.fields||{};
+  anexosBuscando=true;
   render(FIELDS);
   showApp();
+  // busca os arquivos do Forms em segundo plano (não trava a triagem)
+  buscarAnexosForms(FIELDS)
+    .then(r=>{ anexosExtra=r.lista; anexosNota=r.nota; })
+    .catch(e=>{ console.error(e); anexosNota="Não foi possível listar a pasta de anexos. Use o botão abaixo."; })
+    .finally(()=>{ anexosBuscando=false; renderAnexos(FIELDS); });
 }
 
 /* ---------------- render ---------------- */
@@ -400,13 +413,41 @@ function coletarAnexos(f){
   return out;
 }
 
+/* busca na pasta do Forms os arquivos deste respondente */
+let anexosExtra=[], anexosNota="", anexosBuscando=false;
+
+function pastaUrl(){
+  const p=`${ANEXOS.sitePath}/${ANEXOS.biblioteca}/${ANEXOS.pasta}`;
+  return `https://${CONFIG.siteHost}${ANEXOS.sitePath}/${encodeURIComponent(ANEXOS.biblioteca)}/Forms/AllItems.aspx?id=${encodeURIComponent(p)}`;
+}
+
+async function buscarAnexosForms(f){
+  const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${ANEXOS.sitePath}`);
+  const path=ANEXOS.pasta.split("/").map(encodeURIComponent).join("/");
+  const r=await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root:/${path}:/children?$select=name,webUrl,createdDateTime&$top=999`);
+  const arqs=(r.value||[]).filter(x=>!x.folder);
+
+  const nome=String(f.NOME_USUARIO||"").trim().toLowerCase();
+  const termos=nome.split(/\s+/).filter(t=>t.length>=3);
+  let hits=termos.length?arqs.filter(x=>{const n=x.name.toLowerCase();return termos.some(t=>n.includes(t));}):[];
+  let nota="";
+  if(!hits.length){
+    const base=new Date(f.Created||f.DATA_INCIDENTE||Date.now()).getTime();
+    hits=arqs.filter(x=>Math.abs(new Date(x.createdDateTime)-base)<3*864e5);
+    if(hits.length) nota="Arquivos localizados pela data do registro (o nome do arquivo não traz o nome do usuário). Confira antes de usar como evidência.";
+  }
+  hits.sort((a,b)=>new Date(b.createdDateTime)-new Date(a.createdDateTime));
+  return {lista:hits.map(x=>({nome:`${x.name} · ${fmtD(x.createdDateTime)}`,url:x.webUrl})),nota};
+}
+
 function renderAnexos(f){
-  const lista=coletarAnexos(f);
+  const lista=coletarAnexos(f).concat(anexosExtra);
   let html = lista.length
     ? lista.map(a=>`<div class="attach-item"><span class="attach-name">${ICO_CLIP}${esc(a.nome)}</span><a class="attach-btn" href="${esc(a.url)}" target="_blank" rel="noopener">${ICO_EXT} Abrir</a></div>`).join("")
-    : `<div class="attach-empty">Nenhum arquivo identificado nos campos do registro.</div>`;
-  if(ITEMID && !DEMO){
-    html += `<div class="attach-item alt"><span class="attach-name">${ICO_CLIP}Item completo na lista</span><a class="attach-btn ghost" href="${esc(itemUrl())}" target="_blank" rel="noopener">${ICO_EXT} SharePoint</a></div>`;
+    : `<div class="attach-empty">${anexosBuscando?"Procurando arquivos enviados pelo formulário…":"Nenhum arquivo localizado para este usuário."}</div>`;
+  if(anexosNota) html += `<div class="attach-empty" style="color:#854d0e">${esc(anexosNota)}</div>`;
+  if(!DEMO){
+    html += `<div class="attach-item alt"><span class="attach-name">${ICO_CLIP}Pasta de anexos do formulário</span><a class="attach-btn ghost" href="${esc(pastaUrl())}" target="_blank" rel="noopener">${ICO_EXT} Abrir pasta</a></div>`;
   }
   document.querySelectorAll(".js-anexos").forEach(box=>box.innerHTML=html);
 }
