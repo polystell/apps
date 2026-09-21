@@ -124,6 +124,9 @@
   .attach-btn.ghost{background:#fff;color:#374151;border:1px solid #d1d5db}
   .attach-btn.ghost:hover{background:#f3f4f6}
   .attach-empty{font-size:13px;color:#6b7280;line-height:1.5}
+  input[type="file"]{font:inherit;font-size:13px;width:100%;padding:9px 11px;border:1px dashed #d1d5db;border-radius:8px;background:#fafbfc;color:#4b5563;cursor:pointer}
+  input[type="file"]::file-selector-button{font:inherit;font-size:12.5px;font-weight:600;margin-right:10px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
+  input[type="file"]:disabled{cursor:not-allowed;opacity:.6}
   @media(max-width:520px){.attach-item{flex-direction:column;align-items:stretch}.attach-btn{justify-content:center}}
 </style>
 </head>
@@ -221,6 +224,11 @@
         <div class="field" style="margin-top:12px"><label>Recorrente?</label><select id="c_recorrente"><option value="Não">Não</option><option value="Sim">Sim</option></select></div>
         <div class="field" style="margin-top:12px"><label>Resposta do usuário (se houve)</label><textarea id="c_respuser" rows="2"></textarea></div>
         <div class="field" style="margin-top:12px"><label>Lições aprendidas</label><textarea id="c_licoes" rows="2"></textarea></div>
+        <div class="field" style="margin-top:12px">
+          <label>Evidências do encerramento</label>
+          <input type="file" id="c_arquivos" multiple>
+          <div class="attach-list" id="evidList" style="margin-top:10px"></div>
+        </div>
       </div>
     </div>
   </main>
@@ -340,9 +348,8 @@ async function loadItem(){
   render(FIELDS);
   showApp();
   // busca os arquivos do Forms em segundo plano (não trava a triagem)
-  buscarAnexosForms(FIELDS)
-    .then(r=>{ anexosExtra=r.lista; anexosNota=r.nota; })
-    .catch(e=>{ console.error(e); anexosNota="Não foi possível listar a pasta de anexos. Use o botão abaixo."; })
+  carregarAbertura()
+    .catch(e=>{ console.error(e); anexosNota="Não foi possível listar os anexos. Use o botão abaixo."; })
     .finally(()=>{ anexosBuscando=false; renderAnexos(FIELDS); });
 }
 
@@ -414,7 +421,7 @@ function coletarAnexos(f){
 }
 
 /* busca na pasta do Forms os arquivos deste respondente */
-let anexosExtra=[], anexosNota="", anexosBuscando=false;
+let anexosExtra=[], anexosForms=[], anexosNota="", anexosBuscando=false;
 
 function pastaUrl(){
   const p=`${ANEXOS.sitePath}/${ANEXOS.biblioteca}/${ANEXOS.pasta}`;
@@ -424,7 +431,7 @@ function pastaUrl(){
 async function buscarAnexosForms(f){
   const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${ANEXOS.sitePath}`);
   const path=ANEXOS.pasta.split("/").map(encodeURIComponent).join("/");
-  const r=await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root:/${path}:/children?$select=name,webUrl,createdDateTime&$top=999`);
+  const r=await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive/root:/${path}:/children?$select=id,name,webUrl,createdDateTime,parentReference&$top=999`);
   const arqs=(r.value||[]).filter(x=>!x.folder);
 
   const nome=String(f.NOME_USUARIO||"").trim().toLowerCase();
@@ -437,7 +444,19 @@ async function buscarAnexosForms(f){
     if(hits.length) nota="Arquivos localizados pela data do registro (o nome do arquivo não traz o nome do usuário). Confira antes de usar como evidência.";
   }
   hits.sort((a,b)=>new Date(b.createdDateTime)-new Date(a.createdDateTime));
-  return {lista:hits.map(x=>({nome:`${x.name} · ${fmtD(x.createdDateTime)}`,url:x.webUrl})),nota};
+  return {
+    lista:hits.map(x=>({nome:`${x.name} · ${fmtD(x.createdDateTime)}`,url:x.webUrl})),
+    brutos:hits.map(x=>({id:x.id,driveId:x.parentReference&&x.parentReference.driveId,arquivo:x.name})),
+    nota
+  };
+}
+
+/* pasta do incidente primeiro; só cai no Forms se ainda não foi copiado */
+async function carregarAbertura(){
+  const jaCopiado=await listarFase("abertura");
+  if(jaCopiado.length){ anexosExtra=jaCopiado; anexosForms=[]; return; }
+  const r=await buscarAnexosForms(FIELDS);
+  anexosExtra=r.lista; anexosForms=r.brutos; anexosNota=r.nota;
 }
 
 function renderAnexos(f){
@@ -447,7 +466,8 @@ function renderAnexos(f){
     : `<div class="attach-empty">${anexosBuscando?"Procurando arquivos enviados pelo formulário…":"Nenhum arquivo localizado para este usuário."}</div>`;
   if(anexosNota) html += `<div class="attach-empty" style="color:#854d0e">${esc(anexosNota)}</div>`;
   if(!DEMO){
-    html += `<div class="attach-item alt"><span class="attach-name">${ICO_CLIP}Pasta de anexos do formulário</span><a class="attach-btn ghost" href="${esc(pastaUrl())}" target="_blank" rel="noopener">${ICO_EXT} Abrir pasta</a></div>`;
+    const temPasta=anexosExtra.length&&!anexosForms.length;
+    html += `<div class="attach-item alt"><span class="attach-name">${ICO_CLIP}${temPasta?"Pasta do incidente":"Pasta de anexos do formulário"}</span><a class="attach-btn ghost" href="${esc(temPasta?pastaIncidenteUrl():pastaUrl())}" target="_blank" rel="noopener">${ICO_EXT} Abrir pasta</a></div>`;
   }
   document.querySelectorAll(".js-anexos").forEach(box=>box.innerHTML=html);
 }
@@ -474,6 +494,8 @@ function aplicarFase(st, f){
     setSel("#c_recorrente", raw(f.RECORRENTE) || "Não");
     if(f.RESPOSTA_USUARIO) $("#c_respuser").value = f.RESPOSTA_USUARIO;
     if(f.LICOES_APRENDIDAS) $("#c_licoes").value = f.LICOES_APRENDIDAS;
+    if(fim) $("#c_arquivos").disabled = true;
+    renderEvidencias();
   }
 
   // ajusta o botão de ação conforme a fase
@@ -504,10 +526,92 @@ function setMulti(sel,arr){ $(sel).querySelectorAll("input").forEach(cb=>cb.chec
 function getMulti(sel){ return [...$(sel).querySelectorAll("input:checked")].map(cb=>cb.value); }
 function sugerir(txt){ const t=txt.toLowerCase(); for(const r of REGRAS){ if(r.kw.some(k=>t.includes(k))) return r.tipo; } return null; }
 
+/* ---------------- evidências do encerramento ---------------- */
+/* sobem para /sites/Apps → biblioteca "99 - Automação" → 99_Form_Incidente_Seguranca → {id} */
+const EVID={
+  biblioteca:"99  Automao",              // segmento de URL da biblioteca (não é o título)
+  pasta:"99_Form_Incidente_Seguranca"
+};
+const EVID_MAX=15*1024*1024;
+
+let EVID_DRIVE=null;
+async function evidDrive(){
+  if(EVID_DRIVE) return EVID_DRIVE;
+  const r=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/drives?$select=id,name,webUrl`);
+  const seg=d=>{ try{ return decodeURIComponent(new URL(d.webUrl).pathname.split("/").filter(Boolean).pop()); }catch{ return ""; } };
+  const d=(r.value||[]).find(x=>seg(x)===EVID.biblioteca) || (r.value||[]).find(x=>x.name===EVID.biblioteca);
+  if(!d) throw new Error(`Biblioteca "${EVID.biblioteca}" não encontrada no site.`);
+  EVID_DRIVE=d.id; return EVID_DRIVE;
+}
+
+function encPath(p){ return p.split("/").map(encodeURIComponent).join("/"); }
+function fasePath(fase,extra){ return encPath(`${EVID.pasta}/${ITEMID}/${fase}${extra?"/"+extra:""}`); }
+function pastaIncidenteUrl(){ return `https://${CONFIG.siteHost}${CONFIG.sitePath}/${encodeURIComponent(EVID.biblioteca)}/Forms/AllItems.aspx?id=${encodeURIComponent(`${CONFIG.sitePath}/${EVID.biblioteca}/${EVID.pasta}/${ITEMID}`)}`; }
+
+/* cria a pasta (e as intermediárias) se ainda não existirem */
+async function garantirPasta(drive,caminho){
+  try{ return await graph(`https://graph.microsoft.com/v1.0/drives/${drive}/root:/${encPath(caminho)}`); }catch{}
+  const partes=caminho.split("/"), nome=partes.pop(), pai=partes.join("/");
+  const paiItem = pai ? await garantirPasta(drive,pai)
+                      : await graph(`https://graph.microsoft.com/v1.0/drives/${drive}/root`);
+  return await graph(`https://graph.microsoft.com/v1.0/drives/${drive}/items/${paiItem.id}/children`,
+    {method:"POST",body:JSON.stringify({name:nome,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});
+}
+
+async function listarFase(fase){
+  try{
+    const drive=await evidDrive();
+    const r=await graph(`https://graph.microsoft.com/v1.0/drives/${drive}/root:/${fasePath(fase)}:/children?$select=name,webUrl`);
+    return (r.value||[]).filter(x=>!x.folder).map(x=>({nome:x.name,url:x.webUrl}));
+  }catch{ return []; }
+}
+
+async function uploadEvidencias(files){
+  const drive=await evidDrive(), out=[];
+  await garantirPasta(drive,`${EVID.pasta}/${ITEMID}/encerramento`);
+  for(const file of files){
+    const t=await token();
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${drive}/root:/${fasePath("encerramento",file.name)}:/content?@microsoft.graph.conflictBehavior=rename`,
+      {method:"PUT",headers:{Authorization:`Bearer ${t}`,"Content-Type":file.type||"application/octet-stream"},body:file});
+    if(!r.ok) throw new Error(`${file.name} (${r.status})`);
+    const j=await r.json(); out.push({nome:j.name,url:j.webUrl});
+  }
+  return out;
+}
+
+/* na triagem, copia o anexo do Forms para a pasta do incidente */
+async function copiarAbertura(){
+  if(!anexosForms.length) return 0;
+  const drive=await evidDrive();
+  const dest=await garantirPasta(drive,`${EVID.pasta}/${ITEMID}/abertura`);
+  const t=await token(); let n=0;
+  for(const a of anexosForms){
+    if(!a.id||!a.driveId) continue;
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${a.driveId}/items/${a.id}/copy`,{
+      method:"POST",
+      headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},
+      body:JSON.stringify({parentReference:{driveId:drive,id:dest.id},name:a.arquivo})});
+    if(r.ok||r.status===202) n++;
+  }
+  return n;
+}
+
+async function renderEvidencias(){
+  const box=$("#evidList"); if(!box) return;
+  if(DEMO){ box.innerHTML=`<div class="attach-empty">Modo demo: arquivos não são enviados.</div>`; return; }
+  const lista=await listarFase("encerramento");
+  box.innerHTML = lista.length
+    ? lista.map(a=>`<div class="attach-item"><span class="attach-name">${ICO_CLIP}${esc(a.nome)}</span><a class="attach-btn" href="${esc(a.url)}" target="_blank" rel="noopener">${ICO_EXT} Abrir</a></div>`).join("")
+    : `<div class="attach-empty">Nenhuma evidência anexada ainda.</div>`;
+}
+
 async function encerrar(){
   const btn = $("#confirm");
   if(!$("#c_causa").value.trim() || !$("#c_acoes").value.trim())
     return toast("Preencha causa raiz e ações tomadas.","err");
+  const arqs=[...($("#c_arquivos").files||[])];
+  const grande=arqs.find(a=>a.size>EVID_MAX);
+  if(grande) return toast(`"${grande.name}" passa de 15 MB. Anexe um arquivo menor.`,"err");
   const payload = {
     STATUS: "Encerrado",
     RESPONSAVEL_ENCERRAMENTO: $("#c_resp").value,
@@ -520,11 +624,19 @@ async function encerrar(){
   };
 
   if(DEMO){ toast("Modo demo: encerramento não é gravado."); return; }
-  btn.disabled = true; btn.textContent = "Encerrando…";
+  btn.disabled = true;
   try{
+    if(arqs.length){
+      btn.textContent = `Enviando ${arqs.length} arquivo(s)…`;
+      await uploadEvidencias(arqs);           // se falhar, nada é encerrado
+      $("#c_arquivos").value="";
+      await renderEvidencias();
+    }
+    btn.textContent = "Encerrando…";
     await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${ITEMID}/fields`,{method:"PATCH",body:JSON.stringify(payload)});
     toast("Incidente encerrado com sucesso.");
     btn.textContent = "Incidente encerrado ✓";
+    $("#c_arquivos").disabled=true;
   }catch(e){ toast("Erro ao encerrar: "+e.message,"err"); btn.disabled=false; btn.textContent="Registrar encerramento"; }
 }
 
@@ -544,8 +656,16 @@ async function confirmar(){
   btn.disabled=true; btn.textContent="Enviando…";
   try{
     await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${ITEMID}/fields`,{method:"PATCH",body:JSON.stringify(payload)});
-    toast("Triagem registrada. A orientação será enviada ao usuário.");
     btn.textContent="Concluído ✓";
+    // evidência de abertura vai para a pasta do incidente (não bloqueia a triagem)
+    try{
+      const n=await copiarAbertura();
+      toast(n ? `Triagem registrada e ${n} evidência(s) copiada(s) para a pasta do incidente.`
+              : "Triagem registrada. A orientação será enviada ao usuário.");
+    }catch(err){
+      console.error(err);
+      toast("Triagem registrada, mas não consegui copiar a evidência de abertura.","err");
+    }
   }catch(e){ toast("Erro ao salvar: "+e.message,"err"); btn.disabled=false; btn.textContent="Confirmar e enviar orientação"; }
 }
 
