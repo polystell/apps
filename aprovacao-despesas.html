@@ -251,7 +251,7 @@ async function init(){
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     // >>> TRAVA DE SEGURANÇA: exige uma prestação específica na URL.
     // Sem isso, a página NUNCA busca a lista inteira (evita expor todas as prestações).
-    if(!PRESTID){ showError("Prestação não informada","Abra esta página pelo link recebido por e-mail, que já inclui a prestação (ex.: ?prest=PREST-55)."); return; }
+    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
     msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
     const resp=await msalApp.handleRedirectPromise();
@@ -298,7 +298,7 @@ async function resolveGestores(){
 async function loadItems(){
   try{
     // >>> Defesa em profundidade: mesmo que algo chame loadItems sem prestação, não busca a lista toda.
-    if(!PRESTID){ showError("Prestação não informada","Abra esta página pelo link recebido por e-mail, que já inclui a prestação (ex.: ?prest=PREST-55)."); return; }
+    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
     SITEID=site.id; await resolveColumns();
     const url=`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items`
