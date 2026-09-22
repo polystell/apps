@@ -187,6 +187,9 @@ async function init(){
       $("#header-right").innerHTML='<span class="header-user"><span class="udot"></span>sessão fictícia</span>';
       ITEMS=demoItems(); showApp(); render(); return; }
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
+    // >>> TRAVA DE SEGURANÇA: exige uma prestação específica na URL.
+    // Sem isso, a página NUNCA busca a lista inteira (evita expor outras prestações).
+    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
     msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
     const resp=await msalApp.handleRedirectPromise();
@@ -218,22 +221,22 @@ async function resolveSolicitantes(){
 }
 async function loadItems(){
   try{
+    // >>> Defesa em profundidade: sem prestação, não busca nada.
+    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
     SITEID=site.id; await resolveColumns();
 
-    // Busca TODOS os itens (com paginação) e filtra no cliente — evita o filtro
-    // server-side do Graph em colunas não indexadas, que volta vazio sem erro.
-    let all=[], next=`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items?$expand=fields&$top=200`;
-    while(next){ const page=await graph(next); all=all.concat(page.value||[]); next=page["@odata.nextLink"]||null; }
+    // Busca SOMENTE os itens desta prestação (filtro server-side) e refina o status
+    // "REVISAO_SOLICITANTE" no cliente. Assim nenhuma outra prestação sai do SharePoint.
+    const alvoPrest = PRESTID.replace(/'/g,"''");
+    let all=[], next=`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${CONFIG.listId}/items?$expand=fields&$top=200&$filter=fields/${ci(C.prestacao)} eq '${alvoPrest}'`;
+    while(next){ const page=await graph(next,{headers:{Prefer:"HonorNonIndexedQueriesWarningMayFailRandomly"}}); all=all.concat(page.value||[]); next=page["@odata.nextLink"]||null; }
 
     const norm = s => String(s??"").trim().toUpperCase();
-    const alvoPrest = norm(PRESTID);
 
     ITEMS = all.filter(it=>{
       const f=it.fields||{};
-      const etapaOk = norm(f[ci(C.etapa)]) === "REVISAO_SOLICITANTE";
-      const prestOk = !PRESTID || norm(f[ci(C.prestacao)]) === alvoPrest;
-      return etapaOk && prestOk;
+      return norm(f[ci(C.etapa)]) === "REVISAO_SOLICITANTE";
     }).map(it=>{
       const f=it.fields||{};
       return {
