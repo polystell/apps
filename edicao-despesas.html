@@ -191,10 +191,17 @@ async function init(){
     if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Use ?demo=1 para visualizar, ou publique a página."); return; }
     // >>> TRAVA DE SEGURANÇA: exige uma prestação específica na URL.
     // Sem isso, a página NUNCA busca a lista inteira (evita expor outras prestações).
-    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
+    // Volta do login da Microsoft: a URL chega só com "#code=..." (sem ?prest=). Guardamos a prestação antes
+    // de sair para o login e a recuperamos na volta, para não barrar o usuário no meio do login.
+    const retornoLogin=/(^#|&)(code|error|state)=/.test(location.hash);
+    if(PRESTID) sessionStorage.setItem("prest_pendente",PRESTID);
+    if(!PRESTID && !retornoLogin){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname,navigateToLoginRequestUrl:false},cache:{cacheLocation:"sessionStorage"}});
     const resp=await msalApp.handleRedirectPromise();
+    if(!PRESTID) PRESTID=sessionStorage.getItem("prest_pendente")||"";
+    if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
+    if(new URLSearchParams(location.search).get("prest")!==PRESTID) history.replaceState(null,"",location.pathname+"?prest="+encodeURIComponent(PRESTID));
     account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
     ME=(account.username||"").toLowerCase().trim(); MENAME=(account.name||"").toLowerCase().trim();
