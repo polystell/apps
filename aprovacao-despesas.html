@@ -221,7 +221,9 @@ const ACT_CLASS = {aprovar:"ap", reprovar:"rp", reenviar:"rv", diretoria:"dir"};
 const ROLE_LABEL = {gestor:"Gestor", financeiro:"Financeiro", diretoria:"Diretoria"};
 
 const params  = new URLSearchParams(location.search);
-const PRESTID = params.get("prest") || "";
+let PRESTID = params.get("prest") || "";
+// Tolera link com número puro (ex.: ?prest=68) -> ID_PRESTACAO real "PREST-68"
+if(/^\d+$/.test(PRESTID)) PRESTID = "PREST-" + PRESTID;
 const DEMO    = params.get("demo") === "1" || CONFIG.clientId.startsWith("PREENCHA");
 
 const $  = s => document.querySelector(s);
@@ -253,14 +255,16 @@ async function init(){
     // Sem isso, a página NUNCA busca a lista inteira (evita expor todas as prestações).
     if(!PRESTID){ showError("Não foi possível abrir","O link está incompleto ou expirado. Use o link enviado no e-mail de notificação da prestação. Em caso de dúvida, contate a TI."); return; }
     await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
+    msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
     const resp=await msalApp.handleRedirectPromise();
     account=resp?.account||msalApp.getAllAccounts()[0]||null;
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
     ME=(account.username||"").toLowerCase().trim(); MENAME=(account.name||"").toLowerCase().trim();
     ISSUPER=SUPERVISORES.map(s=>s.toLowerCase()).includes(ME);
+    $("#header-right").innerHTML=`<span class="header-user"><span class="udot"></span>${esc(account.name||account.username)}<button id="logout">Sair</button></span>`;
+    $("#logout").onclick=()=>{ sessionStorage.clear(); msalApp.logoutRedirect(); };
     await loadItems();
-  }catch(e){ showError("Não foi possível iniciar a página", e.message); }
+  }catch(e){ console.error(e); showError("Não foi possível iniciar a página", "Tente novamente ou contate a TI."); }
 }
 init();
 
@@ -327,17 +331,19 @@ async function loadItems(){
     await resolveGestores();   // resolve o LookupId do campo Pessoa -> e-mail/nome real
     // ---- gate de acesso ----
     if(ITEMS.length){
-      const isGestor=ITEMS.some(it=> (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME));
+      const isGestor=ITEMS.some(ehGestorDe);
       const allowed = ISSUPER || ME===FINANCEIRO.toLowerCase() || ME===DIRETORIA.toLowerCase() || isGestor;
       if(!allowed){ showError("Acesso não autorizado","Você não participa da aprovação desta prestação de contas. Se precisar de acesso, contate a TI."); return; }
     }
     showApp(); render();
-  }catch(e){ showError("Não foi possível carregar as despesas", e.message); }
+  }catch(e){ console.error(e); showError("Não foi possível carregar as despesas", "Tente novamente ou contate a TI."); }
 }
 
 /* papel de quem está logado PARA um item (prioridade: financeiro/diretoria globais, depois gestor do item) */
 function ehGestorDe(it){
-  return (it.gestorEmail&&it.gestorEmail===ME)||(it.gestorNome&&it.gestorNome.toLowerCase()===MENAME);
+  // compara pelo e-mail; o nome só é usado se o e-mail do gestor não pôde ser resolvido (evita homônimos)
+  if(it.gestorEmail) return it.gestorEmail===ME;
+  return !!(it.gestorNome && it.gestorNome.toLowerCase()===MENAME);
 }
 /* Cada um age SOMENTE no seu papel real, decidido PELA ETAPA da despesa.
    Assim quem acumula papéis (ex.: Samar = diretoria E gestora) age no papel certo
@@ -372,7 +378,7 @@ function render(){
 function cardInner(it,idx){
   const st=STATUS_META[it.etapa]||{label:it.etapa,cls:"wait"};
   const valExtra = (it.valorAprovSaved!=null && it.valorAprovSaved!=="") ? `<small>Aprovado: ${brl(it.valorAprovSaved)}</small>` : "";
-  const comprovante = it.linkArquivo ? `<a href="${esc(it.linkArquivo)}" target="_blank" rel="noopener" class="comprov-link">&#128206; Ver comprovante</a>` : "";
+  const comprovante = /^https?:\/\//i.test(it.linkArquivo||"") ? `<a href="${esc(it.linkArquivo)}" target="_blank" rel="noopener" class="comprov-link">&#128206; Ver comprovante</a>` : "";
   const head=`<div class="dcard-head">
       <div><div class="dcard-name">${esc(it.title)}</div><div class="dcard-tag">${[it.categoria,it.tipo].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div>${comprovante}</div>
       <div class="dcard-right"><div class="dcard-val">${brl(it.valor)}${valExtra}</div><span class="badge ${st.cls}">${st.label}</span></div>
@@ -468,11 +474,17 @@ function fieldsFor(it){
 async function persist(){
   if(!SITEID){ const site=await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`); SITEID=site.id; await resolveColumns(); }
   const toSave=ITEMS.filter(it=>canAct(it)&&it.decision);
+  let conflitos=0;
   for(const it of toSave){
     const fields=fieldsFor(it); if(!fields) continue;
+    // confere se a despesa ainda está na mesma etapa (página aberta há muito tempo / outra aba / outra pessoa)
+    const atual=await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}?$expand=fields($select=${ci(C.etapa)})`);
+    const etapaAtual=String((atual.fields||{})[ci(C.etapa)]||"AGUARDANDO_GESTOR").trim().toUpperCase();
+    if(etapaAtual!==String(it.etapa).trim().toUpperCase()){ conflitos++; continue; }
     fields[ci(C.notifEtapa)]="";   // mudou de etapa -> rearma a trava do e-mail agrupado
     await graph(`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`,{method:"PATCH",body:JSON.stringify(fields)});
   }
+  return conflitos;
 }
 $("#saveBtn").addEventListener("click", async ()=>{
   const actionable=ITEMS.filter(canAct); const decided=actionable.filter(it=>it.decision);
@@ -481,7 +493,12 @@ $("#saveBtn").addEventListener("click", async ()=>{
   const btn=$("#saveBtn"); btn.disabled=true; btn.textContent="Salvando...";
   try{
     if(DEMO){ await new Promise(r=>setTimeout(r,700)); toast("Decisões salvas (demonstração)."); btn.textContent="Salvar decisões"; }
-    else { await persist(); toast("Decisões salvas com sucesso."); setTimeout(loadItems,900); }
+    else {
+      const conflitos=await persist();
+      if(conflitos) toast(`${conflitos} despesa(s) mudaram de etapa enquanto a página estava aberta e não foram gravadas. A lista foi atualizada.`,"err");
+      else toast("Decisões salvas com sucesso.");
+      setTimeout(loadItems,900);
+    }
   }catch(e){ toast("Erro ao salvar: "+e.message,"err"); btn.disabled=false; btn.textContent="Salvar decisões"; }
 });
 

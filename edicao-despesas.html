@@ -164,7 +164,9 @@ const CATEGORIAS_TIPOS = {
   "TREINAMENTO E DESENVOLVIMENTO":["TREINAMENTOS E CURSOS"]
 };
 const params  = new URLSearchParams(location.search);
-const PRESTID = params.get("prest") || "";
+let PRESTID = params.get("prest") || "";
+// Tolera link com número puro (ex.: ?prest=68) -> ID_PRESTACAO real "PREST-68"
+if(/^\d+$/.test(PRESTID)) PRESTID = "PREST-" + PRESTID;
 const DEMO    = params.get("demo") === "1" || CONFIG.clientId.startsWith("PREENCHA");
 const $  = s => document.querySelector(s);
 const brl = n => (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -197,7 +199,8 @@ async function init(){
     if(!account){ msalApp.loginRedirect({scopes:["Sites.ReadWrite.All"]}); return; }
     ME=(account.username||"").toLowerCase().trim(); MENAME=(account.name||"").toLowerCase().trim();
     ISSUPER=SUPERVISORES.map(s=>s.toLowerCase()).includes(ME);
-    $("#header-right").innerHTML=`<span class="header-user"><span class="udot"></span>${account.name||account.username}<button onclick="msalApp.logoutRedirect()">Sair</button></span>`;
+    $("#header-right").innerHTML=`<span class="header-user"><span class="udot"></span>${esc(account.name||account.username)}<button id="logout">Sair</button></span>`;
+    $("#logout").onclick=()=>{ sessionStorage.clear(); msalApp.logoutRedirect(); };
     await loadItems();
   }catch(e){ console.error(e); showError("Não foi possível iniciar a página", "Tente novamente ou contate a TI."); }
 }
@@ -254,7 +257,8 @@ async function loadItems(){
     await resolveSolicitantes();   // resolve LookupId do campo Pessoa "Solicitante" -> e-mail/nome
     // gate: só o solicitante (ou supervisores)
     if(ITEMS.length){
-      const isDono=ITEMS.some(it=>(it.solicitanteEmail&&it.solicitanteEmail===ME)||(it.solicitanteNome&&it.solicitanteNome.toLowerCase()===MENAME));
+      // compara pelo e-mail; o nome só é usado se o e-mail não pôde ser resolvido (evita homônimos)
+      const isDono=ITEMS.some(it=> it.solicitanteEmail ? it.solicitanteEmail===ME : !!(it.solicitanteNome&&it.solicitanteNome.toLowerCase()===MENAME));
       if(!ISSUPER && !isDono){ showError("Acesso não autorizado","Você não é o solicitante desta prestação de contas. Se precisar de acesso, contate a TI."); return; }
     }
     showApp(); render();
@@ -361,52 +365,42 @@ async function persist(){
   for(const it of ITEMS){
     const prox=(it.contReenvio||0)+1;
     const base=`https://graph.microsoft.com/v1.0/sites/${SITEID}/lists/${CONFIG.listId}/items/${it.id}/fields`;
-    // grava campo por campo, parando (e reportando) no primeiro que o SharePoint recusar
-    const pares=[
-      ["CATEGORIA",      ci(C.categoria), it.categoria],
-      ["TIPO",           ci(C.tipo),      it.tipo],
-      ["VALOR",          ci(C.valor),     Number(it.valor)],
-      ["DESCRICAO",      ci(C.descricao), String(it.descricao||"")],
-      ["STATUS_ETAPA",   ci(C.etapa),     "AGUARDANDO_GESTOR"],
-      ["CONTADOR_REENVIO",ci(C.contReenvio), Number(prox)],
-      ["NOTIFICADO_ETAPA",ci(C.notifEtapa), ""],
-      ["MOTIVO_REENVIO", ci(C.motReenvio), ""]
-    ];
-    for(const [rotulo,campo,valor] of pares){
-      try{
-        await graph(base,{method:"PATCH",body:JSON.stringify({[campo]:valor})});
-        console.log("[reenvio] OK:",rotulo,"("+campo+")");
-      }catch(e){
-        console.error("[reenvio] FALHOU:",rotulo,"("+campo+") =",JSON.stringify(valor),"->",e.message);
-        throw new Error("Campo recusado: "+rotulo+" (coluna interna: "+campo+")");
+
+    // 1) comprovante novo (opcional) PRIMEIRO: se o upload falhar, nada é gravado e a despesa continua em revisão
+    if(it.novoArquivo){
+      let novoLink="";
+      try{ novoLink=await uploadComprovante(it,prox); }
+      catch(eArq){ console.error("[reenvio] upload comprovante:",eArq.message); throw new Error("Não foi possível enviar o comprovante de "+it.title+". Nada foi alterado; tente novamente."); }
+      if(novoLink){
+        const campo=ci(C.linkArquivo);
+        // coluna "Hiperlink ou Imagem": tentamos as formas aceitas pelo Graph
+        const tentativas=[
+          { [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
+          { [campo+"@odata.type"]: "microsoft.graph.SharePointFieldValue", [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
+          { [campo]: novoLink }
+        ];
+        let linkOk=false, ultimoErro="";
+        for(const corpo of tentativas){
+          try{ await graph(base,{method:"PATCH",body:JSON.stringify(corpo)}); linkOk=true; break; }
+          catch(e){ ultimoErro=e.message; }
+        }
+        if(!linkOk) console.warn("[reenvio] link não atualizado (arquivo salvo na pasta REVISAO mesmo assim):",ultimoErro);
       }
     }
-    // comprovante novo (opcional): sobe em DESPESA-XX/REVISAO/rev{n} e atualiza o link em PATCH próprio
-    if(it.novoArquivo){
-      try{
-        const novoLink=await uploadComprovante(it,prox);
-        if(novoLink){
-          const campo=ci(C.linkArquivo);
-          // coluna "Hiperlink ou Imagem": o Graph aceita o objeto {Url, Description}.
-          // tentamos algumas formas conhecidas; se todas falharem, o reenvio (dados) já foi gravado.
-          const tentativas=[
-            { [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
-            { [campo+"@odata.type"]: "microsoft.graph.SharePointFieldValue", [campo]: { Url:novoLink, Description:it.novoArquivo.name } },
-            { [campo]: novoLink }
-          ];
-          let linkOk=false, ultimoErro="";
-          for(const corpo of tentativas){
-            try{ await graph(base,{method:"PATCH",body:JSON.stringify(corpo)}); linkOk=true; break; }
-            catch(e){ ultimoErro=e.message; }
-          }
-          if(!linkOk){
-            // não trava o reenvio: dados já foram salvos e o arquivo já está na pasta REVISAO
-            console.warn("[reenvio] link não atualizado (arquivo salvo na pasta mesmo assim):",ultimoErro);
-            toast("Despesa reenviada. O novo comprovante foi salvo na pasta, mas o link não atualizou automaticamente.","");
-          }
-        }
-      }catch(eArq){ console.error("[reenvio] upload comprovante:",eArq.message); throw new Error("Erro ao subir o comprovante: "+eArq.message); }
-    }
+
+    // 2) dados + mudança de etapa num ÚNICO PATCH (dispara o fluxo uma vez só, já com tudo gravado)
+    const dados={
+      [ci(C.categoria)]:   it.categoria,
+      [ci(C.tipo)]:        it.tipo,
+      [ci(C.valor)]:       Number(it.valor),
+      [ci(C.descricao)]:   String(it.descricao||""),
+      [ci(C.contReenvio)]: Number(prox),
+      [ci(C.notifEtapa)]:  "",
+      [ci(C.motReenvio)]:  "",
+      [ci(C.etapa)]:       "AGUARDANDO_GESTOR"
+    };
+    try{ await graph(base,{method:"PATCH",body:JSON.stringify(dados)}); }
+    catch(e){ console.error("[reenvio] falhou:",e.message); throw new Error("Não foi possível reenviar "+it.title+". Tente novamente ou contate a TI."); }
   }
 }
 $("#saveBtn").addEventListener("click", async ()=>{
