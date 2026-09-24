@@ -29,14 +29,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 .app{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
 .side{background:var(--side);color:var(--side-ink);border-radius:14px;padding:18px 12px;box-shadow:0 8px 24px rgba(13,26,65,.18);display:flex;flex-direction:column;gap:6px;position:sticky;top:16px}
-.brand{padding:0 8px 14px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px}
+.brand{padding:6px 8px 16px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px;text-align:center}
 .brand b{display:block;font-size:17px;letter-spacing:.02em}
 .brand span{font-size:12px;color:var(--side-mute)}
-.who{display:flex;gap:10px;align-items:center;padding:10px 8px 14px}
-.ini{width:36px;height:36px;border-radius:50%;background:var(--side-hi);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;color:#fff;position:relative;overflow:hidden}
+.who{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:16px 8px 18px}
+.ini{width:56px;height:56px;border-radius:50%;background:var(--side-hi);display:grid;place-items:center;font-weight:700;font-size:17px;flex:none;color:#fff;position:relative;overflow:hidden;box-shadow:0 0 0 3px rgba(255,255,255,.12)}
 .ini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.who b{display:block;font-size:13px}
-.who span{font-size:11px;color:var(--side-mute);word-break:break-all}
+.who b{display:block;font-size:14px}
+.who span{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--side-ink);background:rgba(255,255,255,.12);border-radius:999px;padding:3px 12px}
 .grp{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--side-mute);padding:10px 8px 4px}
 .nav{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:9px 10px;color:var(--side-ink);cursor:pointer;font-size:13px}
 .nav:hover{background:rgba(255,255,255,.08)}
@@ -218,7 +218,7 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 
 <div class="app" id="appRoot" hidden>
   <aside class="side" aria-label="Menu">
-    <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:34px;object-fit:contain;margin-bottom:6px;display:block"><span>Planejamento Orçamentário</span></div>
+    <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:42px;object-fit:contain;margin:0 auto 8px;display:block"><span>Planejamento Orçamentário</span></div>
     <div class="who"><div class="ini" id="uIni"></div><div><b id="uName"></b><span id="uRole"></span></div></div>
     <nav id="nav"></nav>
     <div class="ver"><span>v1.0</span><button id="btnSair">Sair</button></div>
@@ -454,7 +454,7 @@ function renderPlan(){
   const closed=exStatus(S.ano)==='Encerrado';
   const meus=myDepts();
   const ro=closed||!meus.includes(S.dept);
-  setHead(`Planejamento ${S.ano}`,(closed?'Exercício encerrado · somente consulta · ':'')+(S.role.all?(meus.length?'Você vê todos · edita: '+meus.map(deptName).join(' · '):'Todos os departamentos · somente leitura'):'Visível para você: '+deps.map(deptName).join(' · ')));
+  setHead(`Planejamento ${S.ano}`,closed?'Exercício encerrado':'');
   const its=itemsOf(S.ano,S.dept);
   const ms=monthsOf(S.scope);
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
@@ -487,7 +487,7 @@ function renderPlan(){
       <label for="fDet">Detalhamento<input id="fDet" placeholder="Ex.: Microsoft 365" autocomplete="off"></label>
       <label for="fObs" class="wide">Observação para a diretoria (opcional)<input id="fObs" placeholder="Ex.: renovação do contrato, reajuste de 8%" autocomplete="off"></label>
       <div class="formbtns"><button type="submit" class="btn">Adicionar</button><button type="button" class="btn ghost" id="cancelAdd">Cancelar</button></div>
-      <p class="hint">Centro de custo e categoria vêm das listas do JAD. O item entra como rascunho; depois digite os meses ou use “Preencher”.</p></form>`;
+</form>`;
   }
 
   let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
@@ -520,7 +520,6 @@ function renderPlan(){
   t+=`<td class="tot">${money(its.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0))}</td></tr></tfoot></table></div>`;
   h+=t;
   h+=`<div class="legend"><span><i class="sw" style="background:var(--panel)"></i>Rascunho</span><span><i class="sw" style="background:var(--warn-soft)"></i>Aguardando diretoria</span><span><i class="sw" style="background:var(--ok-soft)"></i>Aprovado</span><span><i class="sw" style="background:var(--bad-soft)"></i>Reprovado</span><span><i class="sw" style="background:linear-gradient(225deg,var(--warn) 30%,var(--panel) 30%)"></i>Aprovado com ajuste — mostra o valor da diretoria (passe o mouse para ver o pedido e o motivo)</span></div>`;
-  if(!ro)h+=`<p class="hint">Alterar um mês já aprovado devolve esse mês para aprovação.</p>`;
 
   const v=document.getElementById('view');
   v.innerHTML=`<div class="panel">${h}</div>`;
@@ -556,14 +555,14 @@ function toolHtml(){
       <div class="line"><div class="seg" role="group" aria-label="Forma de preencher"><button data-mode="rep" aria-pressed="${T.mode==='rep'}">Repetir valor mensal</button><button data-mode="dist" aria-pressed="${T.mode==='dist'}">Distribuir um total</button></div>
       <label for="tVal" class="hint">${T.mode==='rep'?'Valor por mês (R$)':'Total a distribuir (R$)'}</label><input type="text" id="tVal" inputmode="decimal" placeholder="${T.mode==='rep'?'3.300':'39.600'}">
       <button class="btn" id="tApply">Aplicar</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
-      <p class="hint">Substitui os valores dos meses do período selecionado. Meses já aprovados que mudarem voltam para aprovação.</p></div>`;
+</div>`;
   }
   if(T.kind==='obs'){
     const it=findItem(T.key);if(!it)return '';
     return `<div class="tool" role="region" aria-label="Observação do item"><h2>Observação de “${esc(it.det)}”</h2>
       <textarea id="tObs" placeholder="Explique para a diretoria por que esse valor é necessário">${esc(it.obs)}</textarea>
       <div class="line"><button class="btn" id="tSaveObs">Salvar observação</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
-      <p class="hint">A observação aparece para a diretoria na tela de aprovação. Alterar a observação não muda o status do item.</p></div>`;
+</div>`;
   }
   if(T.kind==='del'){
     const it=findItem(T.key);if(!it)return '';
@@ -585,11 +584,10 @@ function toolHtml(){
     return `<div class="tool" role="region" aria-label="Copiar de outro exercício"><h2>Copiar itens para ${S.ano}</h2>
       <div class="line"><label for="tSrc" class="hint">Copiar do exercício</label><select id="tSrc">${srcYears.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('')}</select>
       <button class="btn" id="tCopyGo">Copiar como rascunho</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
-      <p class="hint">Traz só os itens que ainda não existem em ${S.ano}, com os valores aprovados na origem (ou os pedidos, quando não houve aprovação). Tudo entra como rascunho.</p></div>`;
+</div>`;
   }
   if(T.kind==='imp'){
     let h=`<div class="tool" role="region" aria-label="Importar planilha"><h2>Importar planilha de planejamento</h2>
-      <p class="hint">Aceita o modelo atual em Excel: a aba do departamento com COD C.CUSTO, COD C.FINANCEIRA, DETALHAMENTO e os meses. Os itens entram como rascunho em ${S.ano}. Linhas zeradas e de outros departamentos são ignoradas.</p>
       <div class="line"><button class="btn ghost" id="tModelo">⬇ Baixar modelo (${esc(deptName(S.dept))})</button><input type="file" id="tFile" accept=".xlsx,.xls" aria-label="Arquivo Excel"><button class="btn ghost" id="tCancel">Fechar</button></div>`;
     if(S.imp){
       const I=S.imp;
@@ -845,7 +843,7 @@ function renderAcomp(){
   const real=(DB.real[S.ano]||[]).filter(r=>r.COD_DPTO===S.dept);
   const allReal=DB.real[S.ano]||[];
   const ULT=allReal.length?Math.max(...allReal.map(r=>Number(r.MES)))-1:-1;
-  setHead(`Acompanhamento ${S.ano}`,`Aprovado × realizado · realizado do JAD${ULT>=0?' até '+MES[ULT].toLowerCase():''}`);
+  setHead(`Acompanhamento ${S.ano}`,ULT>=0?'Realizado até '+MES[ULT].toLowerCase():'');
   const its=itemsOf(S.ano,S.dept);
   const rmap={};real.forEach(r=>{const k=r.COD_CC+'|'+r.COD_CAT;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.MES)-1]+=Number(r.VALOR)||0;});
   const keys=[...new Set([...its.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
@@ -881,7 +879,6 @@ function renderAcomp(){
     t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'—':fmt(colR(m))}<div class="av">de ${fmt(colA(m))}</div></td>`).join('')}<td class="tot">${money(A)}</td><td class="tot">${money(R)}</td><td class="tot ${saldo<0?'unpl':''}">${money(saldo)}</td></tr></tfoot></table></div>`;
     h+=t;
     h+=`<div class="legend"><span><i class="sw" style="background:var(--bad-soft)"></i>Realizado acima do aprovado</span><span>Número grande: realizado · número pequeno: aprovado</span></div>`;
-    h+=`<p class="hint">O JAD registra o gasto por centro de custo e categoria, sem o detalhamento. Por isso itens da mesma categoria (como Microsoft 365 e AWS) aparecem juntos aqui. A comparação é contra o valor aprovado.</p>`;
   }
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;bindDeptTabs(v);
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);await loadReal(S.ano);}catch(e){fail(e);}render();});
@@ -905,7 +902,7 @@ const monthOkVal=(x,d,m)=>d.mode==='mes'?d.months[m].val:loteVals(x,d)[m];
 function needMotNow(x,d){return decidedMonths(x,d).some(m=>{const dec=monthDec(d,m);return dec==='no'||(dec==='ok'&&Math.abs(monthOkVal(x,d,m)-x.i.prev[m])>0.005);});}
 
 function renderAprov(){
-  setHead('Aprovação orçamentária','Decisão por item · corte rateado proporcionalmente entre os meses');
+  setHead('Aprovação orçamentária','');
   if(!ANOS().length){document.getElementById('view').innerHTML=noExPanel();return;}
   const PD=planDepts();
   if(!S.aDept||!PD.includes(S.aDept)){const f=PD.find(d=>pendInfo(d).c>0);S.aDept=f||PD[0];}
@@ -933,7 +930,7 @@ function renderAprov(){
         <td>${mes?'':`<div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div>`}<button class="lnk" data-mode-k="${esc(k)}" ${closed?'disabled':''} style="margin-top:6px">${mes?'Voltar à decisão única':'Decidir mês a mês'}</button></td>
         <td>${mes?'<span class="muted">motivos em cada mês, abaixo</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do ajuste de '+money(Math.abs(x.prev-d.val))}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
       if(mes){
-        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do ajuste'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div><span class="hint">Meses sem decisão continuam aguardando a diretoria. Cada mês reprovado ou cortado tem a sua própria justificativa.</span></td></tr>`;
+        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do ajuste'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div></td></tr>`;
       }
     });
     r+=`</tbody></table></div><div class="afoot"><span class="hint" id="aStatus"></span><button class="btn" id="confirmBtn" ${closed?'disabled':''}>Confirmar decisões</button></div>`;
@@ -1029,7 +1026,7 @@ function renderGest(){
       <input type="email" id="gEmail" placeholder="email@polystell.com.br" style="min-width:240px">
       <button class="btn" id="gAdd">Vincular</button>
     </div>
-    <p class="hint">O vínculo controla o que o app mostra. O acesso de verdade é a permissão da pasta do departamento na lista ${CFG.lists.plan} — conceda Edição na pasta ao vincular e remova ao desvincular.</p></div>`;
+</div>`;
   h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Código</th><th>Gestor</th><th>E-mail</th><th></th></tr></thead><tbody>`;
   if(!vincsAtivos.length)h+=`<tr><td colspan="5" class="muted">Nenhum vínculo ativo.</td></tr>`;
   vincsAtivos.forEach(v=>{h+=`<tr><td>${esc(deptName(v.cod))}</td><td class="code">${v.cod}</td><td>${esc(v.nome)}</td><td class="muted">${esc(v.email)}</td><td style="text-align:right"><button class="btn ghost" data-rm="${v.Id}" style="padding:4px 10px;font-size:12px">Remover</button></td></tr>`;});
@@ -1088,7 +1085,6 @@ function renderPrazos(){
     const st=DB.ex[S.pAno].status;
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
-    h+=`<p class="hint">Um exercício só aparece para os gestores depois de aberto aqui. Encerrado, ele vira somente consulta em todas as telas.</p>`;
     h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${(st==='Encerrado'||enc)?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${enc?'draft':'ok'}">${enc?'Encerrado':'Aberto'}</span> <button class="lnk" data-qenc="${q}" ${st==='Encerrado'?'disabled':''}>${enc?'Reabrir':'Encerrar'}</button></td></tr>`;}).join('')}</tbody></table></div>`;
     const PD=planDepts();
     if(PD.length){
@@ -1100,7 +1096,6 @@ function renderPrazos(){
         h+=`</tr>`;
       });
       h+=`</tbody></table></div>`;
-      h+=`<p class="hint">Os lembretes de atraso podem ser automatizados por um fluxo do Power Automate lendo esta lista.</p>`;
     }
   }
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
@@ -1170,12 +1165,10 @@ function recalcRole(){
   S.role={admin,aprov,assess,all:admin||aprov||assess};
 }
 function roleLabel(mine){
-  const parts=[];
-  if(S.role.aprov)parts.push('Diretoria');
-  if(S.role.admin)parts.push('Administração');
-  if(S.role.assess)parts.push('Assessoria');
-  if(mine.length)parts.push('Gestor · '+mine.map(deptName).join(' · '));
-  return parts.join(' · ')||'Sem vínculo';
+  if(S.role.aprov)return 'Diretoria';
+  if(S.role.admin)return 'Administração';
+  if(S.role.assess)return 'Assessoria';
+  return mine.length?'Gestor':'Sem vínculo';
 }
 function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):''),enc:[r.ENCERRADO_Q1,r.ENCERRADO_Q2,r.ENCERRADO_Q3,r.ENCERRADO_Q4].map(x=>!!x)};});}
 async function refreshData(){
