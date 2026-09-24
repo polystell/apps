@@ -387,6 +387,8 @@ const ccDesc=c=>DB.ccMap[c]||'';
 const catDesc=c=>DB.catMap[c]||'';
 const ANOS=()=>Object.keys(DB.ex).map(Number).sort((a,b)=>a-b);
 const exStatus=a=>DB.ex[a]?DB.ex[a].status:null;
+const qClosed=(a,q)=>{const e=DB.ex[a];return !!(e&&(e.status==='Encerrado'||(e.enc&&e.enc[q])));};
+const mOpen=(a,m)=>!qClosed(a,Math.floor(m/3));
 const planDepts=()=>[...new Set([...DB.vincs.map(v=>v.cod),...[].concat(...Object.values(DB.plan)).map(i=>i.dept)])].filter(Boolean).sort();
 const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
 const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
@@ -401,6 +403,7 @@ function qStatus(list,ms){
 }
 function prazoStatus(dept,ano,q){
   const ex=DB.ex[ano];if(!ex)return{s:'—',c:'draft'};
+  if(qClosed(ano,q))return{s:'Encerrado',c:'draft'};
   const ms=[q*3,q*3+1,q*3+2];let has=false,draft=false;
   itemsOf(ano,dept).forEach(i=>ms.forEach(m=>{if(i.prev[m]>0){has=true;if(i.st[m]==='Rascunho')draft=true;}}));
   const late=ex.prazos[q]&&new Date()>new Date(ex.prazos[q].slice(0,10)+'T23:59:59');
@@ -452,7 +455,7 @@ function renderPlan(){
   const ms=monthsOf(S.scope);
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
   const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
-  const draftIn=its.some(i=>ms.some(m=>i.prev[m]>0&&i.st[m]==='Rascunho'));
+  const draftIn=its.some(i=>ms.some(m=>mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho'));
   const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
   const quarters=S.scope==='ANO'?[0,1,2,3]:[S.scope];
   const scopeName=S.scope==='ANO'?'o ano':'o '+QLAB[S.scope];
@@ -501,7 +504,7 @@ function renderPlan(){
         const cut=s==='Aprovado'&&i.apr[m]!=null&&i.apr[m]<i.prev[m];
         const mot=i.mot[m]?' · '+i.mot[m]:'';
         const tip=s==='Aprovado'?`Aprovado · ${money(i.apr[m])}${mot}`:s==='Reprovado'?`Reprovado${mot}`:s;
-        t+=`<td class="c ${m%3===0?'qs':''} ${s?'s-'+s:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${i.prev[m]?fmt(i.prev[m]):''}" ${ro?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
+        t+=`<td class="c ${m%3===0?'qs':''} ${s?'s-'+s:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${i.prev[m]?fmt(i.prev[m]):''}" ${(ro||!mOpen(S.ano,m))?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
       });
       t+=`<td class="tot">${money(rt)}</td></tr>`;
     });
@@ -566,7 +569,7 @@ function toolHtml(){
   if(T.kind==='imp'){
     let h=`<div class="tool" role="region" aria-label="Importar planilha"><h2>Importar planilha de planejamento</h2>
       <p class="hint">Aceita o modelo atual em Excel: a aba do departamento com COD C.CUSTO, COD C.FINANCEIRA, DETALHAMENTO e os meses. Os itens entram como rascunho em ${S.ano}. Linhas zeradas e de outros departamentos são ignoradas.</p>
-      <div class="line"><input type="file" id="tFile" accept=".xlsx,.xls" aria-label="Arquivo Excel"><button class="btn ghost" id="tCancel">Fechar</button></div>`;
+      <div class="line"><button class="btn ghost" id="tModelo">⬇ Baixar modelo (${esc(deptName(S.dept))})</button><input type="file" id="tFile" accept=".xlsx,.xls" aria-label="Arquivo Excel"><button class="btn ghost" id="tCancel">Fechar</button></div>`;
     if(S.imp){
       const I=S.imp;
       if(I.error)h+=`<p class="warnline">${esc(I.error)}</p>`;
@@ -591,6 +594,7 @@ function bindTool(){
   const ts=document.getElementById('tSrc');if(ts)ts.onchange=()=>{S.tool.src=Number(ts.value);};
   on('tCopyGo',()=>{const e=document.getElementById('tSrc');copyFrom(Number(e.value));});
   on('tSaveObs',saveObs);
+  on('tModelo',baixarModelo);
   const f=document.getElementById('tFile');if(f)f.onchange=()=>{if(f.files[0])readFile(f.files[0]);};
   const sh=document.getElementById('tSheet');if(sh)sh.onchange=()=>{S.imp.sel=sh.value;render();};
   on('tImport',doImport);
@@ -645,7 +649,9 @@ function editCell(key,m,v){
 function applyFill(val){
   if(!val){toast('Informe um valor maior que zero.','warn');return;}
   const it=findItem(S.tool.key);if(!it)return;
-  const ms=monthsOf(S.scope);const ano=S.ano;
+  const ano=S.ano;
+  const ms=monthsOf(S.scope).filter(m=>mOpen(ano,m));
+  if(!ms.length){toast('Todos os meses deste período estão encerrados.','warn');return;}
   let vals;
   if(S.tool.mode==='rep')vals=ms.map(()=>val);
   else{const base=Math.floor(val/ms.length*100)/100;vals=ms.map((_,k)=>k===ms.length-1?Math.round((val-base*(ms.length-1))*100)/100:base);}
@@ -689,7 +695,7 @@ function copyFrom(src){
   const ano=S.ano;const tasks=[];let n=0;
   list.forEach(i=>{
     if(exists(ano,i.dept,i.cc,i.cat,i.det))return;
-    const prev=i.prev.map((v,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v);
+    const prev=i.prev.map((v,m)=>!mOpen(ano,m)?0:(i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v));
     const it={key:itemKey(i.dept,i.cc,i.cat,i.det),dept:i.dept,cc:i.cc,cat:i.cat,det:i.det,obs:i.obs,prev,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     (DB.plan[ano]=DB.plan[ano]||[]).push(it);n++;
     prev.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
@@ -701,7 +707,7 @@ function copyFrom(src){
 function sendScope(){
   const ms=monthsOf(S.scope);const tasks=[];let n=0;
   itemsOf(S.ano,S.dept).forEach(i=>ms.forEach(m=>{
-    if(i.prev[m]>0&&i.st[m]==='Rascunho'){i.st[m]='Pendente';n++;
+    if(mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho'){i.st[m]='Pendente';n++;
       if(i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,i.ids[m],{STATUS:'Pendente'}));
     }
   }));
@@ -710,6 +716,29 @@ function sendScope(){
 }
 
 /* ---- importação do Excel ---- */
+function baixarModelo(){
+  const ano=S.ano;
+  const myCCs=DB.ccs.filter(c=>c.COD_DPTO===S.dept);
+  if(!myCCs.length){toast('Nenhum centro de custo do seu departamento no cadastro do ERP.','warn');return;}
+  const MESES=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+  const aoa=[
+    [`PLANEJAMENTO ORÇAMENTÁRIO ${ano} · ${deptName(S.dept)}`],
+    ['Preencha o código da categoria (aba CATEGORIAS), o detalhamento e os valores mensais. Linhas sem categoria ou sem valor são ignoradas. Para lançar mais de um item no mesmo centro de custo, duplique a linha dele.'],
+    ['','','','','',...MESES],
+    ['COD C.CUSTO','CENTRO DE CUSTO','COD C.FINANCEIRA','CATEGORIA FINANCEIRA','DETALHAMENTO'],
+    ...myCCs.map(c=>[c.COD_CC,c.DESC_CC||'','','',''])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:34},{wch:15},{wch:32},{wch:32},...Array(12).fill({wch:11})];
+  const wsCat=XLSX.utils.aoa_to_sheet([['COD C.FINANCEIRA','CATEGORIA FINANCEIRA'],...DB.cats.map(c=>[c.COD_CAT,c.DESC_CAT||''])]);
+  wsCat['!cols']=[{wch:16},{wch:50}];
+  const wb=XLSX.utils.book_new();
+  const nome=(deptName(S.dept)||'PLANEJAMENTO').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31);
+  XLSX.utils.book_append_sheet(wb,ws,nome);
+  XLSX.utils.book_append_sheet(wb,wsCat,'CATEGORIAS');
+  XLSX.writeFile(wb,`Modelo_Planejamento_${ano}_${S.dept}.xlsx`);
+  toast('Modelo baixado com os centros de custo de '+deptName(S.dept)+'.');
+}
 const MESN=['JANEIRO','FEVEREIRO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
 function parseSheet(rows){
@@ -770,9 +799,10 @@ function doImport(){
   pv.novos.forEach(r=>{
     if(!DB.ccMap[r.cc]&&p.ccD[r.cc])DB.ccMap[r.cc]=p.ccD[r.cc];
     if(!DB.catMap[r.cat]&&r.catD)DB.catMap[r.cat]=r.catD;
-    const it={key:itemKey(S.dept,r.cc,r.cat,r.det),dept:S.dept,cc:r.cc,cat:r.cat,det:r.det,obs:'',prev:r.vals.slice(),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    const prevA=r.vals.map((v,m)=>mOpen(ano,m)?v:0);
+    const it={key:itemKey(S.dept,r.cc,r.cat,r.det),dept:S.dept,cc:r.cc,cat:r.cat,det:r.det,obs:'',prev:prevA,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     (DB.plan[ano]=DB.plan[ano]||[]).push(it);
-    r.vals.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
+    prevA.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
   });
   S.tool=null;S.imp=null;render();
   runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length} itens importados como rascunho em ${ano} (${money(pv.total)}).`)).catch(fail);
@@ -1030,7 +1060,7 @@ function renderPrazos(){
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
     h+=`<p class="hint">Um exercício só aparece para os gestores depois de aberto aqui. Encerrado, ele vira somente consulta em todas as telas.</p>`;
-    h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th></tr></thead><tbody>${[0,1,2,3].map(q=>`<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${st==='Encerrado'?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td></tr>`).join('')}</tbody></table></div>`;
+    h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${(st==='Encerrado'||enc)?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${enc?'draft':'ok'}">${enc?'Encerrado':'Aberto'}</span> <button class="lnk" data-qenc="${q}" ${st==='Encerrado'?'disabled':''}>${enc?'Reabrir':'Encerrar'}</button></td></tr>`;}).join('')}</tbody></table></div>`;
     const PD=planDepts();
     if(PD.length){
       h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Gestor</th>${QLAB.map(q=>`<th>${q}</th>`).join('')}</tr></thead><tbody>`;
@@ -1054,13 +1084,20 @@ function renderPrazos(){
     try{await mergeItem(CFG.lists.ex,ex.Id,{['PRAZO_Q'+(q+1)]:inp.value+'T12:00:00Z'});toast('Prazo atualizado.');}
     catch(e){fail(e);}finally{busy(false);render();}
   });
+  v.querySelectorAll('[data-qenc]').forEach(b=>b.onclick=async()=>{
+    const q=Number(b.dataset.qenc);const ex=DB.ex[S.pAno];const novo=!ex.enc[q];
+    busy(true);
+    try{await mergeItem(CFG.lists.ex,ex.Id,{['ENCERRADO_Q'+(q+1)]:novo});ex.enc[q]=novo;render();
+      toast(novo?`${QLAB[q]} de ${S.pAno} encerrado — os gestores não editam mais esses meses.`:`${QLAB[q]} de ${S.pAno} reaberto para edição.`);}
+    catch(e){fail(e);}finally{busy(false);}
+  });
   const ax=document.getElementById('abrirEx');
   if(ax)ax.onclick=async()=>{
     busy(true);
     try{
       const prazos=[`${next-1}-12-15`,`${next}-03-15`,`${next}-06-15`,`${next}-09-15`];
       const j=await addItem(CFG.lists.ex,{Title:String(next),ANO:next,STATUS:'Aberto',PRAZO_Q1:prazos[0]+'T12:00:00Z',PRAZO_Q2:prazos[1]+'T12:00:00Z',PRAZO_Q3:prazos[2]+'T12:00:00Z',PRAZO_Q4:prazos[3]+'T12:00:00Z'});
-      DB.ex[next]={Id:j.Id,status:'Aberto',prazos};
+      DB.ex[next]={Id:j.Id,status:'Aberto',prazos,enc:[false,false,false,false]};
       DB.plan[next]=DB.plan[next]||[];
       S.pAno=next;render();
       toast(`Exercício ${next} aberto. Confira os prazos; os gestores já podem planejar ${next}.`);
@@ -1111,13 +1148,13 @@ function roleLabel(mine){
   if(mine.length)parts.push('Gestor · '+mine.map(deptName).join(' · '));
   return parts.join(' · ')||'Sem vínculo';
 }
-function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):'')};});}
+function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):''),enc:[r.ENCERRADO_Q1,r.ENCERRADO_Q2,r.ENCERRADO_Q3,r.ENCERRADO_Q4].map(x=>!!x)};});}
 async function refreshData(){
   busy(true,'Atualizando…');
   try{
     const [vincRows,exRows,perfRows]=await Promise.all([
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100'),
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
     setVincs(vincRows);setEx(exRows);setPerfis(perfRows);recalcRole();
@@ -1147,7 +1184,7 @@ async function start(){
       getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100'),
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
     setPerfis(perfRows);
