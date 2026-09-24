@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planejamento Orçamentário · Polystell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E8E9EE; --panel:#FFFFFF; --soft:#F3F4F8; --line:#D7D9E1;
+  --ink:#23252B; --mute:#666B78;
+  --side:#0D1A41; --side-ink:#E3E8F7; --side-mute:#8B96C4; --side-hi:#2141A2;
+  --primary:#2141A2; --primary-ink:#FFFFFF; --primary-soft:#E6EBF8;
+  --ok:#2A7F36; --ok-soft:#E3F2E5;
+  --warn:#7E5C00; --warn-soft:#FFF2C7;
+  --bad:#B81F46; --bad-soft:#FBE4EA;
+  --draft:#5E6372; --draft-soft:#ECEDF2;
+  --sans:"Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#101217; --panel:#1A1D24; --soft:#222630; --line:#2F3440;
+    --ink:#E7E9EF; --mute:#9CA2B1;
+    --side:#0A1230; --side-ink:#DDE3F5; --side-mute:#7F8AB8; --side-hi:#2F53C4;
+    --primary:#7098F2; --primary-ink:#0A1230; --primary-soft:#1D2A4F;
+    --ok:#74CF7F; --ok-soft:#15301A;
+    --warn:#F1CB55; --warn-soft:#342A0B;
+    --bad:#F27E9A; --bad-soft:#3A1722;
+    --draft:#A9AEBC; --draft-soft:#262A34;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);padding:16px}
+button,input,select,textarea{font:inherit;color:inherit}
+.code{font-family:var(--mono);font-size:12px;color:var(--mute)}
+
+.app{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
+.side{background:var(--side);color:var(--side-ink);border-radius:12px;padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:16px}
+.brand{padding:0 8px 14px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px}
+.brand b{display:block;font-size:17px;letter-spacing:.02em}
+.brand span{font-size:12px;color:var(--side-mute)}
+.who{display:flex;gap:10px;align-items:center;padding:10px 8px 14px}
+.ini{width:36px;height:36px;border-radius:50%;background:var(--side-hi);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;color:#fff}
+.who b{display:block;font-size:13px}
+.who span{font-size:11px;color:var(--side-mute);word-break:break-all}
+.grp{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--side-mute);padding:10px 8px 4px}
+.nav{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:9px 10px;color:var(--side-ink);cursor:pointer;font-size:13px}
+.nav:hover{background:rgba(255,255,255,.08)}
+.nav[aria-current="page"]{background:var(--side-hi);font-weight:600;color:#fff}
+.nav:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.ver{margin-top:auto;padding:14px 8px 0;font-size:11px;color:var(--side-mute);display:flex;justify-content:space-between;align-items:center}
+.ver button{background:none;border:1px solid rgba(255,255,255,.25);border-radius:6px;color:var(--side-ink);padding:3px 10px;font-size:11px;cursor:pointer}
+
+.main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.top{background:var(--panel);border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.top h1{margin:0;font-size:18px;font-weight:700;text-wrap:balance}
+.meta{font-size:12px;color:var(--mute)}
+.panel{background:var(--panel);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tab{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;cursor:pointer;font-size:13px}
+.tab[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-ink);font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.stat{background:var(--soft);border-radius:10px;padding:10px 14px}
+.stat span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.stat b{font-size:19px;font-variant-numeric:tabular-nums}
+.stat b.neg{color:var(--bad)}
+
+.prazos{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12px}
+.prazos>span:first-child{color:var(--mute);margin-right:4px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-variant-numeric:tabular-nums}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.c-ok{background:var(--ok-soft);color:var(--ok)}
+.c-bad{background:var(--bad-soft);color:var(--bad);font-weight:600}
+.c-draft{background:var(--draft-soft);color:var(--draft)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{padding:6px 12px;background:var(--panel);border:0;border-right:1px solid var(--line);cursor:pointer;font-size:13px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink);font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--primary);background:var(--primary);color:var(--primary-ink);border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
+.btn.ghost{background:var(--panel);color:var(--primary)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.lnk{background:none;border:0;padding:0;color:var(--primary);font-size:11px;font-weight:600;cursor:pointer}
+.lnk:hover{text-decoration:underline}
+
+.tool{background:var(--primary-soft);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.tool h2{margin:0;font-size:14px}
+.tool .line{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tool input[type="text"],.tool input[type="email"],.tool textarea,.tool select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-width:0}
+.tool textarea{width:100%;min-height:64px;resize:vertical}
+.tool input[type="file"]{max-width:100%}
+
+.additem{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;align-items:end;background:var(--soft);border-radius:10px;padding:14px}
+.additem label{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
+.additem select,.additem input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:13px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink);min-width:0}
+.formbtns{display:flex;gap:8px}
+.hint{font-size:12px;color:var(--mute);margin:0}
+.additem .hint,.additem .wide{grid-column:1/-1}
+
+.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.grid th,.grid td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.grid thead th{background:var(--soft);font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.grid .item{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;min-width:240px;max-width:280px;white-space:normal;border-right:1px solid var(--line)}
+.grid thead .item{background:var(--soft);z-index:2}
+.grid .item b{display:block;font-weight:600}
+.sub{display:block;font-size:11px;color:var(--mute)}
+.obs{display:block;font-size:11px;font-style:italic;color:var(--mute);margin-top:2px}
+.rowact{display:flex;gap:12px;margin-top:3px}
+.grid .qh{text-align:center;border-left:2px solid var(--line)}
+.grid .qh .pill{margin-left:6px;vertical-align:1px}
+.grid .mh{text-align:right}
+.grid .qs{border-left:2px solid var(--line)}
+.grid .tot{text-align:right;font-weight:600;border-left:1px solid var(--line)}
+.grid tr.grp td{background:var(--soft);font-weight:600;font-size:12px}
+.grid tr.grp td.item{background:var(--soft)}
+.grid tfoot td{background:var(--soft);font-weight:700;text-align:right}
+.grid tfoot td.item{background:var(--soft);text-align:left}
+.grid td.c{padding:3px 4px;text-align:right;position:relative}
+.grid td.c input{width:78px;text-align:right;border:1px solid transparent;border-radius:6px;background:transparent;padding:5px 6px}
+.grid td.c input:hover:not(:disabled){border-color:var(--line);background:var(--panel)}
+.grid td.c input:focus{outline:2px solid var(--primary);outline-offset:-1px;background:var(--panel)}
+.grid td.c input:disabled{color:var(--ink)}
+.s-Pendente{background:var(--warn-soft)}
+.s-Aprovado{background:var(--ok-soft)}
+.s-Reprovado{background:var(--bad-soft)}
+.grid td.cut::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 8px 8px 0;border-color:transparent var(--warn) transparent transparent}
+.empty{padding:28px;text-align:center;color:var(--mute);white-space:normal!important}
+
+.grid td.r{text-align:right;vertical-align:top;padding:5px 8px}
+.rv{font-weight:600}
+.av{font-size:11px;color:var(--mute)}
+.grid td.over{background:var(--bad-soft)}
+.grid td.over .rv{color:var(--bad)}
+.grid td.fut .rv{color:var(--mute);font-weight:400}
+.unpl{color:var(--bad);font-weight:600}
+
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.02em;padding:1px 8px;border-radius:999px;text-transform:none}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-Rascunho{background:var(--draft-soft);color:var(--draft)}
+.p-Pendente,.p-Parcial{background:var(--warn-soft);color:var(--warn)}
+.p-Aprovado{background:var(--ok-soft);color:var(--ok)}
+.p-Reprovado{background:var(--bad-soft);color:var(--bad)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--mute)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid var(--line)}
+
+.split{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;align-items:start}
+.dlist{display:flex;flex-direction:column;gap:6px}
+.dbtn{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px;cursor:pointer}
+.dbtn[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft)}
+.dbtn b{display:block;font-size:13px}
+.dbtn .sub{font-variant-numeric:tabular-nums}
+table.ap{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.ap th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);text-align:left;padding:8px;border-bottom:1px solid var(--line);background:var(--soft)}
+.ap td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.ap .num{text-align:right;white-space:nowrap}
+.ap input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.ap input.aval{width:110px;text-align:right}
+.ap input.amot{width:100%;min-width:200px}
+.ap input.req{border-color:var(--bad)}
+.dec{display:flex;gap:6px;flex-wrap:wrap}
+.dec button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+.dec .yes[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+.dec .no[aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:var(--panel)}
+.afoot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px}
+
+table.simple{border-collapse:collapse;width:100%;font-size:13px}
+.simple th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);padding:8px;border-bottom:1px solid var(--line)}
+.simple td{padding:10px 8px;border-bottom:1px solid var(--line)}
+.simple input[type="date"]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.muted{color:var(--mute)}
+.warnline{color:var(--bad);font-weight:600}
+
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(600px,calc(100% - 32px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+#toast.show{opacity:1}
+#toast.warn{background:var(--warn);color:#fff}
+#toast.err{background:var(--bad);color:#fff}
+#busy{position:fixed;top:14px;right:14px;background:var(--primary);color:var(--primary-ink);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:40}
+#busy[hidden]{display:none}
+
+#gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:30;padding:16px}
+.gcard{background:var(--panel);border-radius:14px;padding:32px 28px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.15)}
+.gcard h1{margin:0;font-size:19px}
+.gcard p{margin:0;font-size:13px;color:var(--mute)}
+.gerr{font-size:12px;color:var(--bad);word-break:break-word;text-align:left;background:var(--bad-soft);border-radius:8px;padding:10px;max-height:180px;overflow:auto}
+
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px}
+  .brand,.who{border:0;padding:4px 8px;margin:0}
+  .grp,.ver{display:none}
+  .nav{width:auto}
+  .split{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gcard">
+    <h1>Planejamento Orçamentário</h1>
+    <p id="gMsg">Entre com a sua conta Polystell para continuar.</p>
+    <div id="gErr" class="gerr" hidden></div>
+    <button class="btn" id="gBtn">Entrar com a conta Polystell</button>
+  </div>
+</div>
+
+<div class="app" id="appRoot" hidden>
+  <aside class="side" aria-label="Menu">
+    <div class="brand"><b>Polystell</b><span>Planejamento Orçamentário</span></div>
+    <div class="who"><div class="ini" id="uIni"></div><div><b id="uName"></b><span id="uRole"></span></div></div>
+    <nav id="nav"></nav>
+    <div class="ver"><span>v1.0</span><button id="btnSair">Sair</button></div>
+  </aside>
+  <main class="main">
+    <header class="top"><h1 id="vTitle"></h1><span class="meta" id="vMeta"></span></header>
+    <section id="view"></section>
+  </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="busy" hidden>Gravando…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/msal-browser/3.28.1/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   CONFIGURAÇÃO — Polystell (Client ID e Tenant ID são identificadores
+   públicos do App Registration; não são segredos)
+===================================================================== */
+const CFG={
+  clientId:'c066630d-9dc2-4c4a-8c60-8f0056e9e5e2',
+  tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
+  spHost:'https://polystellcombr.sharepoint.com',
+  sitePath:'/sites/Apps',
+  adminEmails:['leonardo@polystell.com.br'],   // admin raiz (destrava tudo mesmo sem vínculo)
+  deptDiretoria:'00004',                        // vínculo a este depto = aprova
+  deptTI:'00008',                               // vínculo a este depto = admin
+  lists:{
+    plan:'08_Planejamento',
+    vinc:'08_Gestor_Departamento',
+    ex:'08_Exercicios',
+    dept:'98_Cadastro_Departamento',
+    cc:'98_Cadastro_Centro_Custo',
+    cat:'98_Cadastro_Categoria_Financeira',
+    real:'98_Realizado'                         // opcional (Etapa 2)
+  }
+};
+
+const MES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const QLAB=['1º tri','2º tri','3º tri','4º tri'];
+
+/* ============================ AUTENTICAÇÃO ============================ */
+const SCOPE_SP=[CFG.spHost+'/AllSites.Write'];
+const msalApp=new msal.PublicClientApplication({
+  auth:{clientId:CFG.clientId,authority:'https://login.microsoftonline.com/'+CFG.tenantId,redirectUri:location.origin+location.pathname},
+  cache:{cacheLocation:'localStorage'}
+});
+let acct=null;
+async function tok(){
+  try{const r=await msalApp.acquireTokenSilent({scopes:SCOPE_SP,account:acct});return r.accessToken;}
+  catch(e){await msalApp.acquireTokenRedirect({scopes:SCOPE_SP});throw e;}
+}
+
+/* ========================= CAMADA SHAREPOINT ========================= */
+const API=CFG.spHost+CFG.sitePath+'/_api/';
+async function sp(path,opt={}){
+  const t=await tok();
+  const headers={Authorization:'Bearer '+t,Accept:'application/json;odata=nometadata','Content-Type':opt.ctype||'application/json;odata=nometadata'};
+  if(opt.merge){headers['IF-MATCH']='*';headers['X-HTTP-Method']='MERGE';}
+  const res=await fetch(path.startsWith('http')?path:API+path,{method:opt.method||'GET',headers,body:opt.body!==undefined?JSON.stringify(opt.body):undefined});
+  if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}throw new Error(`HTTP ${res.status} em ${path}\n${d}`);}
+  if(res.status===204)return null;
+  const txt=await res.text();return txt?JSON.parse(txt):null;
+}
+async function getAll(list,query){
+  let url=`web/lists/getbytitle('${encodeURIComponent(list)}')/items?${query}`;const out=[];
+  while(url){const j=await sp(url);out.push(...(j.value||[]));url=j['odata.nextLink']||null;}
+  return out;
+}
+const mergeItem=(list,id,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,body:fields});
+const addItem=(list,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items`,{method:'POST',body:fields});
+async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST',body:{logonName:'i:0#.f|membership|'+email}});return j.Id;}
+
+// criação de item DENTRO da pasta do departamento (formato "como digitado na tela": pt-BR)
+const locNum=v=>String(Math.round(v*100)/100).replace('.',',');
+const locDate=(a,m)=>`01/${String(m+1).padStart(2,'0')}/${a}`;
+const personJson=email=>JSON.stringify([{Key:'i:0#.f|membership|'+email}]);
+const SOFT_FIELDS=new Set(['DEPARTAMENTO','GESTOR','OBSERVACAO','Title']);
+async function createPlanRow(dept,fv){
+  const body={
+    listItemCreateInfo:{__metadata:{type:'SP.ListItemCreationInformationUsingPath'},
+      FolderPath:{__metadata:{type:'SP.ResourcePath'},DecodedUrl:`${CFG.sitePath}/Lists/${CFG.lists.plan}/${dept}`}},
+    formValues:Object.entries(fv).map(([FieldName,FieldValue])=>({FieldName,FieldValue:String(FieldValue)})),
+    bNewDocumentUpdate:false
+  };
+  const j=await sp(`web/lists/getbytitle('${encodeURIComponent(CFG.lists.plan)}')/AddValidateUpdateItemUsingPath`,{method:'POST',ctype:'application/json;odata=verbose',body});
+  const vals=j.value||(j.d&&j.d.AddValidateUpdateItemUsingPath&&j.d.AddValidateUpdateItemUsingPath.results)||[];
+  const hard=vals.filter(v=>v.HasException&&!SOFT_FIELDS.has(v.FieldName));
+  if(hard.length)throw new Error('Campo recusado: '+hard.map(v=>v.FieldName+' — '+v.ErrorMessage).join('; '));
+  vals.filter(v=>v.HasException).forEach(v=>console.warn('Campo opcional não gravado:',v.FieldName,v.ErrorMessage));
+  const idf=vals.find(v=>v.FieldName==='Id');
+  return idf?Number(idf.FieldValue):null;
+}
+
+/* ====================== FILA DE GRAVAÇÃO + STATUS ===================== */
+let busyN=0;
+function busy(on,label){
+  busyN+=on?1:-1;if(busyN<0)busyN=0;
+  const b=document.getElementById('busy');
+  b.hidden=busyN===0;if(label)b.textContent=label;else if(busyN)b.textContent='Gravando…';
+}
+async function runQueue(tasks,label){
+  busy(true);
+  try{for(let i=0;i<tasks.length;i++){document.getElementById('busy').textContent=`${label} ${i+1}/${tasks.length}…`;await tasks[i]();}}
+  finally{busy(false);}
+}
+function fail(e){console.error(e);toast('Erro ao gravar no SharePoint. Recarregue a página e confira o console (F12). '+String(e.message||e).split('\n')[0],'err');}
+
+/* ============================ DADOS EM MEMÓRIA ======================== */
+const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],ex:{},plan:{},real:{},realMissing:false};
+const rep=v=>Array(12).fill(v);
+const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
+function buildItems(rows){
+  const map={};
+  rows.forEach(r=>{
+    if(!r.COD_CC||!r.COMPETENCIA)return;
+    const m=new Date(r.COMPETENCIA).getUTCMonth();
+    const det=(r.DETALHAMENTO||'').trim()||'(sem detalhamento)';
+    const k=itemKey(r.COD_DPTO,r.COD_CC,r.COD_CAT,det);
+    if(!map[k])map[k]={key:k,dept:r.COD_DPTO,cc:r.COD_CC,cat:r.COD_CAT,det,obs:'',prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    const it=map[k];
+    it.ids[m]=r.Id;
+    it.prev[m]=Number(r.PREVISTO)||0;
+    it.st[m]=r.STATUS||'Rascunho';
+    it.apr[m]=(r.APROVADO===null||r.APROVADO===undefined||r.APROVADO==='')?null:Number(r.APROVADO);
+    if(r.MOTIVO)it.mot[m]=r.MOTIVO;
+    if(r.OBSERVACAO&&!it.obs)it.obs=r.OBSERVACAO;
+  });
+  return Object.values(map);
+}
+async function loadYear(ano,force){
+  if(DB.plan[ano]&&!force)return;
+  busy(true,'Carregando '+ano+'…');
+  try{
+    const rows=await getAll(CFG.lists.plan,`$select=Id,COD_DPTO,ANO,COMPETENCIA,COD_CC,DESC_CC,COD_CAT,DESC_CAT,DETALHAMENTO,OBSERVACAO,PREVISTO,STATUS,APROVADO,MOTIVO&$filter=ANO eq ${ano}&$top=2000`);
+    rows.forEach(r=>{if(r.DESC_CC&&!DB.ccMap[r.COD_CC])DB.ccMap[r.COD_CC]=r.DESC_CC;if(r.DESC_CAT&&!DB.catMap[r.COD_CAT])DB.catMap[r.COD_CAT]=r.DESC_CAT;});
+    DB.plan[ano]=buildItems(rows);
+  }finally{busy(false);}
+}
+async function loadReal(ano){
+  if(DB.real[ano]||DB.realMissing)return;
+  try{
+    DB.real[ano]=await getAll(CFG.lists.real,`$select=Id,ANO,MES,COD_DPTO,COD_CC,COD_CAT,VALOR&$filter=ANO eq ${ano}&$top=2000`);
+  }catch(e){DB.realMissing=true;DB.real[ano]=[];console.warn('98_Realizado indisponível (Etapa 2 pendente).',e.message);}
+}
+
+/* ============================== ESTADO UI ============================= */
+const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null};
+const fmt=n=>Math.round(n).toLocaleString('pt-BR');
+const money=n=>'R$ '+fmt(n);
+const fmtD=iso=>{if(!iso)return '—';const d=iso.slice(0,10).split('-');return `${d[2]}/${d[1]}/${d[0]}`;};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function parse(v){v=String(v).trim();if(!v)return 0;v=v.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');const n=Number(v);return isFinite(n)&&n>0?Math.round(n*100)/100:0;}
+const monthsOf=sc=>sc==='ANO'?[0,1,2,3,4,5,6,7,8,9,10,11]:[sc*3,sc*3+1,sc*3+2];
+const pill=s=>s?`<span class="pill p-${s}">${s}</span>`:'';
+const deptName=c=>(DB.deptByCod[c]&&DB.deptByCod[c].DESC_DPTO)||c;
+const ccDesc=c=>DB.ccMap[c]||'';
+const catDesc=c=>DB.catMap[c]||'';
+const ANOS=()=>Object.keys(DB.ex).map(Number).sort((a,b)=>a-b);
+const exStatus=a=>DB.ex[a]?DB.ex[a].status:null;
+const planDepts=()=>[...new Set(DB.vincs.map(v=>v.cod))].filter(Boolean).sort();
+const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
+const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
+const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
+let tt;
+function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='show'+(kind?' '+kind:'');clearTimeout(tt);tt=setTimeout(()=>t.className='',kind==='err'?9000:5000);}
+
+function qStatus(list,ms){
+  let has=false,r=false,p=false,x=false,a=false;
+  list.forEach(i=>ms.forEach(m=>{if(i.prev[m]>0){has=true;const s=i.st[m];if(s==='Rascunho')r=true;else if(s==='Pendente')p=true;else if(s==='Reprovado')x=true;else a=true;}}));
+  if(!has)return null;if(r)return'Rascunho';if(p)return'Pendente';if(x&&a)return'Parcial';if(x)return'Reprovado';return'Aprovado';
+}
+function prazoStatus(dept,ano,q){
+  const ex=DB.ex[ano];if(!ex)return{s:'—',c:'draft'};
+  const ms=[q*3,q*3+1,q*3+2];let has=false,draft=false;
+  itemsOf(ano,dept).forEach(i=>ms.forEach(m=>{if(i.prev[m]>0){has=true;if(i.st[m]==='Rascunho')draft=true;}}));
+  const late=ex.prazos[q]&&new Date()>new Date(ex.prazos[q].slice(0,10)+'T23:59:59');
+  if(!has)return late?{s:'Sem itens',c:'draft'}:{s:'Aberto',c:'draft'};
+  if(draft)return late?{s:'Atrasado',c:'bad'}:{s:'Aberto',c:'draft'};
+  return {s:'Enviado',c:'ok'};
+}
+const allowedDepts=()=>S.role.dir?planDepts():myDepts();
+
+function views(){
+  const v=[];
+  if(S.role.admin){v.push(['gest','Gestores','Cadastros']);v.push(['prazos','Exercícios e prazos','Cadastros']);}
+  v.push(['plan','Planejamento','Operações']);
+  v.push(['acomp','Acompanhamento','Operações']);
+  if(S.role.dir)v.push(['aprov','Aprovação','Operações']);
+  return v;
+}
+function render(){
+  const vs=views();
+  if(!vs.some(v=>v[0]===S.view))S.view='plan';
+  let lastG='',nav='';
+  vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${label}</button>`;});
+  document.getElementById('nav').innerHTML=nav;
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{S.view=b.dataset.view;S.adding=false;S.tool=null;render();});
+  const deps=allowedDepts();
+  if(deps.length&&!deps.includes(S.dept))S.dept=deps[0];
+  ({plan:renderPlan,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
+}
+function setHead(t,m){document.getElementById('vTitle').textContent=t;document.getElementById('vMeta').textContent=m;}
+function deptTabs(deps){return deps.length>1?`<div class="tabs" role="group" aria-label="Departamento">${deps.map(d=>`<button class="tab" data-dept="${d}" aria-pressed="${S.dept===d}">${esc(deptName(d))}</button>`).join('')}</div>`:`<b>${esc(deptName(deps[0]||''))}</b>`;}
+function yearSeg(cur,attr){return `<div class="seg" role="group" aria-label="Ano">${ANOS().map(a=>`<button ${attr}="${a}" aria-pressed="${cur===a}">${a}</button>`).join('')}</div>`;}
+function bindDeptTabs(v){v.querySelectorAll('[data-dept]').forEach(b=>b.onclick=()=>{S.dept=b.dataset.dept;S.adding=false;S.tool=null;render();});}
+function noExPanel(){
+  return `<div class="panel"><p class="empty">Nenhum exercício aberto ainda.${S.role.admin?' Abra o primeiro exercício em <b>Exercícios e prazos</b>.':' Peça à TI ou à Diretoria para abrir o exercício.'}</p></div>`;
+}
+
+/* ============================ PLANEJAMENTO ============================ */
+function renderPlan(){
+  const deps=allowedDepts();
+  if(!ANOS().length){setHead('Planejamento','');document.getElementById('view').innerHTML=noExPanel();return;}
+  if(!deps.length){setHead('Planejamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Você ainda não está vinculado a nenhum departamento. Peça à TI para te vincular na tela Gestores.</p></div>`;return;}
+  const closed=exStatus(S.ano)==='Encerrado';
+  const ro=S.role.dir||closed;
+  setHead(`Planejamento ${S.ano}`,(closed?'Exercício encerrado · somente consulta · ':'')+(S.role.dir?'Todos os departamentos · somente leitura':'Visível para você: '+deps.map(deptName).join(' · ')));
+  const its=itemsOf(S.ano,S.dept);
+  const ms=monthsOf(S.scope);
+  const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
+  const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
+  const draftIn=its.some(i=>ms.some(m=>i.prev[m]>0&&i.st[m]==='Rascunho'));
+  const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
+  const quarters=S.scope==='ANO'?[0,1,2,3]:[S.scope];
+  const scopeName=S.scope==='ANO'?'o ano':'o '+QLAB[S.scope];
+
+  let h=`<div class="row">${deptTabs(deps)}<span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${closed?'<span class="chip c-draft">Exercício encerrado</span>':''}${yearSeg(S.ano,'data-ano')}</span></div>`;
+  h+=`<div class="stats">
+    <div class="stat"><span>Previsto no ano</span><b>${money(sumIf(()=>true))}</b></div>
+    <div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div>
+    <div class="stat"><span>Aguardando diretoria</span><b>${money(sumIf((i,m)=>i.st[m]==='Pendente'))}</b></div>
+    <div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div></div>`;
+  if(DB.ex[S.ano])h+=`<div class="prazos"><span>Prazos de envio</span>${[0,1,2,3].map(q=>{const p=prazoStatus(S.dept,S.ano,q);return `<span class="chip c-${p.c}">${QLAB[q]} · até ${fmtD(DB.ex[S.ano].prazos[q])} · ${p.s}</span>`;}).join('')}</div>`;
+  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Período">${['ANO',0,1,2,3].map(sc=>`<button data-scope="${sc}" aria-pressed="${S.scope===sc}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div>`;
+  if(!ro){
+    h+=`<div class="actions"><button class="btn ghost" id="addBtn">+ Novo item</button><button class="btn ghost" id="impBtn">Importar planilha</button>`;
+    if(srcYears.length)h+=`<button class="btn ghost" id="copyBtn">Copiar de outro ano</button>`;
+    h+=`<button class="btn" id="sendBtn" ${draftIn?'':'disabled'}>Enviar ${scopeName} para aprovação</button></div>`;
+  }
+  h+=`</div>`;
+  if(!ro)h+=toolHtml();
+  if(S.adding&&!ro){
+    const myCCs=DB.ccs.filter(c=>c.COD_DPTO===S.dept);
+    h+=`<form class="additem" id="addForm">
+      <label for="fCC">Centro de custo<select id="fCC">${myCCs.map(c=>`<option value="${c.COD_CC}">${c.COD_CC} · ${esc(c.DESC_CC)}</option>`).join('')}</select></label>
+      <label for="fCat">Categoria financeira<select id="fCat">${DB.cats.map(c=>`<option value="${c.COD_CAT}">${c.COD_CAT} · ${esc(c.DESC_CAT)}</option>`).join('')}</select></label>
+      <label for="fDet">Detalhamento<input id="fDet" placeholder="Ex.: Microsoft 365" autocomplete="off"></label>
+      <label for="fObs" class="wide">Observação para a diretoria (opcional)<input id="fObs" placeholder="Ex.: renovação do contrato, reajuste de 8%" autocomplete="off"></label>
+      <div class="formbtns"><button type="submit" class="btn">Adicionar</button><button type="button" class="btn ghost" id="cancelAdd">Cancelar</button></div>
+      <p class="hint">Centro de custo e categoria vêm das listas do JAD. O item entra como rascunho; depois digite os meses ou use “Preencher”.</p></form>`;
+  }
+
+  let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
+  quarters.forEach(q=>{t+=`<th class="qh" colspan="3">${QLAB[q]}${pill(qStatus(its,[q*3,q*3+1,q*3+2]))}</th>`;});
+  t+=`<th class="tot" rowspan="2">Total</th></tr><tr>`;
+  ms.forEach(m=>{t+=`<th class="mh ${m%3===0?'qs':''}">${MES[m]}</th>`;});
+  t+=`</tr></thead><tbody>`;
+  if(!its.length){t+=`<tr><td class="empty" colspan="${ms.length+2}">Nenhum item em ${S.ano}.${ro?'':(srcYears.length?' Use “Copiar de outro ano” para trazer os recorrentes,':'')+' “Importar planilha” ou “Novo item”.'}</td></tr>`;}
+  [...new Set(its.map(i=>i.cc))].sort().forEach(cc=>{
+    const g=its.filter(i=>i.cc===cc);
+    const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+i.prev[m],0),0);
+    t+=`<tr class="grp"><td class="item"><span class="code">${cc}</span> ${esc(ccDesc(cc))}</td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
+    g.forEach(i=>{
+      const rt=ms.reduce((b,m)=>b+i.prev[m],0);
+      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub"><span class="code">${i.cat}</span> ${esc(catDesc(i.cat))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button></span>`}</td>`;
+      ms.forEach(m=>{
+        const s=i.prev[m]>0?i.st[m]:'';
+        const cut=s==='Aprovado'&&i.apr[m]!=null&&i.apr[m]<i.prev[m];
+        const mot=i.mot[m]?' · '+i.mot[m]:'';
+        const tip=s==='Aprovado'?`Aprovado · ${money(i.apr[m])}${mot}`:s==='Reprovado'?`Reprovado${mot}`:s;
+        t+=`<td class="c ${m%3===0?'qs':''} ${s?'s-'+s:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${i.prev[m]?fmt(i.prev[m]):''}" ${ro?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
+      });
+      t+=`<td class="tot">${money(rt)}</td></tr>`;
+    });
+  });
+  t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(deptName(S.dept))}</td>`;
+  ms.forEach(m=>{t+=`<td class="${m%3===0?'qs':''}">${fmt(its.reduce((a,i)=>a+i.prev[m],0))}</td>`;});
+  t+=`<td class="tot">${money(its.reduce((a,i)=>a+ms.reduce((b,m)=>b+i.prev[m],0),0))}</td></tr></tfoot></table></div>`;
+  h+=t;
+  h+=`<div class="legend"><span><i class="sw" style="background:var(--panel)"></i>Rascunho</span><span><i class="sw" style="background:var(--warn-soft)"></i>Aguardando diretoria</span><span><i class="sw" style="background:var(--ok-soft)"></i>Aprovado</span><span><i class="sw" style="background:var(--bad-soft)"></i>Reprovado</span><span><i class="sw" style="background:linear-gradient(225deg,var(--warn) 30%,var(--panel) 30%)"></i>Aprovado com corte (passe o mouse para ver o motivo)</span></div>`;
+  if(!ro)h+=`<p class="hint">Alterar um mês já aprovado devolve esse mês para aprovação.</p>`;
+
+  const v=document.getElementById('view');
+  v.innerHTML=`<div class="panel">${h}</div>`;
+  bindDeptTabs(v);
+  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);S.tool=null;S.adding=false;try{await loadYear(S.ano);await loadReal(S.ano);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-scope]').forEach(b=>b.onclick=()=>{const x=b.dataset.scope;S.scope=x==='ANO'?'ANO':Number(x);render();});
+  const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn;};
+  on('addBtn',()=>{S.adding=true;S.tool=null;render();document.getElementById('fDet').focus();});
+  on('impBtn',()=>{S.tool={kind:'imp'};S.adding=false;render();});
+  on('copyBtn',()=>{S.tool={kind:'copy',src:null};S.adding=false;render();});
+  on('sendBtn',sendScope);
+  on('cancelAdd',()=>{S.adding=false;render();});
+  const fm=document.getElementById('addForm');if(fm)fm.onsubmit=e=>{e.preventDefault();addNewItem();};
+  v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();const x=document.getElementById('tVal');if(x)x.focus();});
+  v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();const x=document.getElementById('tObs');if(x)x.focus();});
+  bindTool();
+  v.querySelectorAll('td.c input').forEach(inp=>{
+    inp.onfocus=()=>inp.select();
+    inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
+    inp.onchange=()=>editCell(inp.dataset.ikey,+inp.dataset.m,parse(inp.value));
+  });
+}
+
+/* ---- painel de ferramentas ---- */
+const findItem=key=>(DB.plan[S.ano]||[]).find(i=>i.key===key);
+function toolHtml(){
+  const T=S.tool;if(!T)return '';
+  const scopeName=S.scope==='ANO'?'no ano inteiro':'no '+QLAB[S.scope];
+  if(T.kind==='fill'){
+    const it=findItem(T.key);if(!it)return '';
+    return `<div class="tool" role="region" aria-label="Preencher linha"><h2>Preencher “${esc(it.det)}” ${scopeName}</h2>
+      <div class="line"><div class="seg" role="group" aria-label="Forma de preencher"><button data-mode="rep" aria-pressed="${T.mode==='rep'}">Repetir valor mensal</button><button data-mode="dist" aria-pressed="${T.mode==='dist'}">Distribuir um total</button></div>
+      <label for="tVal" class="hint">${T.mode==='rep'?'Valor por mês (R$)':'Total a distribuir (R$)'}</label><input type="text" id="tVal" inputmode="decimal" placeholder="${T.mode==='rep'?'3.300':'39.600'}">
+      <button class="btn" id="tApply">Aplicar</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
+      <p class="hint">Substitui os valores dos meses do período selecionado. Meses já aprovados que mudarem voltam para aprovação.</p></div>`;
+  }
+  if(T.kind==='obs'){
+    const it=findItem(T.key);if(!it)return '';
+    return `<div class="tool" role="region" aria-label="Observação do item"><h2>Observação de “${esc(it.det)}”</h2>
+      <textarea id="tObs" placeholder="Explique para a diretoria por que esse valor é necessário">${esc(it.obs)}</textarea>
+      <div class="line"><button class="btn" id="tSaveObs">Salvar observação</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
+      <p class="hint">A observação aparece para a diretoria na tela de aprovação. Alterar a observação não muda o status do item.</p></div>`;
+  }
+  if(T.kind==='copy'){
+    const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
+    const sel=T.src&&srcYears.includes(T.src)?T.src:srcYears[srcYears.length-1];
+    return `<div class="tool" role="region" aria-label="Copiar de outro exercício"><h2>Copiar itens para ${S.ano}</h2>
+      <div class="line"><label for="tSrc" class="hint">Copiar do exercício</label><select id="tSrc">${srcYears.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('')}</select>
+      <button class="btn" id="tCopyGo">Copiar como rascunho</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
+      <p class="hint">Traz só os itens que ainda não existem em ${S.ano}, com os valores aprovados na origem (ou os pedidos, quando não houve aprovação). Tudo entra como rascunho.</p></div>`;
+  }
+  if(T.kind==='imp'){
+    let h=`<div class="tool" role="region" aria-label="Importar planilha"><h2>Importar planilha de planejamento</h2>
+      <p class="hint">Aceita o modelo atual em Excel: a aba do departamento com COD C.CUSTO, COD C.FINANCEIRA, DETALHAMENTO e os meses. Os itens entram como rascunho em ${S.ano}. Linhas zeradas e de outros departamentos são ignoradas.</p>
+      <div class="line"><input type="file" id="tFile" accept=".xlsx,.xls" aria-label="Arquivo Excel"><button class="btn ghost" id="tCancel">Fechar</button></div>`;
+    if(S.imp){
+      const I=S.imp;
+      if(I.error)h+=`<p class="warnline">${esc(I.error)}</p>`;
+      else{
+        const names=Object.keys(I.sheets);
+        if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
+        const pv=impPreview();
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''} · total a importar <b>${money(pv.total)}</b></p>`;
+        if(pv.novos.length)h+=`<div class="line"><button class="btn" id="tImport">Importar ${pv.novos.length} itens como rascunho</button></div>`;
+      }
+    }
+    return h+`</div>`;
+  }
+  return '';
+}
+function bindTool(){
+  const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn;};
+  on('tCancel',()=>{S.tool=null;S.imp=null;render();});
+  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{S.tool.mode=b.dataset.mode;render();document.getElementById('tVal').focus();});
+  on('tApply',()=>applyFill(parse(document.getElementById('tVal').value)));
+  const tv=document.getElementById('tVal');if(tv)tv.onkeydown=e=>{if(e.key==='Enter')applyFill(parse(tv.value));};
+  const ts=document.getElementById('tSrc');if(ts)ts.onchange=()=>{S.tool.src=Number(ts.value);};
+  on('tCopyGo',()=>{const e=document.getElementById('tSrc');copyFrom(Number(e.value));});
+  on('tSaveObs',saveObs);
+  const f=document.getElementById('tFile');if(f)f.onchange=()=>{if(f.files[0])readFile(f.files[0]);};
+  const sh=document.getElementById('tSheet');if(sh)sh.onchange=()=>{S.imp.sel=sh.value;render();};
+  on('tImport',doImport);
+}
+
+/* ---- gravações do planejamento ---- */
+function baseFields(it,m,ano){
+  return {
+    Title:`${it.det} · ${MES[m]}/${ano}`,
+    CHAVE_ITEM:`${ano}-${String(m+1).padStart(2,'0')}-${it.cc}-${it.cat}-${it.det}`,
+    COD_DPTO:it.dept,
+    ANO:String(ano),
+    COMPETENCIA:locDate(ano,m),
+    TRIMESTRE:'Q'+(Math.floor(m/3)+1),
+    COD_CC:it.cc, DESC_CC:ccDesc(it.cc)||it.cc,
+    COD_CAT:it.cat, DESC_CAT:catDesc(it.cat)||it.cat,
+    DETALHAMENTO:it.det,
+    OBSERVACAO:it.obs||'',
+    PREVISTO:locNum(it.prev[m]),
+    STATUS:it.st[m],
+    GESTOR:personJson(DB.me.email),
+    DEPARTAMENTO:deptName(it.dept)
+  };
+}
+async function persistCell(it,m,ano){
+  if(it.ids[m]){
+    await mergeItem(CFG.lists.plan,it.ids[m],{PREVISTO:it.prev[m],STATUS:it.st[m],APROVADO:null,MOTIVO:'',DATA_APROVACAO:null});
+  }else if(it.prev[m]>0){
+    it.ids[m]=await createPlanRow(it.dept,baseFields(it,m,ano));
+  }
+}
+function setCell(it,m,v){
+  const old=it.prev[m];if(v===old)return {changed:false};
+  const s=old>0?it.st[m]:'Rascunho';
+  it.prev[m]=v;
+  let ev=null;
+  if(s==='Aprovado'){it.st[m]=v>0?'Pendente':'Rascunho';it.apr[m]=null;delete it.mot[m];ev='re';}
+  else if(s==='Pendente'){it.st[m]='Rascunho';ev='ca';}
+  else it.st[m]='Rascunho';
+  return {changed:true,ev};
+}
+function editCell(key,m,v){
+  const it=findItem(key);if(!it)return;
+  const r=setCell(it,m,v);
+  if(!r.changed){rerenderKeepFocus();return;}
+  if(r.ev==='re')toast(`${MES[m]} de “${it.det}” já estava aprovado. Voltou para aprovação.`,'warn');
+  if(r.ev==='ca')toast(`Envio de ${MES[m]} de “${it.det}” cancelado. Reenvie quando terminar os ajustes.`);
+  const ano=S.ano;
+  busy(true);persistCell(it,m,ano).catch(fail).finally(()=>busy(false));
+  rerenderKeepFocus();
+}
+function applyFill(val){
+  if(!val){toast('Informe um valor maior que zero.','warn');return;}
+  const it=findItem(S.tool.key);if(!it)return;
+  const ms=monthsOf(S.scope);const ano=S.ano;
+  let vals;
+  if(S.tool.mode==='rep')vals=ms.map(()=>val);
+  else{const base=Math.floor(val/ms.length*100)/100;vals=ms.map((_,k)=>k===ms.length-1?Math.round((val-base*(ms.length-1))*100)/100:base);}
+  const tasks=[];let re=0;
+  ms.forEach((m,k)=>{const r=setCell(it,m,vals[k]);if(r.changed){if(r.ev==='re')re++;tasks.push(()=>persistCell(it,m,ano));}});
+  S.tool=null;render();
+  runQueue(tasks,'Gravando').then(()=>{
+    let msg=`“${it.det}” preenchido em ${ms.length} meses.`;
+    if(re)msg+=` ${re} mês(es) aprovado(s) voltaram para aprovação.`;
+    toast(msg,re?'warn':undefined);
+  }).catch(fail);
+}
+function rerenderKeepFocus(){
+  requestAnimationFrame(()=>{
+    const a=document.activeElement;const k=a&&a.dataset?a.dataset.key:null;
+    render();
+    if(k){const el=document.querySelector(`[data-key="${CSS.escape(k)}"]`);if(el){el.focus();if(el.select)el.select();}}
+  });
+}
+function addNewItem(){
+  const cc=document.getElementById('fCC').value,cat=document.getElementById('fCat').value,det=document.getElementById('fDet').value.trim(),obs=document.getElementById('fObs').value.trim();
+  if(!cc){toast('Nenhum centro de custo do seu departamento foi encontrado na lista do JAD.','warn');return;}
+  if(!det){toast('Informe o detalhamento do item.','warn');document.getElementById('fDet').focus();return;}
+  if(exists(S.ano,S.dept,cc,cat,det)){toast('Já existe um item com esse centro de custo, categoria e detalhamento.','warn');return;}
+  const it={key:itemKey(S.dept,cc,cat,det),dept:S.dept,cc,cat,det,obs,prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+  (DB.plan[S.ano]=DB.plan[S.ano]||[]).push(it);
+  S.adding=false;S.tool={kind:'fill',key:it.key,mode:'rep'};render();
+  const x=document.getElementById('tVal');if(x)x.focus();
+  toast(`“${det}” adicionado como rascunho. Preencha os meses (nada é gravado até ter valor).`);
+}
+function saveObs(){
+  const it=findItem(S.tool.key);if(!it)return;
+  it.obs=document.getElementById('tObs').value.trim();
+  const tasks=[];const ano=S.ano;
+  it.ids.forEach(id=>{if(id)tasks.push(()=>mergeItem(CFG.lists.plan,id,{OBSERVACAO:it.obs}));});
+  S.tool=null;render();
+  runQueue(tasks,'Gravando').then(()=>toast('Observação salva.')).catch(fail);
+}
+function copyFrom(src){
+  const list=(DB.plan[src]||[]).filter(i=>i.dept===S.dept);
+  const ano=S.ano;const tasks=[];let n=0;
+  list.forEach(i=>{
+    if(exists(ano,i.dept,i.cc,i.cat,i.det))return;
+    const prev=i.prev.map((v,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v);
+    const it={key:itemKey(i.dept,i.cc,i.cat,i.det),dept:i.dept,cc:i.cc,cat:i.cat,det:i.det,obs:i.obs,prev,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    (DB.plan[ano]=DB.plan[ano]||[]).push(it);n++;
+    prev.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
+  });
+  S.tool=null;render();
+  if(!n){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
+  runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho, com os valores aprovados lá.`)).catch(fail);
+}
+function sendScope(){
+  const ms=monthsOf(S.scope);const tasks=[];let n=0;
+  itemsOf(S.ano,S.dept).forEach(i=>ms.forEach(m=>{
+    if(i.prev[m]>0&&i.st[m]==='Rascunho'){i.st[m]='Pendente';n++;
+      if(i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,i.ids[m],{STATUS:'Pendente'}));
+    }
+  }));
+  render();
+  runQueue(tasks,'Enviando').then(()=>toast(`${n} lançamento(s) de ${deptName(S.dept)} enviados para a diretoria.`)).catch(fail);
+}
+
+/* ---- importação do Excel ---- */
+const MESN=['JANEIRO','FEVEREIRO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+function parseSheet(rows){
+  let hi=-1;
+  for(let i=0;i<rows.length;i++){const H=(rows[i]||[]).map(norm);if(H.includes('COD C.CUSTO')&&H.some(h=>h.startsWith('DETALHAMENTO'))){hi=i;break;}}
+  if(hi<0)return null;
+  const H=rows[hi].map(norm);
+  const ccI=H.indexOf('COD C.CUSTO'),catI=H.indexOf('COD C.FINANCEIRA'),detI=H.findIndex(h=>h.startsWith('DETALHAMENTO')),cdI=H.indexOf('COD DETALHAMENTO'),catDI=H.indexOf('CATEGORIA FINANCEIRA'),ccDI=H.indexOf('CENTRO DE CUSTO');
+  if(catI<0)return null;
+  let mrow=null;for(let k=hi-1;k>=Math.max(0,hi-6);k--){const R=(rows[k]||[]).map(norm);if(R.includes('JANEIRO')){mrow=R;break;}}
+  if(!mrow)return null;
+  const mc=MESN.map(m=>mrow.indexOf(m));if(mc.some(c=>c<0))return null;
+  const out=[];const ccD={};
+  rows.slice(hi+1).forEach(r=>{
+    r=r||[];const g=i=>i>=0&&i<r.length?r[i]:null;const blank=x=>x===null||x===undefined||x==='';
+    const cc=g(ccI),cat=g(catI);
+    if(ccI>0&&blank(cc)&&!blank(g(ccI-1))&&!blank(g(ccDI))){ccD[String(g(ccI-1)).replace(/\D/g,'').padStart(10,'0')]=String(g(ccDI)).trim();return;}
+    if(blank(cc)||blank(cat))return;
+    if(cdI>=0&&blank(g(cdI)))return;
+    const catD=String((catDI>=0&&!blank(g(catDI))?g(catDI):'')||(ccDI>=0&&!blank(g(ccDI))?g(ccDI):'')).trim();
+    const det=String(!blank(g(detI))?g(detI):(catD||'Item')).trim();
+    const vals=mc.map(c=>{const x=g(c);return typeof x==='number'&&isFinite(x)&&x>0?Math.round(x*100)/100:0;});
+    if(!vals.some(v=>v>0))return;
+    out.push({cc:String(cc).replace(/\D/g,'').padStart(10,'0'),cat:String(cat).replace(/\D/g,'').padStart(6,'0'),det,catD,vals});
+  });
+  return {items:out,ccD};
+}
+function readFile(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(fr.result),{type:'array'});
+      const sheets={};
+      wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});const p=parseSheet(rows);if(p&&p.items.length)sheets[n]=p;});
+      const names=Object.keys(sheets);
+      if(!names.length)S.imp={error:'Nenhuma aba no formato do planejamento foi encontrada (faltam COD C.CUSTO, COD C.FINANCEIRA, DETALHAMENTO e os meses).'};
+      else S.imp={file:file.name,sheets,sel:names.find(n=>!/TESTE/i.test(n))||names[0]};
+    }catch(e){S.imp={error:'Não foi possível ler o arquivo. Confirme que é um Excel (.xlsx) válido.'};}
+    render();
+  };
+  fr.readAsArrayBuffer(file);
+}
+function impPreview(){
+  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0;const novos=[];const seen=new Set();
+  p.items.forEach(r=>{
+    if(r.cc.slice(0,5)!==S.dept){outro++;return;}
+    const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
+    if(seen.has(k)||exists(S.ano,S.dept,r.cc,r.cat,r.det)){dup++;return;}
+    seen.add(k);novos.push(r);
+  });
+  return {found:p.items.length,dup,outro,novos,total:novos.reduce((a,r)=>a+r.vals.reduce((b,v)=>b+v,0),0)};
+}
+function doImport(){
+  const pv=impPreview();const p=S.imp.sheets[S.imp.sel];const ano=S.ano;const tasks=[];
+  pv.novos.forEach(r=>{
+    if(!DB.ccMap[r.cc]&&p.ccD[r.cc])DB.ccMap[r.cc]=p.ccD[r.cc];
+    if(!DB.catMap[r.cat]&&r.catD)DB.catMap[r.cat]=r.catD;
+    const it={key:itemKey(S.dept,r.cc,r.cat,r.det),dept:S.dept,cc:r.cc,cat:r.cat,det:r.det,obs:'',prev:r.vals.slice(),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    (DB.plan[ano]=DB.plan[ano]||[]).push(it);
+    r.vals.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
+  });
+  S.tool=null;S.imp=null;render();
+  runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length} itens importados como rascunho em ${ano} (${money(pv.total)}).`)).catch(fail);
+}
+
+/* ============================ ACOMPANHAMENTO ========================== */
+function renderAcomp(){
+  const deps=allowedDepts();
+  if(!ANOS().length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=noExPanel();return;}
+  if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Você ainda não está vinculado a nenhum departamento.</p></div>`;return;}
+  const real=(DB.real[S.ano]||[]).filter(r=>r.COD_DPTO===S.dept);
+  const allReal=DB.real[S.ano]||[];
+  const ULT=allReal.length?Math.max(...allReal.map(r=>Number(r.MES)))-1:-1;
+  setHead(`Acompanhamento ${S.ano}`,`Aprovado × realizado · realizado do JAD${ULT>=0?' até '+MES[ULT].toLowerCase():''}`);
+  const its=itemsOf(S.ano,S.dept);
+  const rmap={};real.forEach(r=>{const k=r.COD_CC+'|'+r.COD_CAT;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.MES)-1]+=Number(r.VALOR)||0;});
+  const keys=[...new Set([...its.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
+  const rows=keys.map(k=>{
+    const [cc,cat]=k.split('|');const g=its.filter(i=>i.cc===cc&&i.cat===cat);
+    const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));
+    return {cc,cat,names:g.map(i=>i.det),apr,rv:rmap[k]||rep(0)};
+  });
+  const upto=a=>ULT<0?0:a.slice(0,ULT+1).reduce((x,y)=>x+y,0);
+  const A=rows.reduce((a,r)=>a+upto(r.apr),0),R=rows.reduce((a,r)=>a+upto(r.rv),0),saldo=A-R;
+  let over=0;rows.forEach(r=>{for(let m=0;m<=ULT;m++)if(r.rv[m]>r.apr[m]+0.005)over++;});
+
+  let h=`<div class="row">${deptTabs(deps)}${yearSeg(S.ano,'data-ano')}</div>`;
+  if(DB.realMissing){
+    h+=`<p class="empty">O realizado ainda não está disponível: a lista <b>${CFG.lists.real}</b> não existe (ou você não tem acesso). Essa é a Etapa 2 da implantação — a sincronização diária do JAD.</p>`;
+  }else if(ULT<0){
+    h+=`<p class="empty">Ainda não há realizado sincronizado para ${S.ano}.</p>`;
+  }else{
+    h+=`<div class="stats"><div class="stat"><span>Aprovado até ${MES[ULT].toLowerCase()}</span><b>${money(A)}</b></div><div class="stat"><span>Realizado até ${MES[ULT].toLowerCase()}</span><b>${money(R)}</b></div><div class="stat"><span>Saldo</span><b class="${saldo<0?'neg':''}">${money(saldo)}</b></div><div class="stat"><span>Execução · meses estourados</span><b>${A?Math.round(R/A*100):0}% · ${over}</b></div></div>`;
+    let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Centro de custo · categoria</th>${MES.map((m,k)=>`<th class="mh ${k%3===0?'qs':''}">${m}</th>`).join('')}<th class="tot">Aprovado<br>até ${MES[ULT]}</th><th class="tot">Realizado<br>até ${MES[ULT]}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
+    if(!rows.length)t+=`<tr><td class="empty" colspan="16">Nenhum item aprovado nem realizado em ${S.ano}.</td></tr>`;
+    rows.forEach(r=>{
+      const unpl=!r.names.length;
+      t+=`<tr><td class="item"><b>${esc(ccDesc(r.cc)||r.cc)}</b><span class="sub"><span class="code">${r.cc}</span> · <span class="code">${r.cat}</span> ${esc(catDesc(r.cat))}</span>${unpl?'<span class="sub unpl">Gasto sem planejamento</span>':`<span class="sub">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
+      for(let m=0;m<12;m++){
+        const fut=m>ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;
+        t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''}" title="${fut?'Mês ainda não fechado':`Realizado ${money(r.rv[m])} de ${money(r.apr[m])} aprovado`}"><div class="rv">${fut?'—':(r.rv[m]?fmt(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmt(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
+      }
+      const s=upto(r.apr)-upto(r.rv);
+      t+=`<td class="tot">${money(upto(r.apr))}</td><td class="tot">${money(upto(r.rv))}</td><td class="tot ${s<0?'unpl':''}">${money(s)}</td></tr>`;
+    });
+    const colA=m=>rows.reduce((a,r)=>a+r.apr[m],0),colR=m=>rows.reduce((a,r)=>a+r.rv[m],0);
+    t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'—':fmt(colR(m))}<div class="av">de ${fmt(colA(m))}</div></td>`).join('')}<td class="tot">${money(A)}</td><td class="tot">${money(R)}</td><td class="tot ${saldo<0?'unpl':''}">${money(saldo)}</td></tr></tfoot></table></div>`;
+    h+=t;
+    h+=`<div class="legend"><span><i class="sw" style="background:var(--bad-soft)"></i>Realizado acima do aprovado</span><span>Número grande: realizado · número pequeno: aprovado</span></div>`;
+    h+=`<p class="hint">O JAD registra o gasto por centro de custo e categoria, sem o detalhamento. Por isso itens da mesma categoria (como Microsoft 365 e AWS) aparecem juntos aqui. A comparação é contra o valor aprovado.</p>`;
+  }
+  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;bindDeptTabs(v);
+  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);await loadReal(S.ano);}catch(e){fail(e);}render();});
+}
+
+/* ============================== APROVAÇÃO ============================= */
+function pendInfo(d){
+  let v=0,c=0;itemsOf(S.aAno,d).forEach(i=>{let any=false;i.st.forEach((s,m)=>{if(s==='Pendente'&&i.prev[m]>0){v+=i.prev[m];any=true;}});if(any)c++;});
+  return {v,c};
+}
+function aRows(){
+  const ms=monthsOf(S.aScope);
+  return itemsOf(S.aAno,S.aDept).map(i=>{const pm=ms.filter(m=>i.st[m]==='Pendente'&&i.prev[m]>0);return pm.length?{i,pm,prev:pm.reduce((a,m)=>a+i.prev[m],0)}:null;}).filter(Boolean);
+}
+const dKey=r=>`${S.aAno}|${S.aDept}|${S.aScope}|${r.i.key}`;
+function dOf(r){const k=dKey(r);if(!S.dec[k])S.dec[k]={d:null,val:r.prev,mot:''};return S.dec[k];}
+const needMot=(r,d)=>d.d==='no'||(d.d==='ok'&&d.val<r.prev);
+
+function renderAprov(){
+  setHead('Aprovação orçamentária','Decisão por item · corte rateado proporcionalmente entre os meses');
+  if(!ANOS().length){document.getElementById('view').innerHTML=noExPanel();return;}
+  const PD=planDepts();
+  if(!S.aDept||!PD.includes(S.aDept)){const f=PD.find(d=>pendInfo(d).c>0);S.aDept=f||PD[0];}
+  const closed=exStatus(S.aAno)==='Encerrado';
+  const rows=aRows();
+  let left=`<div class="dlist"><div class="row">${yearSeg(S.aAno,'data-aano')}</div><div class="hint">Departamentos</div>`;
+  PD.forEach(d=>{
+    const p=pendInfo(d);const late=[0,1,2,3].filter(q=>prazoStatus(d,S.aAno,q).s==='Atrasado');
+    const gest=[...new Set(DB.vincs.filter(v=>v.cod===d).map(v=>v.nome))];
+    left+=`<button class="dbtn" data-adept="${d}" aria-pressed="${S.aDept===d}"><b>${esc(deptName(d))}</b><span class="sub">${p.c?`${p.c} item(ns) aguardando · ${money(p.v)}`:'Nada aguardando'}</span>${late.length?`<span class="sub unpl">Envio atrasado: ${late.map(q=>QLAB[q]).join(', ')}</span>`:''}${gest.length?`<span class="sub">${gest.map(esc).join(', ')}</span>`:''}</button>`;
+  });
+  left+=`</div>`;
+
+  let r=`<div class="panel"><div class="toolbar"><div class="seg" role="group" aria-label="Período em análise">${['ANO',0,1,2,3].map(sc=>`<button data-ascope="${sc}" aria-pressed="${S.aScope===sc}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div><span class="meta">${closed?'Exercício encerrado — somente consulta':''}</span></div>`;
+  r+=`<div class="stats" id="aKpi"></div>`;
+  if(!rows.length){r+=`<p class="empty">Nada aguardando aprovação neste período para ${esc(deptName(S.aDept))} em ${S.aAno}.</p>`;}
+  else{
+    r+=`<div class="gridwrap"><table class="ap"><thead><tr><th>Item</th><th class="num">Previsto</th><th class="num">Aprovado</th><th>Decisão</th><th>Justificativa</th></tr></thead><tbody>`;
+    rows.forEach(x=>{
+      const d=dOf(x);const k=dKey(x);const need=needMot(x,d);
+      const rateio=d.d==='ok'&&d.val!==x.prev?`<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(x.i.prev[m]*d.val/x.prev)).join(' · ')}</span>`:'';
+      r+=`<tr><td><b>${esc(x.i.det)}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
+        <td class="num">${money(x.prev)}</td>
+        <td class="num"><input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}"></td>
+        <td><div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div></td>
+        <td>${need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do corte de '+money(x.prev-d.val)}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>'}${rateio}</td></tr>`;
+    });
+    r+=`</tbody></table></div><div class="afoot"><span class="hint" id="aStatus"></span><button class="btn" id="confirmBtn" ${closed?'disabled':''}>Confirmar decisões</button></div>`;
+  }
+  r+=`</div>`;
+  const v=document.getElementById('view');
+  v.innerHTML=`<div class="split"><div class="panel">${left}</div>${r}</div>`;
+  updateAprovFooter();
+  v.querySelectorAll('[data-aano]').forEach(b=>b.onclick=async()=>{S.aAno=Number(b.dataset.aano);S.aDept=null;try{await loadYear(S.aAno);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-adept]').forEach(b=>b.onclick=()=>{S.aDept=b.dataset.adept;render();});
+  v.querySelectorAll('[data-ascope]').forEach(b=>b.onclick=()=>{const x=b.dataset.ascope;S.aScope=x==='ANO'?'ANO':Number(x);render();});
+  v.querySelectorAll('.dec button').forEach(b=>b.onclick=()=>{const d=S.dec[b.dataset.k];d.d=d.d===b.dataset.d?null:b.dataset.d;render();});
+  v.querySelectorAll('input.aval').forEach(inp=>{
+    inp.onfocus=()=>inp.select();
+    inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
+    inp.onchange=()=>{const x=aRows().find(r=>dKey(r)===inp.dataset.k);const d=S.dec[inp.dataset.k];d.val=Math.min(parse(inp.value),x.prev);if(!d.d)d.d='ok';rerenderKeepFocus();};
+  });
+  v.querySelectorAll('input.amot').forEach(inp=>{inp.oninput=()=>{S.dec[inp.dataset.k].mot=inp.value;inp.classList.toggle('req',!inp.value.trim());updateAprovFooter();};});
+  const cb=document.getElementById('confirmBtn');if(cb)cb.onclick=confirmAprov;
+}
+function updateAprovFooter(){
+  const rows=aRows();let prev=0,decPrev=0,apr=0,nd=0,bad=0;
+  rows.forEach(x=>{const d=dOf(x);prev+=x.prev;if(d.d){nd++;decPrev+=x.prev;if(d.d==='ok')apr+=d.val;if(needMot(x,d)&&!d.mot.trim())bad++;}});
+  const cut=decPrev-apr;const k=document.getElementById('aKpi');
+  if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Redução</span><b>${money(cut)}</b></div><div class="stat"><span>Corte sobre o decidido</span><b>${decPrev?Math.round(cut/decPrev*100):0}%</b></div>`;
+  const s=document.getElementById('aStatus'),b=document.getElementById('confirmBtn');if(!s||!b)return;
+  s.textContent=bad?`Falta justificativa em ${bad} item(ns).`:`${nd} de ${rows.length} itens decididos. Os não decididos continuam aguardando.`;
+  b.disabled=exStatus(S.aAno)==='Encerrado'||!nd||bad>0;
+}
+function confirmAprov(){
+  const tasks=[];let ok=0,no=0;const nowIso=new Date().toISOString();
+  aRows().forEach(x=>{const d=S.dec[dKey(x)];if(!d||!d.d)return;
+    if(d.d==='ok'){
+      const f=x.prev?d.val/x.prev:0;
+      x.pm.forEach(m=>{
+        const val=Math.round(x.i.prev[m]*f*100)/100;
+        x.i.apr[m]=val;x.i.st[m]='Aprovado';if(d.mot.trim())x.i.mot[m]=d.mot.trim();
+        if(x.i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,x.i.ids[m],{STATUS:'Aprovado',APROVADO:val,MOTIVO:d.mot.trim(),DATA_APROVACAO:nowIso,APROVADO_PORId:DB.me.uid}));
+      });ok++;
+    }else{
+      x.pm.forEach(m=>{
+        x.i.apr[m]=0;x.i.st[m]='Reprovado';x.i.mot[m]=d.mot.trim();
+        if(x.i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,x.i.ids[m],{STATUS:'Reprovado',APROVADO:0,MOTIVO:d.mot.trim(),DATA_APROVACAO:nowIso,APROVADO_PORId:DB.me.uid}));
+      });no++;
+    }
+    delete S.dec[dKey(x)];
+  });
+  render();
+  runQueue(tasks,'Gravando decisões').then(()=>toast(`${ok} aprovado(s) e ${no} reprovado(s).`)).catch(fail);
+}
+
+/* ============================== GESTORES ============================== */
+function renderGest(){
+  setHead('Gestores por departamento','Somente TI e Diretoria');
+  const vincsAtivos=DB.vincs.slice().sort((a,b)=>(a.cod+a.nome).localeCompare(b.cod+b.nome));
+  let h=`<div class="tool"><h2>Vincular gestor</h2>
+    <div class="line">
+      <select id="gDept">${DB.depts.map(d=>`<option value="${d.COD_DPTO}">${d.COD_DPTO} · ${esc(d.DESC_DPTO)}</option>`).join('')}</select>
+      <input type="email" id="gEmail" placeholder="email@polystell.com.br" style="min-width:240px">
+      <button class="btn" id="gAdd">Vincular</button>
+    </div>
+    <p class="hint">O vínculo controla o que o app mostra. O acesso de verdade é a permissão da pasta do departamento na lista ${CFG.lists.plan} — conceda Edição na pasta ao vincular e remova ao desvincular.</p></div>`;
+  h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Código</th><th>Gestor</th><th>E-mail</th><th></th></tr></thead><tbody>`;
+  if(!vincsAtivos.length)h+=`<tr><td colspan="5" class="muted">Nenhum vínculo ativo.</td></tr>`;
+  vincsAtivos.forEach(v=>{h+=`<tr><td>${esc(deptName(v.cod))}</td><td class="code">${v.cod}</td><td>${esc(v.nome)}</td><td class="muted">${esc(v.email)}</td><td style="text-align:right"><button class="btn ghost" data-rm="${v.Id}" style="padding:4px 10px;font-size:12px">Remover</button></td></tr>`;});
+  h+=`</tbody></table></div>`;
+  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
+  document.getElementById('gAdd').onclick=addVinc;
+  v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>rmVinc(Number(b.dataset.rm)));
+}
+async function addVinc(){
+  const cod=document.getElementById('gDept').value;
+  const email=document.getElementById('gEmail').value.trim().toLowerCase();
+  if(!email||!email.includes('@')){toast('Informe o e-mail do gestor.','warn');return;}
+  if(DB.vincs.some(v=>v.cod===cod&&v.email===email)){toast('Este gestor já está vinculado a '+deptName(cod)+'.','warn');return;}
+  busy(true);
+  try{
+    const uid=await ensureUser(email);
+    const dept=DB.deptByCod[cod];
+    const j=await addItem(CFG.lists.vinc,{Title:`${email} · ${cod}`,GESTORId:uid,DEPARTAMENTOId:dept.Id,ATIVO:true});
+    DB.vincs.push({Id:j.Id,cod,email,nome:email.split('@')[0]});
+    render();
+    toast(`Gestor vinculado a ${deptName(cod)}. Agora conceda Edição na pasta ${cod} da lista ${CFG.lists.plan} para ele.`,'warn');
+  }catch(e){fail(e);}finally{busy(false);}
+}
+async function rmVinc(id){
+  const v=DB.vincs.find(x=>x.Id===id);if(!v)return;
+  busy(true);
+  try{
+    await mergeItem(CFG.lists.vinc,id,{ATIVO:false});
+    DB.vincs=DB.vincs.filter(x=>x.Id!==id);
+    render();
+    toast(`Vínculo removido. Lembre-se de retirar o acesso dele à pasta ${v.cod} no SharePoint.`,'warn');
+  }catch(e){fail(e);}finally{busy(false);}
+}
+
+/* ============================== EXERCÍCIOS ============================ */
+function renderPrazos(){
+  setHead('Exercícios e prazos','Somente TI e Diretoria');
+  const anos=ANOS();
+  if(!S.pAno||!DB.ex[S.pAno])S.pAno=anos.length?anos[anos.length-1]:null;
+  const next=anos.length?anos[anos.length-1]+1:new Date().getFullYear();
+  let h='';
+  if(!anos.length){
+    h+=`<p class="empty">Nenhum exercício aberto ainda.</p><div class="row"><span></span><button class="btn" id="abrirEx">Abrir exercício ${next}</button></div>`;
+  }else{
+    const st=DB.ex[S.pAno].status;
+    h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
+    h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
+    h+=`<p class="hint">Um exercício só aparece para os gestores depois de aberto aqui. Encerrado, ele vira somente consulta em todas as telas.</p>`;
+    h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th></tr></thead><tbody>${[0,1,2,3].map(q=>`<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${st==='Encerrado'?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td></tr>`).join('')}</tbody></table></div>`;
+    const PD=planDepts();
+    if(PD.length){
+      h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Gestor</th>${QLAB.map(q=>`<th>${q}</th>`).join('')}</tr></thead><tbody>`;
+      PD.forEach(d=>{
+        const gest=[...new Set(DB.vincs.filter(v=>v.cod===d).map(v=>v.nome))];
+        h+=`<tr><td>${esc(deptName(d))}</td><td>${gest.length?gest.map(esc).join(', '):'—'}</td>`;
+        [0,1,2,3].forEach(q=>{const p=prazoStatus(d,S.pAno,q);h+=`<td><span class="chip c-${p.c}">${p.s}</span></td>`;});
+        h+=`</tr>`;
+      });
+      h+=`</tbody></table></div>`;
+      h+=`<p class="hint">Os lembretes de atraso podem ser automatizados por um fluxo do Power Automate lendo esta lista.</p>`;
+    }
+  }
+  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
+  v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);render();});
+  v.querySelectorAll('input[type="date"]').forEach(inp=>inp.onchange=async()=>{
+    if(!inp.value)return;
+    const q=Number(inp.dataset.q);const ex=DB.ex[S.pAno];
+    ex.prazos[q]=inp.value;
+    busy(true);
+    try{await mergeItem(CFG.lists.ex,ex.Id,{['PRAZO_Q'+(q+1)]:inp.value+'T12:00:00Z'});toast('Prazo atualizado.');}
+    catch(e){fail(e);}finally{busy(false);render();}
+  });
+  const ax=document.getElementById('abrirEx');
+  if(ax)ax.onclick=async()=>{
+    busy(true);
+    try{
+      const prazos=[`${next-1}-12-15`,`${next}-03-15`,`${next}-06-15`,`${next}-09-15`];
+      const j=await addItem(CFG.lists.ex,{Title:String(next),ANO:next,STATUS:'Aberto',PRAZO_Q1:prazos[0]+'T12:00:00Z',PRAZO_Q2:prazos[1]+'T12:00:00Z',PRAZO_Q3:prazos[2]+'T12:00:00Z',PRAZO_Q4:prazos[3]+'T12:00:00Z'});
+      DB.ex[next]={Id:j.Id,status:'Aberto',prazos};
+      DB.plan[next]=DB.plan[next]||[];
+      S.pAno=next;render();
+      toast(`Exercício ${next} aberto. Confira os prazos; os gestores já podem planejar ${next}.`);
+    }catch(e){fail(e);}finally{busy(false);}
+  };
+  const tx=document.getElementById('toggleEx');
+  if(tx)tx.onclick=async()=>{
+    const ex=DB.ex[S.pAno];const novo=ex.status==='Aberto'?'Encerrado':'Aberto';
+    busy(true);
+    try{await mergeItem(CFG.lists.ex,ex.Id,{STATUS:novo});ex.status=novo;render();
+      toast(novo==='Encerrado'?`Exercício ${S.pAno} encerrado. Agora é somente consulta.`:`Exercício ${S.pAno} reaberto.`);}
+    catch(e){fail(e);}finally{busy(false);}
+  };
+}
+
+/* ================================ BOOT ================================ */
+function gate(msg,err){
+  document.getElementById('gMsg').textContent=msg;
+  const e=document.getElementById('gErr');
+  if(err){e.hidden=false;e.textContent=String(err.message||err);}else e.hidden=true;
+}
+async function start(){
+  gate('Carregando cadastros…');
+  document.getElementById('gBtn').hidden=true;
+  try{
+    DB.me={email:acct.username.toLowerCase(),name:acct.name||acct.username};
+    DB.me.uid=await ensureUser(DB.me.email);
+    const [depts,ccs,cats,vincRows,exRows]=await Promise.all([
+      getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
+      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
+      getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
+      getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100')
+    ]);
+    DB.depts=depts.filter(d=>d.COD_DPTO).sort((a,b)=>a.COD_DPTO.localeCompare(b.COD_DPTO));
+    DB.depts.forEach(d=>{DB.deptByCod[d.COD_DPTO]=d;DB.deptById[d.Id]=d;});
+    DB.ccs=ccs.filter(c=>c.COD_CC).sort((a,b)=>a.COD_CC.localeCompare(b.COD_CC));
+    DB.ccs.forEach(c=>DB.ccMap[c.COD_CC]=c.DESC_CC||'');
+    DB.cats=cats.filter(c=>c.COD_CAT).sort((a,b)=>a.COD_CAT.localeCompare(b.COD_CAT));
+    DB.cats.forEach(c=>DB.catMap[c.COD_CAT]=c.DESC_CAT||'');
+    DB.vincs=vincRows.filter(v=>v.ATIVO&&v.GESTOR&&DB.deptById[v.DEPARTAMENTOId]).map(v=>({
+      Id:v.Id,cod:DB.deptById[v.DEPARTAMENTOId].COD_DPTO,
+      email:(v.GESTOR.EMail||'').toLowerCase(),nome:v.GESTOR.Title||v.GESTOR.EMail
+    }));
+    exRows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):'')};});
+
+    const mine=myDepts();
+    const dir=mine.includes(CFG.deptDiretoria);
+    S.role={dir,admin:CFG.adminEmails.includes(DB.me.email)||dir||mine.includes(CFG.deptTI)};
+
+    const anos=ANOS();const nowY=new Date().getFullYear();
+    S.ano=anos.includes(nowY)?nowY:(anos[anos.length-1]||null);
+    S.aAno=S.ano;S.pAno=S.ano;
+    if(S.ano){gate('Carregando planejamento…');await loadYear(S.ano);await loadReal(S.ano);}
+
+    document.getElementById('uIni').textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
+    document.getElementById('uName').textContent=DB.me.name;
+    document.getElementById('uRole').textContent=S.role.dir?'Diretoria':(mine.length?'Gestor · '+mine.map(deptName).join(' · '):(S.role.admin?'Administração':'Sem vínculo'));
+    document.getElementById('btnSair').onclick=()=>msalApp.logoutRedirect({postLogoutRedirectUri:location.origin+location.pathname});
+    document.getElementById('gate').hidden=true;
+    document.getElementById('appRoot').hidden=false;
+    if(!S.role.admin&&!mine.length)S.view='plan';
+    render();
+  }catch(e){
+    console.error(e);
+    document.getElementById('gBtn').hidden=false;
+    document.getElementById('gBtn').textContent='Tentar novamente';
+    gate('Não foi possível carregar. Confira se as listas e permissões da Etapa 1 foram criadas.',e);
+  }
+}
+(async function boot(){
+  try{
+    await msalApp.initialize();
+    const r=await msalApp.handleRedirectPromise();
+    acct=(r&&r.account)||msalApp.getAllAccounts()[0]||null;
+    const btn=document.getElementById('gBtn');
+    if(acct){msalApp.setActiveAccount(acct);start();}
+    else btn.onclick=()=>msalApp.loginRedirect({scopes:SCOPE_SP});
+  }catch(e){gate('Falha na autenticação.',e);}
+})();
+</script>
+</body>
+</html>
