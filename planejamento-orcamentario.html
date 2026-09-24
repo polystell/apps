@@ -178,6 +178,8 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 .mcell.no{background:var(--bad-soft);border-color:var(--bad)}
 .mcell input{width:92px;text-align:right;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .mcell .dec button{padding:4px 10px}
+.mcell .mmot{width:160px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-size:12px}
+.mcell .mmot.req{border-color:var(--bad);background:#fff5f5}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(600px,calc(100% - 32px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
 #toast.show{opacity:1}
 #toast.warn{background:var(--warn);color:#fff}
@@ -852,16 +854,15 @@ function renderAprov(){
   else{
     r+=`<div class="gridwrap"><table class="ap"><thead><tr><th>Item</th><th class="num">Previsto</th><th class="num">Aprovado</th><th>Decisão</th><th>Justificativa</th></tr></thead><tbody>`;
     rows.forEach(x=>{
-      const d=dOf(x);const k=dKey(x);const need=needMotNow(x,d);
-      const mes=d.mode==='mes';
+      const d=dOf(x);const k=dKey(x);const mes=d.mode==='mes';const need=!mes&&needMotNow(x,d);
       const rateio=!mes&&d.d==='ok'&&d.val!==x.prev?`<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(x.i.prev[m]*d.val/x.prev)).join(' · ')}</span>`:'';
       r+=`<tr><td><b>${esc(x.i.det)}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
         <td class="num">${money(x.prev)}</td>
         <td class="num">${mes?'<span class="muted">mês a mês</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
         <td>${mes?'':`<div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div>`}<button class="lnk" data-mode-k="${esc(k)}" ${closed?'disabled':''} style="margin-top:6px">${mes?'Voltar à decisão única':'Decidir mês a mês'}</button></td>
-        <td>${need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${mes?'Justificativa dos meses reprovados/cortados':(d.d==='no'?'Motivo da reprovação':'Motivo do corte de '+money(x.prev-d.val))}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>'}${rateio}</td></tr>`;
+        <td>${mes?'<span class="muted">motivos em cada mês, abaixo</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do corte de '+money(x.prev-d.val)}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
       if(mes){
-        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div></div>`;}).join('')}</div><span class="hint">Meses sem decisão continuam aguardando a diretoria. A justificativa à direita cobre os meses reprovados ou cortados deste item.</span></td></tr>`;
+        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&md.val<x.i.prev[m]-0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do corte'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div><span class="hint">Meses sem decisão continuam aguardando a diretoria. Cada mês reprovado ou cortado tem a sua própria justificativa.</span></td></tr>`;
       }
     });
     r+=`</tbody></table></div><div class="afoot"><span class="hint" id="aStatus"></span><button class="btn" id="confirmBtn" ${closed?'disabled':''}>Confirmar decisões</button></div>`;
@@ -877,7 +878,7 @@ function renderAprov(){
   v.querySelectorAll('[data-mode-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.modeK;const d=S.dec[k];const x=aRows().find(r=>dKey(r)===k);if(!d||!x)return;
     if(d.mode==='mes')d.mode='lote';
-    else{d.mode='mes';d.d=null;d.months=d.months||{};x.pm.forEach(m=>{if(!d.months[m])d.months[m]={d:null,val:x.i.prev[m]};});}
+    else{d.mode='mes';d.d=null;d.months=d.months||{};x.pm.forEach(m=>{if(!d.months[m])d.months[m]={d:null,val:x.i.prev[m],mot:''};});}
     render();
   });
   v.querySelectorAll('.dec button[data-mk]').forEach(b=>b.onclick=()=>{
@@ -899,6 +900,10 @@ function renderAprov(){
     inp.onchange=()=>{const x=aRows().find(r=>dKey(r)===inp.dataset.k);const d=S.dec[inp.dataset.k];d.val=Math.min(parse(inp.value),x.prev);if(!d.d)d.d='ok';rerenderKeepFocus();};
   });
   v.querySelectorAll('input.amot').forEach(inp=>{inp.oninput=()=>{S.dec[inp.dataset.k].mot=inp.value;inp.classList.toggle('req',!inp.value.trim());updateAprovFooter();};});
+  v.querySelectorAll('input[data-mmk]').forEach(inp=>{inp.oninput=()=>{
+    const s2=inp.dataset.mmk,i2=s2.lastIndexOf('|'),k=s2.slice(0,i2),m=+s2.slice(i2+1);
+    S.dec[k].months[m].mot=inp.value;inp.classList.toggle('req',!inp.value.trim());updateAprovFooter();
+  };});
   const cb=document.getElementById('confirmBtn');if(cb)cb.onclick=confirmAprov;
 }
 function updateAprovFooter(){
@@ -907,7 +912,9 @@ function updateAprovFooter(){
     const dm=decidedMonths(x,d);
     if(dm.length){nd++;
       dm.forEach(m=>{decPrev+=x.i.prev[m];if(monthDec(d,m)==='ok')apr+=monthOkVal(x,d,m);});
-      if(needMotNow(x,d)&&!d.mot.trim())bad++;
+      if(d.mode==='mes'){
+        if(dm.some(m=>{const md=d.months[m];const nm=md.d==='no'||(md.d==='ok'&&md.val<x.i.prev[m]-0.005);return nm&&!(md.mot||'').trim();}))bad++;
+      }else if(needMotNow(x,d)&&!d.mot.trim())bad++;
     }});
   const cut=decPrev-apr;const k=document.getElementById('aKpi');
   if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Redução</span><b>${money(cut)}</b></div><div class="stat"><span>Corte sobre o decidido</span><b>${decPrev?Math.round(cut/decPrev*100):0}%</b></div>`;
@@ -920,8 +927,8 @@ function confirmAprov(){
   aRows().forEach(x=>{
     const d=S.dec[dKey(x)];if(!d)return;
     const dm=decidedMonths(x,d);if(!dm.length)return;
-    const mot=d.mot.trim();
     dm.forEach(m=>{
+      const mot=(d.mode==='mes'?(d.months[m].mot||''):d.mot).trim();
       if(monthDec(d,m)==='ok'){
         const val=Math.round(monthOkVal(x,d,m)*100)/100;
         x.i.apr[m]=val;x.i.st[m]='Aprovado';if(mot&&val<x.i.prev[m])x.i.mot[m]=mot;
