@@ -286,7 +286,6 @@ async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST
 const locNum=v=>String(Math.round(v*100)/100).replace('.',',');
 const locDate=(a,m)=>`01/${String(m+1).padStart(2,'0')}/${a}`;
 const personJson=email=>JSON.stringify([{Key:'i:0#.f|membership|'+email}]);
-const SOFT_FIELDS=new Set(['DEPARTAMENTO','GESTOR','OBSERVACAO','Title']);
 async function createPlanRow(dept,fv){
   const body={
     listItemCreateInfo:{__metadata:{type:'SP.ListItemCreationInformationUsingPath'},
@@ -296,11 +295,13 @@ async function createPlanRow(dept,fv){
   };
   const j=await sp(`web/lists/getbytitle('${encodeURIComponent(CFG.lists.plan)}')/AddValidateUpdateItemUsingPath`,{method:'POST',ctype:'application/json;odata=verbose',body});
   const vals=j.value||(j.d&&j.d.AddValidateUpdateItemUsingPath&&j.d.AddValidateUpdateItemUsingPath.results)||[];
-  const hard=vals.filter(v=>v.HasException&&!SOFT_FIELDS.has(v.FieldName));
-  if(hard.length)throw new Error('Campo recusado: '+hard.map(v=>v.FieldName+' — '+v.ErrorMessage).join('; '));
-  vals.filter(v=>v.HasException).forEach(v=>console.warn('Campo opcional não gravado:',v.FieldName,v.ErrorMessage));
+  const errs=vals.filter(v=>v.HasException);
   const idf=vals.find(v=>v.FieldName==='Id');
-  return idf?Number(idf.FieldValue):null;
+  const id=idf?Number(idf.FieldValue):0;
+  // se qualquer campo é recusado, o SharePoint descarta o item inteiro — nunca falhar em silêncio
+  if(!id||id<1)throw new Error('O SharePoint não criou a linha. Campo(s) recusado(s): '+(errs.map(v=>v.FieldName+(v.ErrorMessage?' — '+v.ErrorMessage:'')).join('; ')||'(motivo não informado)'));
+  if(errs.length)console.warn('Campos com ressalva na criação:',errs);
+  return id;
 }
 
 /* ====================== FILA DE GRAVAÇÃO + STATUS ===================== */
@@ -589,9 +590,7 @@ function baseFields(it,m,ano){
     DETALHAMENTO:it.det,
     OBSERVACAO:it.obs||'',
     PREVISTO:locNum(it.prev[m]),
-    STATUS:it.st[m],
-    GESTOR:personJson(DB.me.email),
-    DEPARTAMENTO:deptName(it.dept)
+    STATUS:it.st[m]
   };
 }
 async function persistCell(it,m,ano){
@@ -599,6 +598,8 @@ async function persistCell(it,m,ano){
     await mergeItem(CFG.lists.plan,it.ids[m],{PREVISTO:it.prev[m],STATUS:it.st[m],APROVADO:null,MOTIVO:'',DATA_APROVACAO:null});
   }else if(it.prev[m]>0){
     it.ids[m]=await createPlanRow(it.dept,baseFields(it,m,ano));
+    // gestor gravado após a criação, do jeito confiável (Id de usuário); falha aqui não perde a linha
+    try{await mergeItem(CFG.lists.plan,it.ids[m],{GESTORId:DB.me.uid});}catch(e){console.warn('GESTOR não gravado na linha',it.ids[m],e.message);}
   }
 }
 function setCell(it,m,v){
