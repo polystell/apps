@@ -33,7 +33,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand b{display:block;font-size:17px;letter-spacing:.02em}
 .brand span{font-size:12px;color:var(--side-mute)}
 .who{display:flex;gap:10px;align-items:center;padding:10px 8px 14px}
-.ini{width:36px;height:36px;border-radius:50%;background:var(--side-hi);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;color:#fff}
+.ini{width:36px;height:36px;border-radius:50%;background:var(--side-hi);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none;color:#fff;position:relative;overflow:hidden}
+.ini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .who b{display:block;font-size:13px}
 .who span{font-size:11px;color:var(--side-mute);word-break:break-all}
 .grp{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--side-mute);padding:10px 8px 4px}
@@ -217,7 +218,7 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 
 <div class="app" id="appRoot" hidden>
   <aside class="side" aria-label="Menu">
-    <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:30px;object-fit:contain;margin-bottom:8px;display:block"><b>Polystell</b><span>Planejamento Orçamentário</span></div>
+    <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:34px;object-fit:contain;margin-bottom:6px;display:block"><span>Planejamento Orçamentário</span></div>
     <div class="who"><div class="ini" id="uIni"></div><div><b id="uName"></b><span id="uRole"></span></div></div>
     <nav id="nav"></nav>
     <div class="ver"><span>v1.0</span><button id="btnSair">Sair</button></div>
@@ -533,9 +534,9 @@ function renderPlan(){
   on('sendBtn',sendScope);
   on('cancelAdd',()=>{S.adding=false;render();});
   const fm=document.getElementById('addForm');if(fm)fm.onsubmit=e=>{e.preventDefault();addNewItem();};
-  v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();const x=document.getElementById('tVal');if(x)x.focus();});
-  v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();const x=document.getElementById('tObs');if(x)x.focus();});
-  v.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.tool={kind:'del',key:b.dataset.del};S.adding=false;render();});
+  v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tVal');if(x)x.focus();});
+  v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tObs');if(x)x.focus();});
+  v.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.tool={kind:'del',key:b.dataset.del};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});});
   bindTool();
   v.querySelectorAll('td.c input').forEach(inp=>{
     inp.onfocus=()=>inp.select();
@@ -1020,7 +1021,7 @@ function confirmAprov(){
 
 /* ============================== GESTORES ============================== */
 function renderGest(){
-  setHead('Gestores por departamento','Somente TI e Diretoria');
+  setHead('Gestores por departamento','');
   const vincsAtivos=DB.vincs.slice().sort((a,b)=>(a.cod+a.nome).localeCompare(b.cod+b.nome));
   let h=`<div class="tool"><h2>Vincular gestor</h2>
     <div class="line">
@@ -1076,7 +1077,7 @@ async function rmVinc(id){
 
 /* ============================== EXERCÍCIOS ============================ */
 function renderPrazos(){
-  setHead('Exercícios e prazos','Somente TI e Diretoria');
+  setHead('Exercícios e prazos','');
   const anos=ANOS();
   if(!S.pAno||!DB.ex[S.pAno])S.pAno=anos.length?anos[anos.length-1]:null;
   const next=anos.length?anos[anos.length-1]+1:new Date().getFullYear();
@@ -1232,7 +1233,12 @@ async function start(){
     S.aAno=S.ano;S.pAno=S.ano;
     if(S.ano){gate('Carregando planejamento…');await loadYear(S.ano);await loadReal(S.ano);}
 
-    document.getElementById('uIni').textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
+    const uIni=document.getElementById('uIni');
+    uIni.textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
+    const foto=document.createElement('img');
+    foto.alt='';foto.onerror=()=>foto.remove();
+    foto.src=CFG.spHost+'/_layouts/15/userphoto.aspx?size=M&accountname='+encodeURIComponent(DB.me.email);
+    uIni.appendChild(foto);
     document.getElementById('uName').textContent=DB.me.name;
     document.getElementById('uRole').textContent=roleLabel(mine);
     document.getElementById('btnRefresh').onclick=refreshData;
