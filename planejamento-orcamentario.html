@@ -243,7 +243,6 @@ const CFG={
   tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
   spHost:'https://polystellcombr.sharepoint.com',
   sitePath:'/sites/Apps',
-  adminEmails:['leonardo@polystell.com.br'],   // admin raiz (destrava tudo mesmo sem vínculo)
   deptDiretoria:'00004',                        // vínculo a este depto = aprova
   deptTI:'00008',                               // vínculo a este depto = admin
   lists:{
@@ -253,7 +252,8 @@ const CFG={
     dept:'98_Cadastro_Departamento',
     cc:'98_Cadastro_Centro_Custo',
     cat:'98_Cadastro_Categoria_Financeira',
-    real:'98_Realizado'                         // opcional (Etapa 2)
+    real:'98_Realizado',                        // opcional (Etapa 2)
+    perfil:'08_Perfis'                          // papéis: Administrador / Aprovador / Assessoria (dados, não código)
   }
 };
 
@@ -336,7 +336,7 @@ function fail(e){
 }
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
-const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},realMissing:false};
+const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},realMissing:false,perfis:null};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows){
@@ -408,14 +408,14 @@ function prazoStatus(dept,ano,q){
   if(draft)return late?{s:'Atrasado',c:'bad'}:{s:'Aberto',c:'draft'};
   return {s:'Enviado',c:'ok'};
 }
-const allowedDepts=()=>S.role.dir?planDepts():myDepts();
+const allowedDepts=()=>S.role.all?[...new Set([...planDepts(),...myDepts()])].sort():myDepts();
 
 function views(){
   const v=[];
   if(S.role.admin){v.push(['gest','Gestores','Cadastros']);v.push(['prazos','Exercícios e prazos','Cadastros']);}
   v.push(['plan','Planejamento','Operações']);
   v.push(['acomp','Acompanhamento','Operações']);
-  if(S.role.dir)v.push(['aprov','Aprovação','Operações']);
+  if(S.role.aprov)v.push(['aprov','Aprovação','Operações']);
   return v;
 }
 function render(){
@@ -445,8 +445,9 @@ function renderPlan(){
   if(!ANOS().length){setHead('Planejamento','');document.getElementById('view').innerHTML=noExPanel();return;}
   if(!deps.length){setHead('Planejamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Você ainda não está vinculado a nenhum departamento. Peça à TI para te vincular na tela Gestores.</p></div>`;return;}
   const closed=exStatus(S.ano)==='Encerrado';
-  const ro=S.role.dir||closed;
-  setHead(`Planejamento ${S.ano}`,(closed?'Exercício encerrado · somente consulta · ':'')+(S.role.dir?'Todos os departamentos · somente leitura':'Visível para você: '+deps.map(deptName).join(' · ')));
+  const meus=myDepts();
+  const ro=closed||!meus.includes(S.dept);
+  setHead(`Planejamento ${S.ano}`,(closed?'Exercício encerrado · somente consulta · ':'')+(S.role.all?(meus.length?'Você vê todos · edita: '+meus.map(deptName).join(' · '):'Todos os departamentos · somente leitura'):'Visível para você: '+deps.map(deptName).join(' · ')));
   const its=itemsOf(S.ano,S.dept);
   const ms=monthsOf(S.scope);
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
@@ -1082,15 +1083,45 @@ function setVincs(rows){
   DB.vincs=valid.filter(v=>v.ATIVO).map(map);
   DB.vincsOff=valid.filter(v=>!v.ATIVO).map(map);
 }
+function setPerfis(rows){
+  if(!rows){DB.perfis=null;return;}
+  // PERFIL pode ser opção única (texto) ou múltipla (lista) — aceita os dois
+  DB.perfis=rows.filter(r=>r.ATIVO&&r.PESSOA&&r.PESSOA.EMail&&r.PERFIL)
+    .flatMap(r=>(Array.isArray(r.PERFIL)?r.PERFIL:[r.PERFIL]).map(pf=>({email:String(r.PESSOA.EMail).toLowerCase(),perfil:String(pf)})));
+}
+function recalcRole(){
+  const mine=myDepts();let admin,aprov,assess=false;
+  if(DB.perfis){ // a lista 08_Perfis é a fonte dos papéis
+    const meus=DB.perfis.filter(p=>p.email===DB.me.email).map(p=>p.perfil);
+    admin=meus.includes('Administrador');
+    aprov=meus.includes('Aprovador');
+    assess=meus.includes('Assessoria');
+  }else{ // fallback enquanto a lista não existe: regra antiga
+    const dir=mine.includes(CFG.deptDiretoria);
+    admin=dir||mine.includes(CFG.deptTI);
+    aprov=dir;
+  }
+  S.role={admin,aprov,assess,all:admin||aprov||assess};
+}
+function roleLabel(mine){
+  const parts=[];
+  if(S.role.aprov)parts.push('Diretoria');
+  if(S.role.admin)parts.push('Administração');
+  if(S.role.assess)parts.push('Assessoria');
+  if(mine.length)parts.push('Gestor · '+mine.map(deptName).join(' · '));
+  return parts.join(' · ')||'Sem vínculo';
+}
 function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):'')};});}
 async function refreshData(){
   busy(true,'Atualizando…');
   try{
-    const [vincRows,exRows]=await Promise.all([
+    const [vincRows,exRows,perfRows]=await Promise.all([
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100')
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100'),
+      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
-    setVincs(vincRows);setEx(exRows);
+    setVincs(vincRows);setEx(exRows);setPerfis(perfRows);recalcRole();
+    document.getElementById('uRole').textContent=roleLabel(myDepts());
     DB.real={};DB.realMissing=false;
     if(S.ano){await loadYear(S.ano,true);await loadReal(S.ano);}
     if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
@@ -1111,13 +1142,15 @@ async function start(){
   try{
     DB.me={email:acct.username.toLowerCase(),name:acct.name||acct.username};
     DB.me.uid=await ensureUser(DB.me.email);
-    const [depts,ccs,cats,vincRows,exRows]=await Promise.all([
+    const [depts,ccs,cats,vincRows,exRows,perfRows]=await Promise.all([
       getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
       getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100')
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100'),
+      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
+    setPerfis(perfRows);
     DB.depts=depts.filter(d=>d.COD_DPTO).sort((a,b)=>a.COD_DPTO.localeCompare(b.COD_DPTO));
     DB.depts.forEach(d=>{DB.deptByCod[d.COD_DPTO]=d;DB.deptById[d.Id]=d;});
     DB.ccs=ccs.filter(c=>c.COD_CC).sort((a,b)=>a.COD_CC.localeCompare(b.COD_CC));
@@ -1126,9 +1159,8 @@ async function start(){
     DB.cats.forEach(c=>DB.catMap[c.COD_CAT]=c.DESC_CAT||'');
     setVincs(vincRows);setEx(exRows);
 
+    recalcRole();
     const mine=myDepts();
-    const dir=mine.includes(CFG.deptDiretoria);
-    S.role={dir,admin:CFG.adminEmails.includes(DB.me.email)||dir||mine.includes(CFG.deptTI)};
 
     const anos=ANOS();const nowY=new Date().getFullYear();
     S.ano=anos.includes(nowY)?nowY:(anos[anos.length-1]||null);
@@ -1137,7 +1169,7 @@ async function start(){
 
     document.getElementById('uIni').textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
     document.getElementById('uName').textContent=DB.me.name;
-    document.getElementById('uRole').textContent=S.role.dir?'Diretoria':(mine.length?'Gestor · '+mine.map(deptName).join(' · '):(S.role.admin?'Administração':'Sem vínculo'));
+    document.getElementById('uRole').textContent=roleLabel(mine);
     document.getElementById('btnRefresh').onclick=refreshData;
     document.getElementById('btnSair').onclick=()=>msalApp.logoutRedirect({postLogoutRedirectUri:location.origin+location.pathname});
     document.getElementById('gate').hidden=true;
