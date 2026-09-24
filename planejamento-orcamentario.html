@@ -223,7 +223,7 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
     <div class="ver"><span>v1.0</span><button id="btnSair">Sair</button></div>
   </aside>
   <main class="main">
-    <header class="top"><h1 id="vTitle"></h1><span class="meta" id="vMeta"></span></header>
+    <header class="top"><h1 id="vTitle"></h1><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="meta" id="vMeta"></span><button class="btn ghost" id="btnRefresh" title="Recarregar os dados do SharePoint" style="padding:5px 12px;font-size:12px">↻ Atualizar</button></span></header>
     <section id="view"></section>
   </main>
 </div>
@@ -310,6 +310,9 @@ async function createPlanRow(dept,fv){
   const id=idf?Number(idf.FieldValue):0;
   // se qualquer campo é recusado, o SharePoint descarta o item inteiro — nunca falhar em silêncio
   if(!id||id<1)throw new Error('O SharePoint não criou a linha. Campo(s) recusado(s): '+(errs.map(v=>v.FieldName+(v.ErrorMessage?' — '+v.ErrorMessage:'')).join('; ')||'(motivo não informado)'));
+  const CRIT=['CHAVE_ITEM','COD_DPTO','ANO','COMPETENCIA','COD_CC','COD_CAT','DETALHAMENTO','PREVISTO','STATUS'];
+  const hard=errs.filter(v=>CRIT.includes(v.FieldName));
+  if(hard.length)throw new Error('Linha criada com campo essencial recusado: '+hard.map(v=>v.FieldName+(v.ErrorMessage?' — '+v.ErrorMessage:'')).join('; '));
   if(errs.length)console.warn('Campos com ressalva na criação:',errs);
   return id;
 }
@@ -326,10 +329,14 @@ async function runQueue(tasks,label){
   try{for(let i=0;i<tasks.length;i++){document.getElementById('busy').textContent=`${label} ${i+1}/${tasks.length}…`;await tasks[i]();}}
   finally{busy(false);}
 }
-function fail(e){console.error(e);toast('Erro ao gravar no SharePoint. Recarregue a página e confira o console (F12). '+String(e.message||e).split('\n')[0],'err');}
+function fail(e){
+  console.error(e);
+  toast('Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
+  (async()=>{try{if(S.ano)await loadYear(S.ano,true);if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);}catch(_){}render();})();
+}
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
-const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],ex:{},plan:{},real:{},realMissing:false};
+const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},realMissing:false};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows){
@@ -380,7 +387,7 @@ const ccDesc=c=>DB.ccMap[c]||'';
 const catDesc=c=>DB.catMap[c]||'';
 const ANOS=()=>Object.keys(DB.ex).map(Number).sort((a,b)=>a-b);
 const exStatus=a=>DB.ex[a]?DB.ex[a].status:null;
-const planDepts=()=>[...new Set(DB.vincs.map(v=>v.cod))].filter(Boolean).sort();
+const planDepts=()=>[...new Set([...DB.vincs.map(v=>v.cod),...[].concat(...Object.values(DB.plan)).map(i=>i.dept)])].filter(Boolean).sort();
 const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
 const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
 const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
@@ -417,7 +424,9 @@ function render(){
   let lastG='',nav='';
   vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${label}</button>`;});
   document.getElementById('nav').innerHTML=nav;
-  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{S.view=b.dataset.view;S.adding=false;S.tool=null;render();});
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=async()=>{S.view=b.dataset.view;S.adding=false;S.tool=null;
+    if(S.view==='aprov'&&S.aAno){busy(true,'Atualizando…');try{await loadYear(S.aAno,true);}catch(e){console.warn(e);}busy(false);}
+    render();});
   const deps=allowedDepts();
   if(deps.length&&!deps.includes(S.dept))S.dept=deps[0];
   ({plan:renderPlan,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
@@ -605,7 +614,7 @@ function baseFields(it,m,ano){
 }
 async function persistCell(it,m,ano){
   if(it.ids[m]){
-    await mergeItem(CFG.lists.plan,it.ids[m],{PREVISTO:it.prev[m],STATUS:it.st[m],APROVADO:null,MOTIVO:'',DATA_APROVACAO:null});
+    await mergeItem(CFG.lists.plan,it.ids[m],{PREVISTO:it.prev[m],STATUS:it.st[m],APROVADO:null,MOTIVO:'',DATA_APROVACAO:null,APROVADO_PORId:null});
   }else if(it.prev[m]>0){
     it.ids[m]=await createPlanRow(it.dept,baseFields(it,m,ano));
     // gestor gravado após a criação, do jeito confiável (Id de usuário); falha aqui não perde a linha
@@ -618,8 +627,8 @@ function setCell(it,m,v){
   it.prev[m]=v;
   let ev=null;
   if(s==='Aprovado'){it.st[m]=v>0?'Pendente':'Rascunho';it.apr[m]=null;delete it.mot[m];ev='re';}
-  else if(s==='Pendente'){it.st[m]='Rascunho';ev='ca';}
-  else it.st[m]='Rascunho';
+  else if(s==='Pendente'){it.st[m]='Rascunho';it.apr[m]=null;delete it.mot[m];ev='ca';}
+  else {it.st[m]='Rascunho';it.apr[m]=null;delete it.mot[m];}
   return {changed:true,ev};
 }
 function editCell(key,m,v){
@@ -745,9 +754,10 @@ function readFile(file){
 function impPreview(){
   const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0;const novos=[];const seen=new Set();
   p.items.forEach(r=>{
-    if(r.cc.slice(0,5)!==S.dept){outro++;return;}
-    // só entra o que existe no cadastro do ERP: CC do departamento + categoria válida
-    if(!DB.ccs.some(c=>c.COD_CC===r.cc&&c.COD_DPTO===S.dept)||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
+    // o cadastro do ERP decide: CC existe? categoria existe? o CC é deste departamento?
+    const cad=DB.ccs.find(c=>c.COD_CC===r.cc);
+    if(!cad||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
+    if(cad.COD_DPTO!==S.dept){outro++;return;}
     const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
     if(seen.has(k)||exists(S.ano,S.dept,r.cc,r.cat,r.det)){dup++;return;}
     seen.add(k);novos.push(r);
@@ -830,7 +840,8 @@ const dKey=r=>`${S.aAno}|${S.aDept}|${S.aScope}|${r.i.key}`;
 function dOf(r){const k=dKey(r);if(!S.dec[k])S.dec[k]={d:null,val:r.prev,mot:'',mode:'lote',months:null};return S.dec[k];}
 const decidedMonths=(x,d)=>d.mode==='mes'?x.pm.filter(m=>d.months&&d.months[m]&&d.months[m].d):(d.d?x.pm.slice():[]);
 const monthDec=(d,m)=>d.mode==='mes'?d.months[m].d:d.d;
-const monthOkVal=(x,d,m)=>d.mode==='mes'?d.months[m].val:Math.round(x.i.prev[m]*(x.prev?d.val/x.prev:0)*100)/100;
+function loteVals(x,d){const f=x.prev?d.val/x.prev:0;const out={};let acc=0;x.pm.forEach((m,i)=>{let v=i===x.pm.length-1?Math.round((d.val-acc)*100)/100:Math.round(x.i.prev[m]*f*100)/100;if(v<0)v=0;out[m]=v;acc+=v;});return out;}
+const monthOkVal=(x,d,m)=>d.mode==='mes'?d.months[m].val:loteVals(x,d)[m];
 function needMotNow(x,d){return decidedMonths(x,d).some(m=>{const dec=monthDec(d,m);return dec==='no'||(dec==='ok'&&monthOkVal(x,d,m)<x.i.prev[m]-0.005);});}
 
 function renderAprov(){
@@ -855,7 +866,7 @@ function renderAprov(){
     r+=`<div class="gridwrap"><table class="ap"><thead><tr><th>Item</th><th class="num">Previsto</th><th class="num">Aprovado</th><th>Decisão</th><th>Justificativa</th></tr></thead><tbody>`;
     rows.forEach(x=>{
       const d=dOf(x);const k=dKey(x);const mes=d.mode==='mes';const need=!mes&&needMotNow(x,d);
-      const rateio=!mes&&d.d==='ok'&&d.val!==x.prev?`<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(x.i.prev[m]*d.val/x.prev)).join(' · ')}</span>`:'';
+      const rateio=!mes&&d.d==='ok'&&d.val!==x.prev?(()=>{const lv=loteVals(x,d);return `<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(lv[m])).join(' · ')}</span>`;})():'';
       r+=`<tr><td><b>${esc(x.i.det)}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
         <td class="num">${money(x.prev)}</td>
         <td class="num">${mes?'<span class="muted">mês a mês</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
@@ -907,11 +918,13 @@ function renderAprov(){
   const cb=document.getElementById('confirmBtn');if(cb)cb.onclick=confirmAprov;
 }
 function updateAprovFooter(){
-  const rows=aRows();let prev=0,decPrev=0,apr=0,nd=0,bad=0;
+  const rows=aRows();let prev=0,decPrev=0,apr=0,bad=0,zero=0,decM=0;
+  const totM=rows.reduce((a,x)=>a+x.pm.length,0);
   rows.forEach(x=>{const d=dOf(x);prev+=x.prev;
     const dm=decidedMonths(x,d);
-    if(dm.length){nd++;
-      dm.forEach(m=>{decPrev+=x.i.prev[m];if(monthDec(d,m)==='ok')apr+=monthOkVal(x,d,m);});
+    decM+=dm.length;
+    if(dm.length){
+      dm.forEach(m=>{decPrev+=x.i.prev[m];if(monthDec(d,m)==='ok'){const v=monthOkVal(x,d,m);if(!(v>0))zero++;else apr+=v;}});
       if(d.mode==='mes'){
         if(dm.some(m=>{const md=d.months[m];const nm=md.d==='no'||(md.d==='ok'&&md.val<x.i.prev[m]-0.005);return nm&&!(md.mot||'').trim();}))bad++;
       }else if(needMotNow(x,d)&&!d.mot.trim())bad++;
@@ -919,8 +932,8 @@ function updateAprovFooter(){
   const cut=decPrev-apr;const k=document.getElementById('aKpi');
   if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Redução</span><b>${money(cut)}</b></div><div class="stat"><span>Corte sobre o decidido</span><b>${decPrev?Math.round(cut/decPrev*100):0}%</b></div>`;
   const s=document.getElementById('aStatus'),b=document.getElementById('confirmBtn');if(!s||!b)return;
-  s.textContent=bad?`Falta justificativa em ${bad} item(ns).`:`${nd} de ${rows.length} itens decididos. Os não decididos continuam aguardando.`;
-  b.disabled=exStatus(S.aAno)==='Encerrado'||!nd||bad>0;
+  s.textContent=zero?`Aprovar exige valor maior que zero — use Reprovar para zerar (${zero} mês(es) com R$ 0).`:bad?`Falta justificativa em ${bad} item(ns).`:`${decM} de ${totM} meses decididos. Os demais continuam aguardando.`;
+  b.disabled=exStatus(S.aAno)==='Encerrado'||!decM||bad>0||zero>0;
 }
 function confirmAprov(){
   const tasks=[];let okM=0,noM=0;const nowIso=new Date().toISOString();
@@ -970,6 +983,17 @@ async function addVinc(){
   const email=document.getElementById('gEmail').value.trim().toLowerCase();
   if(!email||!email.includes('@')){toast('Informe o e-mail do gestor.','warn');return;}
   if(DB.vincs.some(v=>v.cod===cod&&v.email===email)){toast('Este gestor já está vinculado a '+deptName(cod)+'.','warn');return;}
+  const off=(DB.vincsOff||[]).find(v=>v.cod===cod&&v.email===email);
+  if(off){
+    busy(true);
+    try{
+      await mergeItem(CFG.lists.vinc,off.Id,{ATIVO:true});
+      DB.vincsOff=DB.vincsOff.filter(v=>v.Id!==off.Id);DB.vincs.push(off);
+      render();
+      toast(`Vínculo de ${off.nome} com ${deptName(cod)} reativado. Confira a Edição dele na pasta ${cod}.`,'warn');
+    }catch(e){fail(e);}finally{busy(false);}
+    return;
+  }
   busy(true);
   try{
     const uid=await ensureUser(email);
@@ -985,7 +1009,7 @@ async function rmVinc(id){
   busy(true);
   try{
     await mergeItem(CFG.lists.vinc,id,{ATIVO:false});
-    DB.vincs=DB.vincs.filter(x=>x.Id!==id);
+    DB.vincs=DB.vincs.filter(x=>x.Id!==id);DB.vincsOff.push(v);
     render();
     toast(`Vínculo removido. Lembre-se de retirar o acesso dele à pasta ${v.cod} no SharePoint.`,'warn');
   }catch(e){fail(e);}finally{busy(false);}
@@ -1051,6 +1075,30 @@ function renderPrazos(){
   };
 }
 
+/* ======================= DADOS COMPARTILHADOS ======================== */
+function setVincs(rows){
+  const map=v=>({Id:v.Id,cod:DB.deptById[v.DEPARTAMENTOId].COD_DPTO,email:(v.GESTOR.EMail||'').toLowerCase(),nome:v.GESTOR.Title||v.GESTOR.EMail});
+  const valid=rows.filter(v=>v.GESTOR&&DB.deptById[v.DEPARTAMENTOId]);
+  DB.vincs=valid.filter(v=>v.ATIVO).map(map);
+  DB.vincsOff=valid.filter(v=>!v.ATIVO).map(map);
+}
+function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):'')};});}
+async function refreshData(){
+  busy(true,'Atualizando…');
+  try{
+    const [vincRows,exRows]=await Promise.all([
+      getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
+      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4&$top=100')
+    ]);
+    setVincs(vincRows);setEx(exRows);
+    DB.real={};DB.realMissing=false;
+    if(S.ano){await loadYear(S.ano,true);await loadReal(S.ano);}
+    if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
+    toast('Dados atualizados.');
+  }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
+  finally{busy(false);render();}
+}
+
 /* ================================ BOOT ================================ */
 function gate(msg,err){
   document.getElementById('gMsg').textContent=msg;
@@ -1076,11 +1124,7 @@ async function start(){
     DB.ccs.forEach(c=>DB.ccMap[c.COD_CC]=c.DESC_CC||'');
     DB.cats=cats.filter(c=>c.COD_CAT).sort((a,b)=>a.COD_CAT.localeCompare(b.COD_CAT));
     DB.cats.forEach(c=>DB.catMap[c.COD_CAT]=c.DESC_CAT||'');
-    DB.vincs=vincRows.filter(v=>v.ATIVO&&v.GESTOR&&DB.deptById[v.DEPARTAMENTOId]).map(v=>({
-      Id:v.Id,cod:DB.deptById[v.DEPARTAMENTOId].COD_DPTO,
-      email:(v.GESTOR.EMail||'').toLowerCase(),nome:v.GESTOR.Title||v.GESTOR.EMail
-    }));
-    exRows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):'')};});
+    setVincs(vincRows);setEx(exRows);
 
     const mine=myDepts();
     const dir=mine.includes(CFG.deptDiretoria);
@@ -1094,6 +1138,7 @@ async function start(){
     document.getElementById('uIni').textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
     document.getElementById('uName').textContent=DB.me.name;
     document.getElementById('uRole').textContent=S.role.dir?'Diretoria':(mine.length?'Gestor · '+mine.map(deptName).join(' · '):(S.role.admin?'Administração':'Sem vínculo'));
+    document.getElementById('btnRefresh').onclick=refreshData;
     document.getElementById('btnSair').onclick=()=>msalApp.logoutRedirect({postLogoutRedirectUri:location.origin+location.pathname});
     document.getElementById('gate').hidden=true;
     document.getElementById('appRoot').hidden=false;
