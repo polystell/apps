@@ -553,7 +553,7 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''} · total a importar <b>${money(pv.total)}</b></p>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''} · total a importar <b>${money(pv.total)}</b></p>`;
         if(pv.novos.length)h+=`<div class="line"><button class="btn" id="tImport">Importar ${pv.novos.length} itens como rascunho</button></div>`;
       }
     }
@@ -732,14 +732,16 @@ function readFile(file){
   fr.readAsArrayBuffer(file);
 }
 function impPreview(){
-  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0;const novos=[];const seen=new Set();
+  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0;const novos=[];const seen=new Set();
   p.items.forEach(r=>{
     if(r.cc.slice(0,5)!==S.dept){outro++;return;}
+    // só entra o que existe no cadastro do ERP: CC do departamento + categoria válida
+    if(!DB.ccs.some(c=>c.COD_CC===r.cc&&c.COD_DPTO===S.dept)||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
     const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
     if(seen.has(k)||exists(S.ano,S.dept,r.cc,r.cat,r.det)){dup++;return;}
     seen.add(k);novos.push(r);
   });
-  return {found:p.items.length,dup,outro,novos,total:novos.reduce((a,r)=>a+r.vals.reduce((b,v)=>b+v,0),0)};
+  return {found:p.items.length,dup,outro,inval,novos,total:novos.reduce((a,r)=>a+r.vals.reduce((b,v)=>b+v,0),0)};
 }
 function doImport(){
   const pv=impPreview();const p=S.imp.sheets[S.imp.sel];const ano=S.ano;const tasks=[];
