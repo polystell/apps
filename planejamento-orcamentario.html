@@ -38,7 +38,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .who b{display:block;font-size:14px}
 .who span{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--side-ink);background:rgba(255,255,255,.12);border-radius:999px;padding:3px 12px}
 .grp{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--side-mute);padding:10px 8px 4px}
-.nav{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:9px 10px;color:var(--side-ink);cursor:pointer;font-size:13px}
+.nav{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:9px 12px;color:var(--side-ink);cursor:pointer;font-size:13px}
+.nav svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.85}
 .nav:hover{background:rgba(255,255,255,.08)}
 .nav[aria-current="page"]{background:var(--side-hi);font-weight:600;color:#fff}
 .nav:focus-visible{outline:2px solid #fff;outline-offset:1px}
@@ -103,17 +104,20 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;f
 .grid thead th{background:var(--soft);font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
 .grid .item{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;min-width:240px;max-width:280px;white-space:normal;border-right:1px solid var(--line)}
 .grid thead .item{background:var(--soft);z-index:2}
-.grid .item b{display:block;font-weight:600}
+.grid .item b{display:block;font-weight:500;color:var(--ink)}
 .sub{display:block;font-size:11px;color:var(--mute)}
 .obs{display:block;font-size:11px;font-style:italic;color:var(--mute);margin-top:2px}
-.rowact{display:flex;gap:12px;margin-top:3px}
+.rowact{display:flex;gap:12px;margin-top:4px;opacity:0;transition:opacity .15s ease}
+tr:hover .rowact,.rowact:focus-within{opacity:1}
+@media (hover:none){.rowact{opacity:1}}
 .grid .qh{text-align:center;border-left:2px solid var(--line)}
 .grid .qh .pill{margin-left:6px;vertical-align:1px}
 .grid .mh{text-align:right}
 .grid .qs{border-left:2px solid var(--line)}
 .grid .tot{text-align:right;font-weight:600;border-left:1px solid var(--line)}
-.grid tr.grp td{background:var(--soft);font-weight:600;font-size:12px}
-.grid tr.grp td.item{background:var(--soft)}
+.grid tr.grp td{background:var(--primary-soft);color:var(--primary);font-weight:700;font-size:11.5px;letter-spacing:.04em}
+.grid tr.grp td.item{background:var(--primary-soft)}
+.grid tr.grp .code{color:var(--primary);opacity:.7}
 .grid tfoot td{background:var(--soft);font-weight:700;text-align:right}
 .grid tfoot td.item{background:var(--soft);text-align:left}
 .grid td.c{padding:3px 4px;text-align:right;position:relative}
@@ -202,7 +206,8 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
   .nav{width:auto}
   .split{grid-template-columns:1fr}
 }
-@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+.btn,.tab,.seg button,.nav,.dec button,.dbtn,.lnk{transition:background .15s ease,color .15s ease,border-color .15s ease,opacity .15s ease}
+@media (prefers-reduced-motion:reduce){#toast,.rowact,.btn,.tab,.seg button,.nav,.dec button,.dbtn,.lnk{transition:none}}
 </style>
 </head>
 <body>
@@ -417,6 +422,13 @@ function prazoStatus(dept,ano,q){
 }
 const allowedDepts=()=>S.role.all?[...new Set([...planDepts(),...myDepts()])].sort():myDepts();
 
+const NAVICON={
+ gest:'<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+ prazos:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+ plan:'<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+ acomp:'<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+ aprov:'<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+};
 function views(){
   const v=[];
   if(S.role.admin){v.push(['gest','Gestores','Cadastros']);v.push(['prazos','Exercícios e prazos','Cadastros']);}
@@ -429,7 +441,7 @@ function render(){
   const vs=views();
   if(!vs.some(v=>v[0]===S.view))S.view='plan';
   let lastG='',nav='';
-  vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${label}</button>`;});
+  vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${NAVICON[id]||''}<span>${label}</span></button>`;});
   document.getElementById('nav').innerHTML=nav;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=async()=>{S.view=b.dataset.view;S.adding=false;S.tool=null;
     if(S.view==='aprov'&&S.aAno){busy(true,'Atualizando…');try{await loadYear(S.aAno,true);}catch(e){console.warn(e);}busy(false);}
