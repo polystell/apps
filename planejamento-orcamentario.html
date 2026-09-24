@@ -278,6 +278,7 @@ async function sp(path,opt={}){
   const t=await tok();
   const headers={Authorization:'Bearer '+t,Accept:'application/json;odata=nometadata','Content-Type':opt.ctype||'application/json;odata=nometadata'};
   if(opt.merge){headers['IF-MATCH']='*';headers['X-HTTP-Method']='MERGE';}
+  if(opt.del){headers['IF-MATCH']='*';headers['X-HTTP-Method']='DELETE';}
   const res=await fetch(path.startsWith('http')?path:API+path,{method:opt.method||'GET',headers,body:opt.body!==undefined?JSON.stringify(opt.body):undefined});
   if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}throw new Error(`HTTP ${res.status} em ${path}\n${d}`);}
   if(res.status===204)return null;
@@ -289,6 +290,7 @@ async function getAll(list,query){
   return out;
 }
 const mergeItem=(list,id,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,body:fields});
+const delItem=(list,id)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',del:true});
 const addItem=(list,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items`,{method:'POST',body:fields});
 async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST',body:{logonName:'i:0#.f|membership|'+email}});return j.Id;}
 
@@ -391,6 +393,7 @@ const qClosed=(a,q)=>{const e=DB.ex[a];return !!(e&&(e.status==='Encerrado'||(e.
 const mOpen=(a,m)=>!qClosed(a,Math.floor(m/3));
 const planDepts=()=>[...new Set([...DB.vincs.map(v=>v.cod),...[].concat(...Object.values(DB.plan)).map(i=>i.dept)])].filter(Boolean).sort();
 const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
+const vig=(i,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.prev[m];
 const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
 const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
 let tt;
@@ -494,26 +497,28 @@ function renderPlan(){
   if(!its.length){t+=`<tr><td class="empty" colspan="${ms.length+2}">Nenhum item em ${S.ano}.${ro?'':(srcYears.length?' Use “Copiar de outro ano” para trazer os recorrentes,':'')+' “Importar planilha” ou “Novo item”.'}</td></tr>`;}
   [...new Set(its.map(i=>i.cc))].sort().forEach(cc=>{
     const g=its.filter(i=>i.cc===cc);
-    const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+i.prev[m],0),0);
+    const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0);
     t+=`<tr class="grp"><td class="item"><span class="code">${cc}</span> ${esc(ccDesc(cc))}</td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
-      const rt=ms.reduce((b,m)=>b+i.prev[m],0);
-      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub"><span class="code">${i.cat}</span> ${esc(catDesc(i.cat))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button></span>`}</td>`;
+      const rt=ms.reduce((b,m)=>b+vig(i,m),0);
+      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub"><span class="code">${i.cat}</span> ${esc(catDesc(i.cat))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
       ms.forEach(m=>{
         const s=i.prev[m]>0?i.st[m]:'';
-        const cut=s==='Aprovado'&&i.apr[m]!=null&&i.apr[m]<i.prev[m];
+        const ap=s==='Aprovado'&&i.apr[m]!=null;
+        const show=ap?i.apr[m]:i.prev[m];
+        const cut=ap&&Math.abs(i.apr[m]-i.prev[m])>0.005;
         const mot=i.mot[m]?' · '+i.mot[m]:'';
-        const tip=s==='Aprovado'?`Aprovado · ${money(i.apr[m])}${mot}`:s==='Reprovado'?`Reprovado${mot}`:s;
-        t+=`<td class="c ${m%3===0?'qs':''} ${s?'s-'+s:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${i.prev[m]?fmt(i.prev[m]):''}" ${(ro||!mOpen(S.ano,m))?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
+        const tip=ap?`Aprovado · ${money(i.apr[m])}${cut?` (pedido ${money(i.prev[m])})`:''}${mot}`:s==='Reprovado'?`Reprovado${mot}`:s;
+        t+=`<td class="c ${m%3===0?'qs':''} ${s?'s-'+s:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${show?fmt(show):''}" ${(ro||!mOpen(S.ano,m))?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
       });
       t+=`<td class="tot">${money(rt)}</td></tr>`;
     });
   });
   t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(deptName(S.dept))}</td>`;
-  ms.forEach(m=>{t+=`<td class="${m%3===0?'qs':''}">${fmt(its.reduce((a,i)=>a+i.prev[m],0))}</td>`;});
-  t+=`<td class="tot">${money(its.reduce((a,i)=>a+ms.reduce((b,m)=>b+i.prev[m],0),0))}</td></tr></tfoot></table></div>`;
+  ms.forEach(m=>{t+=`<td class="${m%3===0?'qs':''}">${fmt(its.reduce((a,i)=>a+vig(i,m),0))}</td>`;});
+  t+=`<td class="tot">${money(its.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0))}</td></tr></tfoot></table></div>`;
   h+=t;
-  h+=`<div class="legend"><span><i class="sw" style="background:var(--panel)"></i>Rascunho</span><span><i class="sw" style="background:var(--warn-soft)"></i>Aguardando diretoria</span><span><i class="sw" style="background:var(--ok-soft)"></i>Aprovado</span><span><i class="sw" style="background:var(--bad-soft)"></i>Reprovado</span><span><i class="sw" style="background:linear-gradient(225deg,var(--warn) 30%,var(--panel) 30%)"></i>Aprovado com corte (passe o mouse para ver o motivo)</span></div>`;
+  h+=`<div class="legend"><span><i class="sw" style="background:var(--panel)"></i>Rascunho</span><span><i class="sw" style="background:var(--warn-soft)"></i>Aguardando diretoria</span><span><i class="sw" style="background:var(--ok-soft)"></i>Aprovado</span><span><i class="sw" style="background:var(--bad-soft)"></i>Reprovado</span><span><i class="sw" style="background:linear-gradient(225deg,var(--warn) 30%,var(--panel) 30%)"></i>Aprovado com ajuste — mostra o valor da diretoria (passe o mouse para ver o pedido e o motivo)</span></div>`;
   if(!ro)h+=`<p class="hint">Alterar um mês já aprovado devolve esse mês para aprovação.</p>`;
 
   const v=document.getElementById('view');
@@ -530,6 +535,7 @@ function renderPlan(){
   const fm=document.getElementById('addForm');if(fm)fm.onsubmit=e=>{e.preventDefault();addNewItem();};
   v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();const x=document.getElementById('tVal');if(x)x.focus();});
   v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();const x=document.getElementById('tObs');if(x)x.focus();});
+  v.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.tool={kind:'del',key:b.dataset.del};S.adding=false;render();});
   bindTool();
   v.querySelectorAll('td.c input').forEach(inp=>{
     inp.onfocus=()=>inp.select();
@@ -557,6 +563,20 @@ function toolHtml(){
       <textarea id="tObs" placeholder="Explique para a diretoria por que esse valor é necessário">${esc(it.obs)}</textarea>
       <div class="line"><button class="btn" id="tSaveObs">Salvar observação</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
       <p class="hint">A observação aparece para a diretoria na tela de aprovação. Alterar a observação não muda o status do item.</p></div>`;
+  }
+  if(T.kind==='del'){
+    const it=findItem(T.key);if(!it)return '';
+    const temDecisao=it.st.some((st,m)=>it.prev[m]>0&&(st==='Aprovado'||st==='Reprovado'));
+    const temFechado=it.ids.some((id,m)=>id&&!mOpen(S.ano,m));
+    if(temDecisao||temFechado){
+      return `<div class="tool" role="region" aria-label="Excluir item"><h2>Não dá para excluir “${esc(it.det)}”</h2>
+        <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.'}</p>
+        <div class="line"><button class="btn ghost" id="tCancel">Fechar</button></div></div>`;
+    }
+    const n=it.ids.filter(Boolean).length;
+    return `<div class="tool" role="region" aria-label="Excluir item"><h2>Excluir “${esc(it.det)}” de ${S.ano}?</h2>
+      <p class="hint">Remove o item${n?` e as ${n} linha(s) mensais já gravadas`:' (nada foi gravado ainda)'}. As linhas excluídas ficam na Lixeira do SharePoint.</p>
+      <div class="line"><button class="btn" id="tDelGo" style="background:var(--bad);border-color:var(--bad)">Excluir item</button><button class="btn ghost" id="tCancel">Cancelar</button></div></div>`;
   }
   if(T.kind==='copy'){
     const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
@@ -594,6 +614,7 @@ function bindTool(){
   const ts=document.getElementById('tSrc');if(ts)ts.onchange=()=>{S.tool.src=Number(ts.value);};
   on('tCopyGo',()=>{const e=document.getElementById('tSrc');copyFrom(Number(e.value));});
   on('tSaveObs',saveObs);
+  on('tDelGo',doDelete);
   on('tModelo',baixarModelo);
   const f=document.getElementById('tFile');if(f)f.onchange=()=>{if(f.files[0])readFile(f.files[0]);};
   const sh=document.getElementById('tSheet');if(sh)sh.onchange=()=>{S.imp.sel=sh.value;render();};
@@ -689,6 +710,13 @@ function saveObs(){
   it.ids.forEach(id=>{if(id)tasks.push(()=>mergeItem(CFG.lists.plan,id,{OBSERVACAO:it.obs}));});
   S.tool=null;render();
   runQueue(tasks,'Gravando').then(()=>toast('Observação salva.')).catch(fail);
+}
+function doDelete(){
+  const it=findItem(S.tool.key);if(!it)return;
+  const ids=it.ids.filter(Boolean);
+  DB.plan[S.ano]=DB.plan[S.ano].filter(x=>x!==it);
+  S.tool=null;render();
+  runQueue(ids.map(id=>()=>delItem(CFG.lists.plan,id)),'Excluindo').then(()=>toast(`“${it.det}” excluído${ids.length?` (${ids.length} linha(s) removida(s))`:''}.`)).catch(fail);
 }
 function copyFrom(src){
   const list=(DB.plan[src]||[]).filter(i=>i.dept===S.dept);
@@ -873,7 +901,7 @@ const decidedMonths=(x,d)=>d.mode==='mes'?x.pm.filter(m=>d.months&&d.months[m]&&
 const monthDec=(d,m)=>d.mode==='mes'?d.months[m].d:d.d;
 function loteVals(x,d){const f=x.prev?d.val/x.prev:0;const out={};let acc=0;x.pm.forEach((m,i)=>{let v=i===x.pm.length-1?Math.round((d.val-acc)*100)/100:Math.round(x.i.prev[m]*f*100)/100;if(v<0)v=0;out[m]=v;acc+=v;});return out;}
 const monthOkVal=(x,d,m)=>d.mode==='mes'?d.months[m].val:loteVals(x,d)[m];
-function needMotNow(x,d){return decidedMonths(x,d).some(m=>{const dec=monthDec(d,m);return dec==='no'||(dec==='ok'&&monthOkVal(x,d,m)<x.i.prev[m]-0.005);});}
+function needMotNow(x,d){return decidedMonths(x,d).some(m=>{const dec=monthDec(d,m);return dec==='no'||(dec==='ok'&&Math.abs(monthOkVal(x,d,m)-x.i.prev[m])>0.005);});}
 
 function renderAprov(){
   setHead('Aprovação orçamentária','Decisão por item · corte rateado proporcionalmente entre os meses');
@@ -902,9 +930,9 @@ function renderAprov(){
         <td class="num">${money(x.prev)}</td>
         <td class="num">${mes?'<span class="muted">mês a mês</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
         <td>${mes?'':`<div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div>`}<button class="lnk" data-mode-k="${esc(k)}" ${closed?'disabled':''} style="margin-top:6px">${mes?'Voltar à decisão única':'Decidir mês a mês'}</button></td>
-        <td>${mes?'<span class="muted">motivos em cada mês, abaixo</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do corte de '+money(x.prev-d.val)}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
+        <td>${mes?'<span class="muted">motivos em cada mês, abaixo</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do ajuste de '+money(Math.abs(x.prev-d.val))}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
       if(mes){
-        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&md.val<x.i.prev[m]-0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do corte'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div><span class="hint">Meses sem decisão continuam aguardando a diretoria. Cada mês reprovado ou cortado tem a sua própria justificativa.</span></td></tr>`;
+        r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do ajuste'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div><span class="hint">Meses sem decisão continuam aguardando a diretoria. Cada mês reprovado ou cortado tem a sua própria justificativa.</span></td></tr>`;
       }
     });
     r+=`</tbody></table></div><div class="afoot"><span class="hint" id="aStatus"></span><button class="btn" id="confirmBtn" ${closed?'disabled':''}>Confirmar decisões</button></div>`;
@@ -933,13 +961,13 @@ function renderAprov(){
     inp.onchange=()=>{
       const s2=inp.dataset.mvk,i2=s2.lastIndexOf('|'),k=s2.slice(0,i2),m=+s2.slice(i2+1);
       const x=aRows().find(r=>dKey(r)===k);const md=S.dec[k].months[m];
-      md.val=Math.min(parse(inp.value),x.i.prev[m]);if(!md.d)md.d='ok';rerenderKeepFocus();
+      md.val=parse(inp.value);if(!md.d)md.d='ok';rerenderKeepFocus();
     };
   });
   v.querySelectorAll('input.aval[data-k]').forEach(inp=>{
     inp.onfocus=()=>inp.select();
     inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
-    inp.onchange=()=>{const x=aRows().find(r=>dKey(r)===inp.dataset.k);const d=S.dec[inp.dataset.k];d.val=Math.min(parse(inp.value),x.prev);if(!d.d)d.d='ok';rerenderKeepFocus();};
+    inp.onchange=()=>{const x=aRows().find(r=>dKey(r)===inp.dataset.k);const d=S.dec[inp.dataset.k];d.val=parse(inp.value);if(!d.d)d.d='ok';rerenderKeepFocus();};
   });
   v.querySelectorAll('input.amot').forEach(inp=>{inp.oninput=()=>{S.dec[inp.dataset.k].mot=inp.value;inp.classList.toggle('req',!inp.value.trim());updateAprovFooter();};});
   v.querySelectorAll('input[data-mmk]').forEach(inp=>{inp.oninput=()=>{
@@ -957,11 +985,11 @@ function updateAprovFooter(){
     if(dm.length){
       dm.forEach(m=>{decPrev+=x.i.prev[m];if(monthDec(d,m)==='ok'){const v=monthOkVal(x,d,m);if(!(v>0))zero++;else apr+=v;}});
       if(d.mode==='mes'){
-        if(dm.some(m=>{const md=d.months[m];const nm=md.d==='no'||(md.d==='ok'&&md.val<x.i.prev[m]-0.005);return nm&&!(md.mot||'').trim();}))bad++;
+        if(dm.some(m=>{const md=d.months[m];const nm=md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005);return nm&&!(md.mot||'').trim();}))bad++;
       }else if(needMotNow(x,d)&&!d.mot.trim())bad++;
     }});
   const cut=decPrev-apr;const k=document.getElementById('aKpi');
-  if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Redução</span><b>${money(cut)}</b></div><div class="stat"><span>Corte sobre o decidido</span><b>${decPrev?Math.round(cut/decPrev*100):0}%</b></div>`;
+  if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Diferença p/ pedido</span><b>${money(-cut)}</b></div><div class="stat"><span>Ajuste sobre o decidido</span><b>${decPrev?Math.round(-cut/decPrev*100):0}%</b></div>`;
   const s=document.getElementById('aStatus'),b=document.getElementById('confirmBtn');if(!s||!b)return;
   s.textContent=zero?`Aprovar exige valor maior que zero — use Reprovar para zerar (${zero} mês(es) com R$ 0).`:bad?`Falta justificativa em ${bad} item(ns).`:`${decM} de ${totM} meses decididos. Os demais continuam aguardando.`;
   b.disabled=exStatus(S.aAno)==='Encerrado'||!decM||bad>0||zero>0;
@@ -975,8 +1003,8 @@ function confirmAprov(){
       const mot=(d.mode==='mes'?(d.months[m].mot||''):d.mot).trim();
       if(monthDec(d,m)==='ok'){
         const val=Math.round(monthOkVal(x,d,m)*100)/100;
-        x.i.apr[m]=val;x.i.st[m]='Aprovado';if(mot&&val<x.i.prev[m])x.i.mot[m]=mot;
-        if(x.i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,x.i.ids[m],{STATUS:'Aprovado',APROVADO:val,MOTIVO:(val<x.i.prev[m]?mot:''),DATA_APROVACAO:nowIso,APROVADO_PORId:DB.me.uid}));
+        x.i.apr[m]=val;x.i.st[m]='Aprovado';const dif=Math.abs(val-x.i.prev[m])>0.005;if(mot&&dif)x.i.mot[m]=mot;
+        if(x.i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,x.i.ids[m],{STATUS:'Aprovado',APROVADO:val,MOTIVO:(dif?mot:''),DATA_APROVACAO:nowIso,APROVADO_PORId:DB.me.uid}));
         okM++;
       }else{
         x.i.apr[m]=0;x.i.st[m]='Reprovado';x.i.mot[m]=mot;
