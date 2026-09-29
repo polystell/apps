@@ -58,7 +58,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tab[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-ink);font-weight:600}
 
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.stat{background:var(--soft);border-radius:10px;padding:10px 14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
 .stat span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
 .stat b{font-size:19px;font-variant-numeric:tabular-nums}
 .stat b.neg{color:var(--bad)}
@@ -72,12 +72,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .c-draft{background:var(--draft-soft);color:var(--draft)}
 
 .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
-.seg button{padding:6px 12px;background:var(--panel);border:0;border-right:1px solid var(--line);cursor:pointer;font-size:13px}
-.seg button:last-child{border-right:0}
-.seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink);font-weight:600}
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{padding:6px 14px;background:transparent;border:0;border-radius:999px;cursor:pointer;font-size:13px;color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink);font-weight:600;box-shadow:0 1px 4px rgba(33,65,162,.35)}
 .actions{display:flex;flex-wrap:wrap;gap:8px}
-.btn{border:1px solid var(--primary);background:var(--primary);color:var(--primary-ink);border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
+.btn{border:1px solid var(--primary);background:var(--primary);color:var(--primary-ink);border-radius:10px;padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer}
 .btn.ghost{background:var(--panel);color:var(--primary)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
@@ -98,13 +97,16 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 .hint{font-size:12px;color:var(--mute);margin:0}
 .additem .hint,.additem .wide{grid-column:1/-1}
 
-.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
 table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
-.grid th,.grid td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-.grid thead th{background:var(--soft);font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.grid th,.grid td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.grid thead th{background:var(--panel);font-size:10.5px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid var(--line)}
+.grid tbody tr:not(.grp):hover td.item{background:var(--soft)}
 .grid .item{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;min-width:240px;max-width:280px;white-space:normal;border-right:1px solid var(--line)}
-.grid thead .item{background:var(--soft);z-index:2}
-.grid .item b{display:block;font-weight:500;color:var(--ink)}
+.grid thead .item{background:var(--panel);z-index:2}
+.catline{display:block;font-weight:600;font-size:12.5px;color:var(--ink);line-height:1.35}
+.catline .code{color:var(--ink);opacity:.65}
+.detline{display:block;font-size:12.5px;color:var(--mute);margin-top:1px}
 .sub{display:block;font-size:11px;color:var(--mute)}
 .obs{display:block;font-size:11px;font-style:italic;color:var(--mute);margin-top:2px}
 .rowact{display:flex;gap:12px;margin-top:4px;opacity:0;transition:opacity .15s ease}
@@ -515,7 +517,7 @@ function renderPlan(){
     t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(ccDesc(cc)||cc)}</span><span class="code">${cc}</span></td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
-      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub">${esc(catDesc(i.cat))} <span class="code">${i.cat}</span></span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
+      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
       ms.forEach(m=>{
         const s=i.prev[m]>0?i.st[m]:'';
         const ap=s==='Aprovado'&&i.apr[m]!=null;
@@ -589,7 +591,7 @@ function toolHtml(){
     }
     const n=it.ids.filter(Boolean).length;
     return `<div class="tool" role="region" aria-label="Excluir item"><h2>Excluir “${esc(it.det)}” de ${S.ano}?</h2>
-      <p class="hint">Remove o item${n?` e as ${n} linha(s) mensais já gravadas`:' (nada foi gravado ainda)'}. As linhas excluídas ficam na Lixeira do SharePoint.</p>
+      <p class="hint">${n?`Serão removidas ${n} linha(s) gravadas.`:'Nada foi gravado ainda.'}</p>
       <div class="line"><button class="btn" id="tDelGo" style="background:var(--bad);border-color:var(--bad)">Excluir item</button><button class="btn ghost" id="tCancel">Cancelar</button></div></div>`;
   }
   if(T.kind==='copy'){
