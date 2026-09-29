@@ -25,7 +25,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);padding:16px}
 button,input,select,textarea{font:inherit;color:inherit}
-.code{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.code{font-family:var(--mono);font-size:12px;color:var(--mute);white-space:nowrap}
 
 .app{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
 .side{background:var(--side);color:var(--side-ink);border-radius:14px;padding:18px 12px;box-shadow:0 8px 24px rgba(13,26,65,.18);display:flex;flex-direction:column;gap:6px;position:sticky;top:16px}
@@ -117,7 +117,8 @@ tr:hover .rowact,.rowact:focus-within{opacity:1}
 .grid .tot{text-align:right;font-weight:600;border-left:1px solid var(--line)}
 .grid tr.grp td{background:var(--primary-soft);color:var(--primary);font-weight:700;font-size:11.5px;letter-spacing:.04em}
 .grid tr.grp td.item{background:var(--primary-soft)}
-.grid tr.grp .code{color:var(--primary);opacity:.7}
+.grpdesc{display:block;line-height:1.25}
+.grid tr.grp .code{display:block;font-size:10px;color:var(--primary);opacity:.55;letter-spacing:.06em;margin-top:2px}
 .grid tfoot td{background:var(--soft);font-weight:700;text-align:right}
 .grid tfoot td.item{background:var(--soft);text-align:left}
 .grid td.c{padding:3px 4px;text-align:right;position:relative}
@@ -177,13 +178,13 @@ table.simple{border-collapse:collapse;width:100%;font-size:13px}
 
 tr.mesrow td{background:var(--soft);padding:10px 8px}
 .mgrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
-.mcell{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;background:var(--panel)}
+.mcell{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;background:var(--panel);min-width:160px;max-width:200px}
 .mcell b{font-size:12px}
 .mcell.ok{background:var(--ok-soft);border-color:var(--ok)}
 .mcell.no{background:var(--bad-soft);border-color:var(--bad)}
-.mcell input{width:92px;text-align:right;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.mcell input{width:100%;text-align:right;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .mcell .dec button{padding:4px 10px}
-.mcell .mmot{width:160px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-size:12px}
+.mcell .mmot{text-align:left;font-size:12px}
 .mcell .mmot.req{border-color:var(--bad);background:#fff5f5}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(600px,calc(100% - 32px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
 #toast.show{opacity:1}
@@ -511,10 +512,10 @@ function renderPlan(){
   [...new Set(its.map(i=>i.cc))].sort().forEach(cc=>{
     const g=its.filter(i=>i.cc===cc);
     const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0);
-    t+=`<tr class="grp"><td class="item"><span class="code">${cc}</span> ${esc(ccDesc(cc))}</td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
+    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(ccDesc(cc)||cc)}</span><span class="code">${cc}</span></td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
-      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub"><span class="code">${i.cat}</span> ${esc(catDesc(i.cat))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
+      t+=`<tr><td class="item"><b>${esc(i.det)}</b><span class="sub">${esc(catDesc(i.cat))} <span class="code">${i.cat}</span></span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
       ms.forEach(m=>{
         const s=i.prev[m]>0?i.st[m]:'';
         const ap=s==='Aprovado'&&i.apr[m]!=null;
@@ -564,9 +565,10 @@ function toolHtml(){
   if(T.kind==='fill'){
     const it=findItem(T.key);if(!it)return '';
     return `<div class="tool" role="region" aria-label="Preencher linha"><h2>Preencher “${esc(it.det)}” ${scopeName}</h2>
-      <div class="line"><div class="seg" role="group" aria-label="Forma de preencher"><button data-mode="rep" aria-pressed="${T.mode==='rep'}">Repetir valor mensal</button><button data-mode="dist" aria-pressed="${T.mode==='dist'}">Distribuir um total</button></div>
+      <div class="line"><div class="seg" role="group" aria-label="Forma de preencher"><button data-mode="rep" aria-pressed="${T.mode==='rep'}">Repetir valor mensal</button><button data-mode="dist" aria-pressed="${T.mode==='dist'}">Distribuir um total no período</button></div>
       <label for="tVal" class="hint">${T.mode==='rep'?'Valor por mês (R$)':'Total a distribuir (R$)'}</label><input type="text" id="tVal" inputmode="decimal" placeholder="${T.mode==='rep'?'3.300':'39.600'}">
-      <button class="btn" id="tApply">Aplicar</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
+      <button class="btn" id="tApply">Aplicar</button><button class="btn ghost" id="tCancel">Fechar</button></div>
+      <p class="hint">Este painel é só um atalho — para lançar um único mês, feche e digite o valor direto na célula do mês. Nada do item é perdido ao fechar.</p>
 </div>`;
   }
   if(T.kind==='obs'){
@@ -938,9 +940,9 @@ function renderAprov(){
       const rateio=!mes&&d.d==='ok'&&d.val!==x.prev?(()=>{const lv=loteVals(x,d);return `<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(lv[m])).join(' · ')}</span>`;})():'';
       r+=`<tr><td><b>${esc(x.i.det)}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
         <td class="num">${money(x.prev)}</td>
-        <td class="num">${mes?'<span class="muted">mês a mês</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
+        <td class="num">${mes?'<span class="muted">—</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
         <td>${mes?'':`<div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div>`}<button class="lnk" data-mode-k="${esc(k)}" ${closed?'disabled':''} style="margin-top:6px">${mes?'Voltar à decisão única':'Decidir mês a mês'}</button></td>
-        <td>${mes?'<span class="muted">motivos em cada mês, abaixo</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do ajuste de '+money(Math.abs(x.prev-d.val))}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
+        <td>${mes?'<span class="muted">—</span>':(need?`<input class="amot ${d.mot?'':'req'}" data-k="${esc(k)}" placeholder="${d.d==='no'?'Motivo da reprovação':'Motivo do ajuste de '+money(Math.abs(x.prev-d.val))}" value="${esc(d.mot)}" ${closed?'disabled':''} aria-label="Justificativa">`:'<span class="muted">—</span>')}${rateio}</td></tr>`;
       if(mes){
         r+=`<tr class="mesrow"><td colspan="5"><div class="mgrid">${x.pm.map(m=>{const md=d.months[m];return `<div class="mcell ${md.d==='ok'?'ok':md.d==='no'?'no':''}"><b>${MES[m]}</b><span class="sub">Previsto ${fmt(x.i.prev[m])}</span><input data-key="mv-${esc(k)}-${m}" data-mvk="${esc(k)}|${m}" inputmode="decimal" value="${fmt(md.val)}" ${(closed||md.d==='no')?'disabled':''} aria-label="Valor aprovado de ${MES[m]}"><div class="dec"><button class="yes" data-mk="${esc(k)}|${m}" data-md="ok" aria-pressed="${md.d==='ok'}" ${closed?'disabled':''}>✓</button><button class="no" data-mk="${esc(k)}|${m}" data-md="no" aria-pressed="${md.d==='no'}" ${closed?'disabled':''}>✗</button></div>${(md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005))?`<input class="mmot ${(md.mot||'').trim()?'':'req'}" data-mmk="${esc(k)}|${m}" placeholder="${md.d==='no'?'Motivo da reprovação':'Motivo do ajuste'}" value="${esc(md.mot||'')}" ${closed?'disabled':''} aria-label="Justificativa de ${MES[m]}">`:''}</div>`;}).join('')}</div></td></tr>`;
       }
@@ -1097,7 +1099,7 @@ function renderPrazos(){
     const st=DB.ex[S.pAno].status;
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
-    h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${(st==='Encerrado'||enc)?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${enc?'draft':'ok'}">${enc?'Encerrado':'Aberto'}</span> <button class="lnk" data-qenc="${q}" ${st==='Encerrado'?'disabled':''}>${enc?'Reabrir':'Encerrar'}</button></td></tr>`;}).join('')}</tbody></table></div>`;
+    h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];const encEff=st==='Encerrado'||enc;return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${encEff?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${encEff?'draft':'ok'}">${encEff?'Encerrado':'Aberto'}</span>${st==='Encerrado'?'':` <button class="lnk" data-qenc="${q}">${enc?'Reabrir':'Encerrar'}</button>`}</td></tr>`;}).join('')}</tbody></table></div>`;
     const PD=planDepts();
     if(PD.length){
       h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Gestor</th>${QLAB.map(q=>`<th>${q}</th>`).join('')}</tr></thead><tbody>`;
