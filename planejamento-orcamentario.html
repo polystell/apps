@@ -946,7 +946,7 @@ function renderAcomp(){
         t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(ccDesc(cc)||cc)}</span><span class="code">${cc}</span></td><td colspan="12"></td><td class="tot">${moneyC(gA)}</td><td class="tot">${moneyC(gR)}</td><td class="tot ${gS<0?'unpl':''}">${moneyC(gS)}</td></tr>`;
         grp.forEach(r=>{
         const unpl=!r.names.length;
-        t+=`<tr><td class="item"><span class="catline"><span class="code">${r.cat}</span> - ${esc(catDesc(r.cat))}</span>${unpl?'<span class="detline unpl">Gasto sem planejamento</span>':`<span class="detline">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
+        t+=`<tr><td class="item"><span class="catline"><span class="code">${r.cat}</span> - ${esc(catDesc(r.cat))}</span>${unpl?'<span class="detline unpl">Gasto sem planejamento</span>':`<span class="detline">Itens planejados: ${r.names.map(esc).join(', ')}</span>`}</td>`;
         for(let m=0;m<12;m++){
           const fut=m>ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;const clk=!fut&&r.rv[m]>0;
           t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''} ${clk?'click':''}" ${clk?`data-ext="${r.cc}|${r.cat}|${m}"`:''} title="${fut?'M\u00eas ainda n\u00e3o fechado':(clk?'Clique para ver os lan\u00e7amentos':'')}"><div class="rv">${fut?'\u2014':(r.rv[m]?moneyC(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmtC(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
@@ -1077,8 +1077,8 @@ function updateAprovFooter(){
         if(dm.some(m=>{const md=d.months[m];const nm=md.d==='no'||(md.d==='ok'&&Math.abs(md.val-x.i.prev[m])>0.005);return nm&&!(md.mot||'').trim();}))bad++;
       }else if(needMotNow(x,d)&&!d.mot.trim())bad++;
     }});
-  const cut=decPrev-apr;const k=document.getElementById('aKpi');
-  if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Diferença p/ pedido</span><b>${money(-cut)}</b></div><div class="stat"><span>Ajuste sobre o decidido</span><b>${decPrev?Math.round(-cut/decPrev*100):0}%</b></div>`;
+  const cut=(decPrev-apr)||0;const k=document.getElementById('aKpi');
+  if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Diferença p/ pedido</span><b>${money(cut?-cut:0)}</b></div><div class="stat"><span>Ajuste sobre o decidido</span><b>${decPrev?Math.round(-cut/decPrev*100):0}%</b></div>`;
   const s=document.getElementById('aStatus'),b=document.getElementById('confirmBtn');if(!s||!b)return;
   s.textContent=zero?`Aprovar exige valor maior que zero — use Reprovar para zerar (${zero} mês(es) com R$ 0).`:bad?`Falta justificativa em ${bad} item(ns).`:`${decM} de ${totM} meses decididos. Os demais continuam aguardando.`;
   b.disabled=exStatus(S.aAno)==='Encerrado'||!decM||bad>0||zero>0;
