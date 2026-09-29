@@ -404,6 +404,8 @@ async function loadReal(ano,dept){
 const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null};
 const fmt=n=>Math.round(n).toLocaleString('pt-BR');
 const money=n=>'R$ '+fmt(n);
+const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const moneyC=n=>'R$ '+fmtC(n);
 const fmtD=iso=>{if(!iso)return '—';const d=iso.slice(0,10).split('-');return `${d[2]}/${d[1]}/${d[0]}`;};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parse(v){v=String(v).trim();if(!v)return 0;v=v.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');const n=Number(v);return isFinite(n)&&n>0?Math.round(n*100)/100:0;}
@@ -935,21 +937,26 @@ function renderAcomp(){
     if(ULT<0){
       h+=`<p class="empty">Ainda n\u00e3o h\u00e1 lan\u00e7amentos de ${esc(deptName(S.dept))} em ${S.ano}.</p>`;
     }else{
-      h+=`<div class="stats"><div class="stat"><span>Aprovado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${money(A)}</b></div><div class="stat"><span>Realizado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${money(R)}</b></div><div class="stat"><span>Saldo</span><b class="${saldo<0?'neg':''}">${money(saldo)}</b></div><div class="stat"><span>Execu\u00e7\u00e3o \u00b7 meses estourados</span><b>${A?Math.round(R/A*100):0}% \u00b7 ${over}</b></div></div>`;
+      h+=`<div class="stats"><div class="stat"><span>Aprovado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${moneyC(A)}</b></div><div class="stat"><span>Realizado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${moneyC(R)}</b></div><div class="stat"><span>Saldo</span><b class="${saldo<0?'neg':''}">${moneyC(saldo)}</b></div><div class="stat"><span>Execu\u00e7\u00e3o \u00b7 meses estourados</span><b>${A?Math.round(R/A*100):0}% \u00b7 ${over}</b></div></div>`;
       let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Centro de custo \u00b7 categoria</th>${MES.map((m,k)=>`<th class="mh ${k%3===0?'qs':''}">${m}</th>`).join('')}<th class="tot">Aprovado<br>at\u00e9 ${MES[ULT]}</th><th class="tot">Realizado<br>at\u00e9 ${MES[ULT]}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
       if(!rows.length)t+=`<tr><td class="empty" colspan="16">Nenhum item aprovado nem realizado em ${S.ano}.</td></tr>`;
-      rows.forEach(r=>{
+      [...new Set(rows.map(r=>r.cc))].forEach(cc=>{
+        const grp=rows.filter(r=>r.cc===cc);
+        const gA=grp.reduce((a,r)=>a+upto(r.apr),0),gR=grp.reduce((a,r)=>a+upto(r.rv),0),gS=gA-gR;
+        t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(ccDesc(cc)||cc)}</span><span class="code">${cc}</span></td><td colspan="12"></td><td class="tot">${moneyC(gA)}</td><td class="tot">${moneyC(gR)}</td><td class="tot ${gS<0?'unpl':''}">${moneyC(gS)}</td></tr>`;
+        grp.forEach(r=>{
         const unpl=!r.names.length;
-        t+=`<tr><td class="item"><b>${esc(ccDesc(r.cc)||r.cc)}</b><span class="sub"><span class="code">${r.cc}</span> \u00b7 <span class="code">${r.cat}</span> ${esc(catDesc(r.cat))}</span>${unpl?'<span class="sub unpl">Gasto sem planejamento</span>':`<span class="sub">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
+        t+=`<tr><td class="item"><span class="catline"><span class="code">${r.cat}</span> - ${esc(catDesc(r.cat))}</span>${unpl?'<span class="detline unpl">Gasto sem planejamento</span>':`<span class="detline">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
         for(let m=0;m<12;m++){
           const fut=m>ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;const clk=!fut&&r.rv[m]>0;
-          t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''} ${clk?'click':''}" ${clk?`data-ext="${r.cc}|${r.cat}|${m}"`:''} title="${fut?'M\u00eas ainda n\u00e3o fechado':(clk?'Clique para ver os lan\u00e7amentos':'')}"><div class="rv">${fut?'\u2014':(r.rv[m]?fmt(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmt(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
+          t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''} ${clk?'click':''}" ${clk?`data-ext="${r.cc}|${r.cat}|${m}"`:''} title="${fut?'M\u00eas ainda n\u00e3o fechado':(clk?'Clique para ver os lan\u00e7amentos':'')}"><div class="rv">${fut?'\u2014':(r.rv[m]?moneyC(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmtC(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
         }
         const sd=upto(r.apr)-upto(r.rv);
-        t+=`<td class="tot">${money(upto(r.apr))}</td><td class="tot">${money(upto(r.rv))}</td><td class="tot ${sd<0?'unpl':''}">${money(sd)}</td></tr>`;
+        t+=`<td class="tot">${moneyC(upto(r.apr))}</td><td class="tot">${moneyC(upto(r.rv))}</td><td class="tot ${sd<0?'unpl':''}">${moneyC(sd)}</td></tr>`;
+        });
       });
       const colA=m=>rows.reduce((a,r)=>a+r.apr[m],0),colR=m=>rows.reduce((a,r)=>a+r.rv[m],0);
-      t+=`</tbody><tfoot><tr><td class="item">Total \u00b7 ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'\u2014':fmt(colR(m))}<div class="av">de ${fmt(colA(m))}</div></td>`).join('')}<td class="tot">${money(A)}</td><td class="tot">${money(R)}</td><td class="tot ${saldo<0?'unpl':''}">${money(saldo)}</td></tr></tfoot></table></div>`;
+      t+=`</tbody><tfoot><tr><td class="item">Total \u00b7 ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'\u2014':moneyC(colR(m))}<div class="av">de ${fmtC(colA(m))}</div></td>`).join('')}<td class="tot">${moneyC(A)}</td><td class="tot">${moneyC(R)}</td><td class="tot ${saldo<0?'unpl':''}">${moneyC(saldo)}</td></tr></tfoot></table></div>`;
       h+=t;
       h+=`<div class="legend"><span><i class="sw" style="background:var(--bad-soft)"></i>Realizado acima do aprovado</span><span>N\u00famero grande: realizado \u00b7 pequeno: aprovado</span><span>Clique num m\u00eas para ver os lan\u00e7amentos</span></div>`;
     }
@@ -963,7 +970,7 @@ function openExtrato(cc,cat,m){
   const tot=rows.reduce((a,r)=>a+(Number(r.valor)||0),0);
   document.getElementById('mTitle').textContent=`${ccDesc(cc)||cc} \u00b7 ${catDesc(cat)||cat} \u00b7 ${MES[m]}/${S.ano}`;
   document.getElementById('mBody').innerHTML=rows.length
-    ?`<table class="simple"><thead><tr><th>Compet\u00eancia</th><th>Documento</th><th>NF</th><th>Fornecedor</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtD(String(r.data||''))}</td><td class="code">${esc(r.doc||'')}</td><td class="code">${esc(r.nf||'')}</td><td>${esc(r.forn||'')}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${money(Number(r.valor)||0)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:600;padding:10px 8px">Total \u00b7 ${rows.length} lan\u00e7amento(s)</td><td style="text-align:right;font-weight:700;padding:10px 8px">${money(tot)}</td></tr></tfoot></table>`
+    ?`<table class="simple"><thead><tr><th>Compet\u00eancia</th><th>Tipo</th><th>Documento</th><th>NF</th><th>Fornecedor</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtD(String(r.data||''))}</td><td class="code">${esc(r.tipo||'')}</td><td class="code">${esc(r.doc||'')}</td><td class="code">${esc(r.nf||'')}</td><td>${esc(r.forn||'')}${r.obs?`<span class="detline">${esc(r.obs)}</span>`:''}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${moneyC(Number(r.valor)||0)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5" style="text-align:right;font-weight:600;padding:10px 8px">Total \u00b7 ${rows.length} lan\u00e7amento(s)</td><td style="text-align:right;font-weight:700;padding:10px 8px">${moneyC(tot)}</td></tr></tfoot></table>`
     :'<p class="empty">Nenhum lan\u00e7amento.</p>';
   document.getElementById('modal').hidden=false;
 }
