@@ -90,9 +90,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 .tool textarea{width:100%;min-height:64px;resize:vertical}
 .tool input[type="file"]{max-width:100%}
 
-.additem{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;align-items:end;background:var(--soft);border-radius:10px;padding:14px}
+.additem{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 16px;align-items:end;background:var(--soft);border-radius:12px;padding:18px}
+@media (max-width:900px){.additem{grid-template-columns:1fr}}
 .additem label{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
-.additem select,.additem input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:13px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink);min-width:0}
+.additem select,.additem input{padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:14px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink);min-width:0;width:100%}
 .formbtns{display:flex;gap:8px}
 .hint{font-size:12px;color:var(--mute);margin:0}
 .additem .hint,.additem .wide{grid-column:1/-1}
@@ -497,8 +498,8 @@ function renderPlan(){
   if(S.adding&&!ro){
     const myCCs=DB.ccs.filter(c=>c.COD_DPTO===S.dept);
     h+=`<form class="additem" id="addForm">
-      <label for="fCC">Centro de custo<select id="fCC">${myCCs.map(c=>`<option value="${c.COD_CC}">${c.COD_CC} · ${esc(c.DESC_CC)}</option>`).join('')}</select></label>
-      <label for="fCat">Categoria financeira<select id="fCat">${DB.cats.map(c=>`<option value="${c.COD_CAT}">${c.COD_CAT} · ${esc(c.DESC_CAT)}</option>`).join('')}</select></label>
+      <label for="fCC">Centro de custo<input id="fCC" list="dlCC" placeholder="Pesquise por código ou nome" autocomplete="off"><datalist id="dlCC">${myCCs.map(c=>`<option value="${c.COD_CC} - ${esc(c.DESC_CC)}"></option>`).join('')}</datalist></label>
+      <label for="fCat">Categoria financeira<input id="fCat" list="dlCat" placeholder="Pesquise por código ou nome" autocomplete="off"><datalist id="dlCat">${DB.cats.map(c=>`<option value="${c.COD_CAT} - ${esc(c.DESC_CAT)}"></option>`).join('')}</datalist></label>
       <label for="fDet">Detalhamento<input id="fDet" placeholder="Ex.: Microsoft 365" autocomplete="off"></label>
       <label for="fObs" class="wide">Observação para a diretoria (opcional)<input id="fObs" placeholder="Ex.: renovação do contrato, reajuste de 8%" autocomplete="off"></label>
       <div class="formbtns"><button type="submit" class="btn">Adicionar</button><button type="button" class="btn ghost" id="cancelAdd">Cancelar</button></div>
@@ -707,9 +708,22 @@ function rerenderKeepFocus(){
     if(k){const el=document.querySelector(`[data-key="${CSS.escape(k)}"]`);if(el){el.focus();if(el.select)el.select();}}
   });
 }
+function pickCode(val,list,codeKey,descKey){
+  val=String(val||'').trim();if(!val)return '';
+  const low=val.toLowerCase();
+  let hit=list.find(x=>(x[codeKey]+' - '+(x[descKey]||'')).toLowerCase()===low)
+        ||list.find(x=>String(x[codeKey])===val)
+        ||list.find(x=>String(x[codeKey])===((val.match(/^(\d+)/)||[])[1]||'__'));
+  if(!hit){const m=list.filter(x=>(x[descKey]||'').toLowerCase().includes(low));if(m.length===1)hit=m[0];}
+  return hit?hit[codeKey]:'';
+}
 function addNewItem(){
-  const cc=document.getElementById('fCC').value,cat=document.getElementById('fCat').value,det=document.getElementById('fDet').value.trim(),obs=document.getElementById('fObs').value.trim();
-  if(!cc){toast('Nenhum centro de custo do seu departamento foi encontrado na lista do JAD.','warn');return;}
+  const myCCs=DB.ccs.filter(c=>c.COD_DPTO===S.dept);
+  const cc=pickCode(document.getElementById('fCC').value,myCCs,'COD_CC','DESC_CC');
+  const cat=pickCode(document.getElementById('fCat').value,DB.cats,'COD_CAT','DESC_CAT');
+  const det=document.getElementById('fDet').value.trim(),obs=document.getElementById('fObs').value.trim();
+  if(!cc){toast('Escolha um centro de custo da lista.','warn');document.getElementById('fCC').focus();return;}
+  if(!cat){toast('Escolha uma categoria financeira da lista.','warn');document.getElementById('fCat').focus();return;}
   if(!det){toast('Informe o detalhamento do item.','warn');document.getElementById('fDet').focus();return;}
   if(exists(S.ano,S.dept,cc,cat,det)){toast('Já existe um item com esse centro de custo, categoria e detalhamento.','warn');return;}
   const it={key:itemKey(S.dept,cc,cat,det),dept:S.dept,cc,cat,det,obs,prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
