@@ -210,6 +210,14 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
   .nav{width:auto}
   .split{grid-template-columns:1fr}
 }
+td.r.click{cursor:pointer}
+td.r.click:hover .rv{text-decoration:underline}
+#modal{position:fixed;inset:0;z-index:250}
+#modal .mback{position:absolute;inset:0;background:rgba(13,26,65,.45)}
+#modal .mcard{position:relative;margin:6vh auto 0;max-width:800px;width:calc(100% - 32px);background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:84vh}
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.mhead h2{font-size:15px;font-weight:700}
+.mbody{padding:8px 20px 20px;overflow:auto}
 .btn,.tab,.seg button,.nav,.dec button,.dbtn,.lnk{transition:background .15s ease,color .15s ease,border-color .15s ease,opacity .15s ease}
 @media (prefers-reduced-motion:reduce){#toast,.rowact,.btn,.tab,.seg button,.nav,.dec button,.dbtn,.lnk{transition:none}}
 </style>
@@ -239,6 +247,7 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="busy" hidden>Gravando…</div>
+<div id="modal" hidden><div class="mback"></div><div class="mcard" role="dialog" aria-modal="true" aria-labelledby="mTitle"><div class="mhead"><h2 id="mTitle"></h2><button class="btn ghost" id="mClose">Fechar</button></div><div class="mbody" id="mBody"></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -253,6 +262,7 @@ const CFG={
   tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
   spHost:'https://polystellcombr.sharepoint.com',
   sitePath:'/sites/Apps',
+  realLib:'08_Realizado',                       // biblioteca: 1 arquivo JSON por departamento/ano
   deptDiretoria:'00004',                        // vínculo a este depto = aprova
   deptTI:'00008',                               // vínculo a este depto = admin
   lists:{
@@ -262,7 +272,6 @@ const CFG={
     dept:'98_Cadastro_Departamento',
     cc:'98_Cadastro_Centro_Custo',
     cat:'98_Cadastro_Categoria_Financeira',
-    real:'98_Realizado',                        // opcional (Etapa 2)
     perfil:'08_Perfis'                          // papéis: Administrador / Aprovador / Assessoria (dados, não código)
   }
 };
@@ -348,7 +357,7 @@ function fail(e){
 }
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
-const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},realMissing:false,perfis:null};
+const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows){
@@ -378,11 +387,17 @@ async function loadYear(ano,force){
     DB.plan[ano]=buildItems(rows);
   }finally{busy(false);}
 }
-async function loadReal(ano){
-  if(DB.real[ano]||DB.realMissing)return;
+async function loadReal(ano,dept){
+  DB.real[ano]=DB.real[ano]||{};
+  if(DB.real[ano][dept]!==undefined)return;
   try{
-    DB.real[ano]=await getAll(CFG.lists.real,`$select=Id,ANO,MES,COD_DPTO,COD_CC,COD_CAT,VALOR&$filter=ANO eq ${ano}&$top=2000`);
-  }catch(e){DB.realMissing=true;DB.real[ano]=[];console.warn('98_Realizado indisponível (Etapa 2 pendente).',e.message);}
+    const t=await tok();
+    const url=`${CFG.spHost}${CFG.sitePath}/_api/web/GetFileByServerRelativePath(decodedurl='${CFG.sitePath}/${CFG.realLib}/${dept}/detalhe_${ano}.json')/$value`;
+    const res=await fetch(url,{headers:{Authorization:'Bearer '+t,Accept:'application/json'}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const rows=await res.json();
+    DB.real[ano][dept]=Array.isArray(rows)?rows:[];
+  }catch(e){DB.real[ano][dept]=null;console.warn('Realizado indisponível para',dept,ano,String(e.message||e));}
 }
 
 /* ============================== ESTADO UI ============================= */
@@ -543,7 +558,7 @@ function renderPlan(){
   const v=document.getElementById('view');
   v.innerHTML=`<div class="panel">${h}</div>`;
   bindDeptTabs(v);
-  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);S.tool=null;S.adding=false;try{await loadYear(S.ano);await loadReal(S.ano);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);S.tool=null;S.adding=false;try{await loadYear(S.ano);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-scope]').forEach(b=>b.onclick=()=>{const x=b.dataset.scope;S.scope=x==='ANO'?'ANO':Number(x);render();});
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn;};
   on('addBtn',()=>{S.adding=true;S.tool=null;render();document.getElementById('fDet').focus();});
@@ -892,49 +907,65 @@ function doImport(){
 function renderAcomp(){
   const deps=allowedDepts();
   if(!ANOS().length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=noExPanel();return;}
-  if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Você ainda não está vinculado a nenhum departamento.</p></div>`;return;}
-  const real=(DB.real[S.ano]||[]).filter(r=>r.COD_DPTO===S.dept);
-  const allReal=DB.real[S.ano]||[];
-  const ULT=allReal.length?Math.max(...allReal.map(r=>Number(r.MES)))-1:-1;
-  setHead(`Acompanhamento ${S.ano}`,ULT>=0?'Realizado até '+MES[ULT].toLowerCase():'');
-  const its=itemsOf(S.ano,S.dept);
-  const rmap={};real.forEach(r=>{const k=r.COD_CC+'|'+r.COD_CAT;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.MES)-1]+=Number(r.VALOR)||0;});
-  const keys=[...new Set([...its.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
-  const rows=keys.map(k=>{
-    const [cc,cat]=k.split('|');const g=its.filter(i=>i.cc===cc&&i.cat===cat);
-    const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));
-    return {cc,cat,names:g.map(i=>i.det),apr,rv:rmap[k]||rep(0)};
-  });
-  const upto=a=>ULT<0?0:a.slice(0,ULT+1).reduce((x,y)=>x+y,0);
-  const A=rows.reduce((a,r)=>a+upto(r.apr),0),R=rows.reduce((a,r)=>a+upto(r.rv),0),saldo=A-R;
-  let over=0;rows.forEach(r=>{for(let m=0;m<=ULT;m++)if(r.rv[m]>r.apr[m]+0.005)over++;});
-
+  if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
+  const cache=(DB.real[S.ano]||{})[S.dept];
   let h=`<div class="row">${deptTabs(deps)}${yearSeg(S.ano,'data-ano')}</div>`;
-  if(DB.realMissing){
-    h+=`<p class="empty">O realizado ainda não está disponível: a lista <b>${CFG.lists.real}</b> não existe (ou você não tem acesso). Essa é a Etapa 2 da implantação — a sincronização diária do JAD.</p>`;
-  }else if(ULT<0){
-    h+=`<p class="empty">Ainda não há realizado sincronizado para ${S.ano}.</p>`;
+  if(cache===undefined){
+    setHead(`Acompanhamento ${S.ano}`,'');
+    loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
+    h+=`<p class="empty">Carregando o realizado\u2026</p>`;
+  }else if(cache===null){
+    setHead(`Acompanhamento ${S.ano}`,'');
+    h+=`<p class="empty">O realizado de ${esc(deptName(S.dept))} em ${S.ano} ainda n\u00e3o foi sincronizado.</p>`;
   }else{
-    h+=`<div class="stats"><div class="stat"><span>Aprovado até ${MES[ULT].toLowerCase()}</span><b>${money(A)}</b></div><div class="stat"><span>Realizado até ${MES[ULT].toLowerCase()}</span><b>${money(R)}</b></div><div class="stat"><span>Saldo</span><b class="${saldo<0?'neg':''}">${money(saldo)}</b></div><div class="stat"><span>Execução · meses estourados</span><b>${A?Math.round(R/A*100):0}% · ${over}</b></div></div>`;
-    let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Centro de custo · categoria</th>${MES.map((m,k)=>`<th class="mh ${k%3===0?'qs':''}">${m}</th>`).join('')}<th class="tot">Aprovado<br>até ${MES[ULT]}</th><th class="tot">Realizado<br>até ${MES[ULT]}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
-    if(!rows.length)t+=`<tr><td class="empty" colspan="16">Nenhum item aprovado nem realizado em ${S.ano}.</td></tr>`;
-    rows.forEach(r=>{
-      const unpl=!r.names.length;
-      t+=`<tr><td class="item"><b>${esc(ccDesc(r.cc)||r.cc)}</b><span class="sub"><span class="code">${r.cc}</span> · <span class="code">${r.cat}</span> ${esc(catDesc(r.cat))}</span>${unpl?'<span class="sub unpl">Gasto sem planejamento</span>':`<span class="sub">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
-      for(let m=0;m<12;m++){
-        const fut=m>ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;
-        t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''}" title="${fut?'Mês ainda não fechado':`Realizado ${money(r.rv[m])} de ${money(r.apr[m])} aprovado`}"><div class="rv">${fut?'—':(r.rv[m]?fmt(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmt(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
-      }
-      const s=upto(r.apr)-upto(r.rv);
-      t+=`<td class="tot">${money(upto(r.apr))}</td><td class="tot">${money(upto(r.rv))}</td><td class="tot ${s<0?'unpl':''}">${money(s)}</td></tr>`;
+    const real=cache;
+    const ULT=real.length?Math.max(...real.map(r=>Number(r.mes)))-1:-1;
+    setHead(`Acompanhamento ${S.ano}`,ULT>=0?'Realizado at\u00e9 '+MES[ULT].toLowerCase():'');
+    const its=itemsOf(S.ano,S.dept);
+    const rmap={};real.forEach(r=>{const k=r.cc+'|'+r.cat;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.mes)-1]+=Number(r.valor)||0;});
+    const keys=[...new Set([...its.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
+    const rows=keys.map(k=>{
+      const [cc,cat]=k.split('|');const g=its.filter(i=>i.cc===cc&&i.cat===cat);
+      const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));
+      return {cc,cat,names:g.map(i=>i.det),apr,rv:rmap[k]||rep(0)};
     });
-    const colA=m=>rows.reduce((a,r)=>a+r.apr[m],0),colR=m=>rows.reduce((a,r)=>a+r.rv[m],0);
-    t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'—':fmt(colR(m))}<div class="av">de ${fmt(colA(m))}</div></td>`).join('')}<td class="tot">${money(A)}</td><td class="tot">${money(R)}</td><td class="tot ${saldo<0?'unpl':''}">${money(saldo)}</td></tr></tfoot></table></div>`;
-    h+=t;
-    h+=`<div class="legend"><span><i class="sw" style="background:var(--bad-soft)"></i>Realizado acima do aprovado</span><span>Número grande: realizado · número pequeno: aprovado</span></div>`;
+    const upto=a=>ULT<0?0:a.slice(0,ULT+1).reduce((x,y)=>x+y,0);
+    const A=rows.reduce((a,r)=>a+upto(r.apr),0),R=rows.reduce((a,r)=>a+upto(r.rv),0),saldo=A-R;
+    let over=0;rows.forEach(r=>{for(let m=0;m<=ULT;m++)if(r.rv[m]>r.apr[m]+0.005)over++;});
+    if(ULT<0){
+      h+=`<p class="empty">Ainda n\u00e3o h\u00e1 lan\u00e7amentos de ${esc(deptName(S.dept))} em ${S.ano}.</p>`;
+    }else{
+      h+=`<div class="stats"><div class="stat"><span>Aprovado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${money(A)}</b></div><div class="stat"><span>Realizado at\u00e9 ${MES[ULT].toLowerCase()}</span><b>${money(R)}</b></div><div class="stat"><span>Saldo</span><b class="${saldo<0?'neg':''}">${money(saldo)}</b></div><div class="stat"><span>Execu\u00e7\u00e3o \u00b7 meses estourados</span><b>${A?Math.round(R/A*100):0}% \u00b7 ${over}</b></div></div>`;
+      let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Centro de custo \u00b7 categoria</th>${MES.map((m,k)=>`<th class="mh ${k%3===0?'qs':''}">${m}</th>`).join('')}<th class="tot">Aprovado<br>at\u00e9 ${MES[ULT]}</th><th class="tot">Realizado<br>at\u00e9 ${MES[ULT]}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
+      if(!rows.length)t+=`<tr><td class="empty" colspan="16">Nenhum item aprovado nem realizado em ${S.ano}.</td></tr>`;
+      rows.forEach(r=>{
+        const unpl=!r.names.length;
+        t+=`<tr><td class="item"><b>${esc(ccDesc(r.cc)||r.cc)}</b><span class="sub"><span class="code">${r.cc}</span> \u00b7 <span class="code">${r.cat}</span> ${esc(catDesc(r.cat))}</span>${unpl?'<span class="sub unpl">Gasto sem planejamento</span>':`<span class="sub">Inclui: ${r.names.map(esc).join(', ')}</span>`}</td>`;
+        for(let m=0;m<12;m++){
+          const fut=m>ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;const clk=!fut&&r.rv[m]>0;
+          t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''} ${clk?'click':''}" ${clk?`data-ext="${r.cc}|${r.cat}|${m}"`:''} title="${fut?'M\u00eas ainda n\u00e3o fechado':(clk?'Clique para ver os lan\u00e7amentos':'')}"><div class="rv">${fut?'\u2014':(r.rv[m]?fmt(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmt(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
+        }
+        const sd=upto(r.apr)-upto(r.rv);
+        t+=`<td class="tot">${money(upto(r.apr))}</td><td class="tot">${money(upto(r.rv))}</td><td class="tot ${sd<0?'unpl':''}">${money(sd)}</td></tr>`;
+      });
+      const colA=m=>rows.reduce((a,r)=>a+r.apr[m],0),colR=m=>rows.reduce((a,r)=>a+r.rv[m],0);
+      t+=`</tbody><tfoot><tr><td class="item">Total \u00b7 ${esc(deptName(S.dept))}</td>${MES.map((_,m)=>`<td class="${m%3===0?'qs':''}">${m>ULT?'\u2014':fmt(colR(m))}<div class="av">de ${fmt(colA(m))}</div></td>`).join('')}<td class="tot">${money(A)}</td><td class="tot">${money(R)}</td><td class="tot ${saldo<0?'unpl':''}">${money(saldo)}</td></tr></tfoot></table></div>`;
+      h+=t;
+      h+=`<div class="legend"><span><i class="sw" style="background:var(--bad-soft)"></i>Realizado acima do aprovado</span><span>N\u00famero grande: realizado \u00b7 pequeno: aprovado</span><span>Clique num m\u00eas para ver os lan\u00e7amentos</span></div>`;
+    }
   }
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;bindDeptTabs(v);
-  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);await loadReal(S.ano);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-ext]').forEach(td=>td.onclick=()=>{const x=td.dataset.ext,i1=x.indexOf('|'),i2=x.lastIndexOf('|');openExtrato(x.slice(0,i1),x.slice(i1+1,i2),+x.slice(i2+1));});
+}
+function openExtrato(cc,cat,m){
+  const rows=(((DB.real[S.ano]||{})[S.dept])||[]).filter(r=>r.cc===cc&&r.cat===cat&&Number(r.mes)===m+1).sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
+  const tot=rows.reduce((a,r)=>a+(Number(r.valor)||0),0);
+  document.getElementById('mTitle').textContent=`${ccDesc(cc)||cc} \u00b7 ${catDesc(cat)||cat} \u00b7 ${MES[m]}/${S.ano}`;
+  document.getElementById('mBody').innerHTML=rows.length
+    ?`<table class="simple"><thead><tr><th>Compet\u00eancia</th><th>Documento</th><th>NF</th><th>Fornecedor</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtD(String(r.data||''))}</td><td class="code">${esc(r.doc||'')}</td><td class="code">${esc(r.nf||'')}</td><td>${esc(r.forn||'')}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${money(Number(r.valor)||0)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:600;padding:10px 8px">Total \u00b7 ${rows.length} lan\u00e7amento(s)</td><td style="text-align:right;font-weight:700;padding:10px 8px">${money(tot)}</td></tr></tfoot></table>`
+    :'<p class="empty">Nenhum lan\u00e7amento.</p>';
+  document.getElementById('modal').hidden=false;
 }
 
 /* ============================== APROVAÇÃO ============================= */
@@ -1246,8 +1277,8 @@ async function refreshData(){
     setVincs(vincRows);setEx(exRows);setPerfis(perfRows);recalcRole();
     S.dec={};
     document.getElementById('uRole').textContent=roleLabel(myDepts());
-    DB.real={};DB.realMissing=false;
-    if(S.ano){await loadYear(S.ano,true);await loadReal(S.ano);}
+    DB.real={};
+    if(S.ano){await loadYear(S.ano,true);}
     if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
     toast('Dados atualizados.');
   }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
@@ -1285,7 +1316,7 @@ async function start(){
     const anos=ANOS();const nowY=new Date().getFullYear();
     S.ano=anos.includes(nowY)?nowY:(anos[anos.length-1]||null);
     S.aAno=S.ano;S.pAno=S.ano;
-    if(S.ano){gate('Carregando planejamento…');await loadYear(S.ano);await loadReal(S.ano);}
+    if(S.ano){gate('Carregando planejamento…');await loadYear(S.ano);}
 
     const uIni=document.getElementById('uIni');
     uIni.textContent=(DB.me.name.match(/\b\p{L}/gu)||['?']).slice(0,2).join('').toUpperCase();
@@ -1296,6 +1327,9 @@ async function start(){
     document.getElementById('uName').textContent=DB.me.name;
     document.getElementById('uRole').textContent=roleLabel(mine);
     document.getElementById('btnRefresh').onclick=refreshData;
+    document.getElementById('mClose').onclick=()=>document.getElementById('modal').hidden=true;
+    document.querySelector('#modal .mback').onclick=()=>document.getElementById('modal').hidden=true;
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('modal').hidden=true;});
     document.getElementById('btnSair').onclick=()=>msalApp.logoutRedirect({postLogoutRedirectUri:location.origin+location.pathname});
     document.getElementById('gate').hidden=true;
     document.getElementById('appRoot').hidden=false;
