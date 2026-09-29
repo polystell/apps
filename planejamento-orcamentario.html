@@ -401,9 +401,9 @@ const ANOS=()=>Object.keys(DB.ex).map(Number).sort((a,b)=>a-b);
 const exStatus=a=>DB.ex[a]?DB.ex[a].status:null;
 const qClosed=(a,q)=>{const e=DB.ex[a];return !!(e&&(e.status==='Encerrado'||(e.enc&&e.enc[q])));};
 const mOpen=(a,m)=>!qClosed(a,Math.floor(m/3));
-const planDepts=()=>[...new Set([...DB.vincs.map(v=>v.cod),...[].concat(...Object.values(DB.plan)).map(i=>i.dept)])].filter(Boolean).sort();
+const planDepts=a=>[...new Set([...DB.vincs.map(v=>v.cod),...((DB.plan[a]||[]).map(i=>i.dept))])].filter(Boolean).sort();
 const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
-const vig=(i,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.prev[m];
+const vig=(i,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:(i.st[m]==='Reprovado'?0:i.prev[m]);
 const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
 const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
 let tt;
@@ -424,7 +424,7 @@ function prazoStatus(dept,ano,q){
   if(draft)return late?{s:'Atrasado',c:'bad'}:{s:'Aberto',c:'draft'};
   return {s:'Enviado',c:'ok'};
 }
-const allowedDepts=()=>S.role.all?[...new Set([...planDepts(),...myDepts()])].sort():myDepts();
+const allowedDepts=()=>S.role.all?[...new Set([...planDepts(S.ano),...myDepts()])].sort():myDepts();
 
 const NAVICON={
  gest:'<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -518,7 +518,10 @@ function renderPlan(){
     t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(ccDesc(cc)||cc)}</span><span class="code">${cc}</span></td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
-      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button><button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button><button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
+      const temDec=i.st.some((st,m)=>i.prev[m]>0&&(st==='Aprovado'||st==='Reprovado'));
+      const temPen=ms.some(m=>i.prev[m]>0&&i.st[m]==='Pendente'&&mOpen(S.ano,m));
+      const temRep=ms.some(m=>i.prev[m]>0&&i.st[m]==='Reprovado'&&mOpen(S.ano,m));
+      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button>${temDec?'':`<button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button>`}${temPen?`<button class="lnk" data-cenv="${esc(i.key)}">Cancelar envio</button>`:''}${temRep?`<button class="lnk" data-reab="${esc(i.key)}">Reabrir reprovados</button>`:''}<button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
       ms.forEach(m=>{
         const s=i.prev[m]>0?i.st[m]:'';
         const ap=s==='Aprovado'&&i.apr[m]!=null;
@@ -552,6 +555,8 @@ function renderPlan(){
   v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tVal');if(x)x.focus();});
   v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tObs');if(x)x.focus();});
   v.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.tool={kind:'del',key:b.dataset.del};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});});
+  v.querySelectorAll('[data-cenv]').forEach(b=>b.onclick=()=>setMonthsStatus(b.dataset.cenv,'Pendente'));
+  v.querySelectorAll('[data-reab]').forEach(b=>b.onclick=()=>setMonthsStatus(b.dataset.reab,'Reprovado'));
   bindTool();
   v.querySelectorAll('td.c input').forEach(inp=>{
     inp.onfocus=()=>inp.select();
@@ -584,10 +589,11 @@ function toolHtml(){
   if(T.kind==='del'){
     const it=findItem(T.key);if(!it)return '';
     const temDecisao=it.st.some((st,m)=>it.prev[m]>0&&(st==='Aprovado'||st==='Reprovado'));
+    const temPend=it.st.some((st,m)=>it.prev[m]>0&&st==='Pendente');
     const temFechado=it.ids.some((id,m)=>id&&!mOpen(S.ano,m));
-    if(temDecisao||temFechado){
+    if(temDecisao||temPend||temFechado){
       return `<div class="tool" role="region" aria-label="Excluir item"><h2>Não dá para excluir “${esc(it.det)}”</h2>
-        <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.'}</p>
+        <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':temPend?'O item está aguardando a diretoria — use “Cancelar envio” e depois exclua.':'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.'}</p>
         <div class="line"><button class="btn ghost" id="tCancel">Fechar</button></div></div>`;
     }
     const n=it.ids.filter(Boolean).length;
@@ -613,7 +619,7 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''} · total a importar <b>${money(pv.total)}</b></p>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}</p>`;
         if(pv.novos.length)h+=`<div class="line"><button class="btn" id="tImport">Importar ${pv.novos.length} itens como rascunho</button></div>`;
       }
     }
@@ -664,7 +670,9 @@ async function persistCell(it,m,ano){
   }
 }
 function setCell(it,m,v){
-  const old=it.prev[m];if(v===old)return {changed:false};
+  const shown=it.st[m]==='Aprovado'&&it.apr[m]!=null?it.apr[m]:it.prev[m];
+  if(v===shown)return {changed:false};
+  const old=it.prev[m];
   const s=old>0?it.st[m]:'Rascunho';
   it.prev[m]=v;
   let ev=null;
@@ -761,6 +769,19 @@ function copyFrom(src){
   if(!n){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
   runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho, com os valores aprovados lá.`)).catch(fail);
 }
+function setMonthsStatus(key,fromSt){
+  const it=findItem(key);if(!it)return;
+  const ms=monthsOf(S.scope).filter(m=>mOpen(S.ano,m)&&it.prev[m]>0&&it.st[m]===fromSt);
+  if(!ms.length)return;
+  const tasks=[];
+  ms.forEach(m=>{
+    it.st[m]='Rascunho';
+    if(fromSt==='Reprovado'){it.apr[m]=null;delete it.mot[m];}
+    if(it.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,it.ids[m],fromSt==='Reprovado'?{STATUS:'Rascunho',APROVADO:null,MOTIVO:'',DATA_APROVACAO:null,APROVADO_PORId:null}:{STATUS:'Rascunho'}));
+  });
+  render();
+  runQueue(tasks,'Gravando').then(()=>toast(fromSt==='Reprovado'?`${ms.length} mês(es) reaberto(s) como rascunho — ajuste e reenvie.`:`Envio cancelado — ${ms.length} mês(es) voltaram a rascunho.`)).catch(fail);
+}
 function sendScope(){
   const ms=monthsOf(S.scope);const tasks=[];let n=0;
   itemsOf(S.ano,S.dept).forEach(i=>ms.forEach(m=>{
@@ -849,7 +870,9 @@ function impPreview(){
     if(seen.has(k)||exists(S.ano,S.dept,r.cc,r.cat,r.det)){dup++;return;}
     seen.add(k);novos.push(r);
   });
-  return {found:p.items.length,dup,outro,inval,novos,total:novos.reduce((a,r)=>a+r.vals.reduce((b,v)=>b+v,0),0)};
+  return {found:p.items.length,dup,outro,inval,novos,
+    total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0),
+    fech:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
 }
 function doImport(){
   const pv=impPreview();const p=S.imp.sheets[S.imp.sel];const ano=S.ano;const tasks=[];
@@ -934,7 +957,7 @@ function needMotNow(x,d){return decidedMonths(x,d).some(m=>{const dec=monthDec(d
 function renderAprov(){
   setHead('Aprovação orçamentária','');
   if(!ANOS().length){document.getElementById('view').innerHTML=noExPanel();return;}
-  const PD=planDepts();
+  const PD=planDepts(S.aAno);
   if(!S.aDept||!PD.includes(S.aDept)){const f=PD.find(d=>pendInfo(d).c>0);S.aDept=f||PD[0];}
   const closed=exStatus(S.aAno)==='Encerrado';
   const rows=aRows();
@@ -1116,7 +1139,7 @@ function renderPrazos(){
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
     h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];const encEff=st==='Encerrado'||enc;return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${encEff?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${encEff?'draft':'ok'}">${encEff?'Encerrado':'Aberto'}</span>${st==='Encerrado'?'':` <button class="lnk" data-qenc="${q}">${enc?'Reabrir':'Encerrar'}</button>`}</td></tr>`;}).join('')}</tbody></table></div>`;
-    const PD=planDepts();
+    const PD=planDepts(S.pAno);
     if(PD.length){
       h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Gestor</th>${QLAB.map(q=>`<th>${q}</th>`).join('')}</tr></thead><tbody>`;
       PD.forEach(d=>{
@@ -1168,6 +1191,15 @@ function renderPrazos(){
 }
 
 /* ======================= DADOS COMPARTILHADOS ======================== */
+function setCadastros(depts,ccs,cats){
+  DB.deptByCod={};DB.deptById={};DB.ccMap={};DB.catMap={};
+  DB.depts=depts.filter(d=>d.COD_DPTO).sort((a,b)=>a.COD_DPTO.localeCompare(b.COD_DPTO));
+  DB.depts.forEach(d=>{DB.deptByCod[d.COD_DPTO]=d;DB.deptById[d.Id]=d;});
+  DB.ccs=ccs.filter(c=>c.COD_CC).sort((a,b)=>a.COD_CC.localeCompare(b.COD_CC));
+  DB.ccs.forEach(c=>DB.ccMap[c.COD_CC]=c.DESC_CC||'');
+  DB.cats=cats.filter(c=>c.COD_CAT).sort((a,b)=>a.COD_CAT.localeCompare(b.COD_CAT));
+  DB.cats.forEach(c=>DB.catMap[c.COD_CAT]=c.DESC_CAT||'');
+}
 function setVincs(rows){
   const map=v=>({Id:v.Id,cod:DB.deptById[v.DEPARTAMENTOId].COD_DPTO,email:(v.GESTOR.EMail||'').toLowerCase(),nome:v.GESTOR.Title||v.GESTOR.EMail});
   const valid=rows.filter(v=>v.GESTOR&&DB.deptById[v.DEPARTAMENTOId]);
@@ -1187,10 +1219,8 @@ function recalcRole(){
     admin=meus.includes('Administrador');
     aprov=meus.includes('Aprovador');
     assess=meus.includes('Assessoria');
-  }else{ // fallback enquanto a lista não existe: regra antiga
-    const dir=mine.includes(CFG.deptDiretoria);
-    admin=dir||mine.includes(CFG.deptTI);
-    aprov=dir;
+  }else{ // 08_Perfis inacessível: ninguém recebe papel elevado (gestores seguem pelos vínculos)
+    admin=false;aprov=false;
   }
   S.role={admin,aprov,assess,all:admin||aprov||assess};
 }
@@ -1204,12 +1234,17 @@ function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id
 async function refreshData(){
   busy(true,'Atualizando…');
   try{
-    const [vincRows,exRows,perfRows]=await Promise.all([
+    const [depts,ccs,cats,vincRows,exRows,perfRows]=await Promise.all([
+      getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
+      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
+      getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
+    setCadastros(depts,ccs,cats);
     setVincs(vincRows);setEx(exRows);setPerfis(perfRows);recalcRole();
+    S.dec={};
     document.getElementById('uRole').textContent=roleLabel(myDepts());
     DB.real={};DB.realMissing=false;
     if(S.ano){await loadYear(S.ano,true);await loadReal(S.ano);}
@@ -1240,15 +1275,11 @@ async function start(){
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
     ]);
     setPerfis(perfRows);
-    DB.depts=depts.filter(d=>d.COD_DPTO).sort((a,b)=>a.COD_DPTO.localeCompare(b.COD_DPTO));
-    DB.depts.forEach(d=>{DB.deptByCod[d.COD_DPTO]=d;DB.deptById[d.Id]=d;});
-    DB.ccs=ccs.filter(c=>c.COD_CC).sort((a,b)=>a.COD_CC.localeCompare(b.COD_CC));
-    DB.ccs.forEach(c=>DB.ccMap[c.COD_CC]=c.DESC_CC||'');
-    DB.cats=cats.filter(c=>c.COD_CAT).sort((a,b)=>a.COD_CAT.localeCompare(b.COD_CAT));
-    DB.cats.forEach(c=>DB.catMap[c.COD_CAT]=c.DESC_CAT||'');
+    setCadastros(depts,ccs,cats);
     setVincs(vincRows);setEx(exRows);
 
     recalcRole();
+    if(!DB.perfis)toast('Não foi possível carregar os perfis de acesso — funções administrativas ficam ocultas. Avise a TI.','warn');
     const mine=myDepts();
 
     const anos=ANOS();const nowY=new Date().getFullYear();
