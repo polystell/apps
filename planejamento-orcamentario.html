@@ -272,7 +272,8 @@ const CFG={
     dept:'98_Cadastro_Departamento',
     cc:'98_Cadastro_Centro_Custo',
     cat:'98_Cadastro_Categoria_Financeira',
-    perfil:'08_Perfis'                          // papéis: Administrador / Aprovador / Assessoria (dados, não código)
+    perfil:'08_Perfis',                         // papéis: Administrador / Aprovador / Assessoria (dados, não código)
+    reab:'08_Reaberturas'                       // reaberturas pontuais por departamento/trimestre
   }
 };
 
@@ -357,7 +358,7 @@ function fail(e){
 }
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
-const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null};
+const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows){
@@ -401,7 +402,7 @@ async function loadReal(ano,dept){
 }
 
 /* ============================== ESTADO UI ============================= */
-const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null};
+const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false};
 const fmt=n=>Math.round(n).toLocaleString('pt-BR');
 const money=n=>'R$ '+fmt(n);
 const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -416,8 +417,11 @@ const ccDesc=c=>DB.ccMap[c]||'';
 const catDesc=c=>DB.catMap[c]||'';
 const ANOS=()=>Object.keys(DB.ex).map(Number).sort((a,b)=>a-b);
 const exStatus=a=>DB.ex[a]?DB.ex[a].status:null;
-const qClosed=(a,q)=>{const e=DB.ex[a];return !!(e&&(e.status==='Encerrado'||(e.enc&&e.enc[q])));};
-const mOpen=(a,m)=>!qClosed(a,Math.floor(m/3));
+const qClosedRaw=(a,q)=>{const e=DB.ex[a];return !!(e&&(e.status==='Encerrado'||(e.enc&&e.enc[q])));};
+const reabAtiva=(a,q,d)=>!!d&&(DB.reabs||[]).some(r=>r.ativo&&r.ano===a&&r.cod===d&&r.tri==='Q'+(q+1));
+const anyReab=(a,d)=>!!d&&(DB.reabs||[]).some(r=>r.ativo&&r.ano===a&&r.cod===d);
+const qClosed=(a,q,d=S.dept)=>qClosedRaw(a,q)&&!reabAtiva(a,q,d);
+const mOpen=(a,m,d=S.dept)=>!qClosed(a,Math.floor(m/3),d);
 const planDepts=a=>[...new Set([...DB.vincs.map(v=>v.cod),...((DB.plan[a]||[]).map(i=>i.dept))])].filter(Boolean).sort();
 const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v.cod))].sort();
 const vig=(i,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:(i.st[m]==='Reprovado'?0:i.prev[m]);
@@ -433,7 +437,7 @@ function qStatus(list,ms){
 }
 function prazoStatus(dept,ano,q){
   const ex=DB.ex[ano];if(!ex)return{s:'—',c:'draft'};
-  if(qClosed(ano,q))return{s:'Encerrado',c:'draft'};
+  if(qClosed(ano,q,dept))return{s:'Encerrado',c:'draft'};
   const ms=[q*3,q*3+1,q*3+2];let has=false,draft=false;
   itemsOf(ano,dept).forEach(i=>ms.forEach(m=>{if(i.prev[m]>0){has=true;if(i.st[m]==='Rascunho')draft=true;}}));
   const late=ex.prazos[q]&&new Date()>new Date(ex.prazos[q].slice(0,10)+'T23:59:59');
@@ -484,7 +488,8 @@ function renderPlan(){
   const deps=allowedDepts();
   if(!ANOS().length){setHead('Planejamento','');document.getElementById('view').innerHTML=noExPanel();return;}
   if(!deps.length){setHead('Planejamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Você ainda não está vinculado a nenhum departamento. Peça à TI para te vincular na tela Gestores.</p></div>`;return;}
-  const closed=exStatus(S.ano)==='Encerrado';
+  const closed=exStatus(S.ano)==='Encerrado'&&!anyReab(S.ano,S.dept);
+  const rq=[0,1,2,3].filter(q=>qClosedRaw(S.ano,q)&&reabAtiva(S.ano,q,S.dept));
   const meus=myDepts();
   const ro=closed||!meus.includes(S.dept);
   setHead(`Planejamento ${S.ano}`,closed?'Exercício encerrado':'');
@@ -497,7 +502,7 @@ function renderPlan(){
   const quarters=S.scope==='ANO'?[0,1,2,3]:[S.scope];
   const scopeName=S.scope==='ANO'?'o ano':'o '+QLAB[S.scope];
 
-  let h=`<div class="row">${deptTabs(deps)}<span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${closed?'<span class="chip c-draft">Exercício encerrado</span>':''}${yearSeg(S.ano,'data-ano')}</span></div>`;
+  let h=`<div class="row">${deptTabs(deps)}<span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${closed?'<span class="chip c-draft">Exercício encerrado</span>':''}${rq.length?`<span class="chip c-ok">Reaberto: ${rq.map(q=>QLAB[q]).join(', ')}</span>`:''}${yearSeg(S.ano,'data-ano')}</span></div>`;
   h+=`<div class="stats">
     <div class="stat"><span>Previsto no ano</span><b>${money(sumIf(()=>true))}</b></div>
     <div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div>
@@ -997,7 +1002,7 @@ function renderAprov(){
   if(!ANOS().length){document.getElementById('view').innerHTML=noExPanel();return;}
   const PD=planDepts(S.aAno);
   if(!S.aDept||!PD.includes(S.aDept)){const f=PD.find(d=>pendInfo(d).c>0);S.aDept=f||PD[0];}
-  const closed=exStatus(S.aAno)==='Encerrado';
+  const closed=exStatus(S.aAno)==='Encerrado'&&!anyReab(S.aAno,S.aDept);
   const rows=aRows();
   let left=`<div class="dlist"><div class="row">${yearSeg(S.aAno,'data-aano')}</div><div class="hint">Departamentos</div>`;
   PD.forEach(d=>{
@@ -1081,7 +1086,7 @@ function updateAprovFooter(){
   if(k)k.innerHTML=`<div class="stat"><span>Em análise</span><b>${money(prev)}</b></div><div class="stat"><span>Aprovado</span><b>${money(apr)}</b></div><div class="stat"><span>Diferença p/ pedido</span><b>${money(cut?-cut:0)}</b></div><div class="stat"><span>Ajuste sobre o decidido</span><b>${decPrev?Math.round(-cut/decPrev*100):0}%</b></div>`;
   const s=document.getElementById('aStatus'),b=document.getElementById('confirmBtn');if(!s||!b)return;
   s.textContent=zero?`Aprovar exige valor maior que zero — use Reprovar para zerar (${zero} mês(es) com R$ 0).`:bad?`Falta justificativa em ${bad} item(ns).`:`${decM} de ${totM} meses decididos. Os demais continuam aguardando.`;
-  b.disabled=exStatus(S.aAno)==='Encerrado'||!decM||bad>0||zero>0;
+  b.disabled=(exStatus(S.aAno)==='Encerrado'&&!anyReab(S.aAno,S.aDept))||!decM||bad>0||zero>0;
 }
 function confirmAprov(){
   const tasks=[];let okM=0,noM=0;const nowIso=new Date().toISOString();
@@ -1177,6 +1182,17 @@ function renderPrazos(){
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
     h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];const encEff=st==='Encerrado'||enc;return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${encEff?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${encEff?'draft':'ok'}">${encEff?'Encerrado':'Aberto'}</span>${st==='Encerrado'?'':` <button class="lnk" data-qenc="${q}">${enc?'Reabrir':'Encerrar'}</button>`}</td></tr>`;}).join('')}</tbody></table></div>`;
+    const rl=(DB.reabs||[]).filter(r=>r.ano===S.pAno);
+    h+=`<div class="row" style="margin-top:6px"><b style="font-size:13px">Reaberturas por departamento</b><button class="btn ghost" id="rbNew">Reabrir para um departamento…</button></div>`;
+    if(S.rbAdd){
+      const opts=planDepts(S.pAno).map(d=>`<option value="${d}">${esc(deptName(d))}</option>`).join('');
+      h+=`<div class="tool" role="region" aria-label="Reabrir para um departamento"><h2>Reabrir ${S.pAno} para um departamento</h2>
+      <div class="line"><select id="rbDept" aria-label="Departamento">${opts}</select><select id="rbQ" aria-label="Trimestre">${QLAB.map((q,i)=>`<option value="${i}">${q}</option>`).join('')}</select><input type="text" id="rbMot" placeholder="Motivo da reabertura" style="flex:1;min-width:220px"></div>
+      <div class="line"><button class="btn" id="rbOk">Reabrir</button><button class="btn ghost" id="rbCancel">Cancelar</button></div></div>`;
+    }
+    if(rl.length){
+      h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Trimestre</th><th>Motivo</th><th>Situação</th><th></th></tr></thead><tbody>${rl.map(r=>`<tr><td>${esc(deptName(r.cod))}</td><td>${QLAB[Number(r.tri.slice(1))-1]||esc(r.tri)}</td><td>${esc(r.motivo)}</td><td><span class="chip c-${r.ativo?'ok':'draft'}">${r.ativo?'Reaberto':'Encerrada'}</span></td><td>${r.ativo?`<button class="lnk" data-rbend="${r.Id}">Encerrar reabertura</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+    }
     const PD=planDepts(S.pAno);
     if(PD.length){
       h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Departamento</th><th>Gestor</th>${QLAB.map(q=>`<th>${q}</th>`).join('')}</tr></thead><tbody>`;
@@ -1190,7 +1206,7 @@ function renderPrazos(){
     }
   }
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
-  v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);render();});
+  v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);S.rbAdd=false;render();});
   v.querySelectorAll('input[type="date"]').forEach(inp=>inp.onchange=async()=>{
     if(!inp.value)return;
     const q=Number(inp.dataset.q);const ex=DB.ex[S.pAno];
@@ -1226,6 +1242,32 @@ function renderPrazos(){
       toast(novo==='Encerrado'?`Exercício ${S.pAno} encerrado. Agora é somente consulta.`:`Exercício ${S.pAno} reaberto.`);}
     catch(e){fail(e);}finally{busy(false);}
   };
+  const rbn=document.getElementById('rbNew');
+  if(rbn)rbn.onclick=()=>{S.rbAdd=!S.rbAdd;render();};
+  const rbc=document.getElementById('rbCancel');
+  if(rbc)rbc.onclick=()=>{S.rbAdd=false;render();};
+  const rbo=document.getElementById('rbOk');
+  if(rbo)rbo.onclick=async()=>{
+    const cod=document.getElementById('rbDept').value;
+    const q=Number(document.getElementById('rbQ').value);
+    const mot=document.getElementById('rbMot').value.trim();
+    if(!mot){toast('Informe o motivo da reabertura.','err');return;}
+    if((DB.reabs||[]).some(r=>r.ativo&&r.ano===S.pAno&&r.cod===cod&&r.tri==='Q'+(q+1))){toast('Esse departamento já está reaberto nesse trimestre.','err');return;}
+    busy(true);
+    try{
+      const j=await addItem(CFG.lists.reab,{Title:`${S.pAno} · ${cod} · Q${q+1}`,ANO:S.pAno,COD_DPTO:cod,TRIMESTRE:'Q'+(q+1),MOTIVO:mot,ATIVO:true});
+      DB.reabs.push({Id:j.Id,ano:S.pAno,cod:cod,tri:'Q'+(q+1),motivo:mot,ativo:true});
+      S.rbAdd=false;render();
+      toast(`${QLAB[q]} de ${S.pAno} reaberto para ${deptName(cod)}. Só esse departamento pode editar.`);
+    }catch(e){fail(e);}finally{busy(false);}
+  };
+  v.querySelectorAll('[data-rbend]').forEach(b=>b.onclick=async()=>{
+    const id=Number(b.dataset.rbend);const r=(DB.reabs||[]).find(x=>x.Id===id);if(!r)return;
+    busy(true);
+    try{await mergeItem(CFG.lists.reab,id,{ATIVO:false});r.ativo=false;render();
+      toast(`Reabertura de ${deptName(r.cod)} encerrada — o trimestre voltou a ficar travado.`);}
+    catch(e){fail(e);}finally{busy(false);}
+  });
 }
 
 /* ======================= DADOS COMPARTILHADOS ======================== */
@@ -1268,20 +1310,22 @@ function roleLabel(mine){
   if(S.role.assess)return 'Assessoria';
   return mine.length?'Gestor':'Sem vínculo';
 }
+function setReabs(rows){DB.reabs=(rows||[]).filter(r=>r.ANO&&r.COD_DPTO&&r.TRIMESTRE).map(r=>({Id:r.Id,ano:Number(r.ANO),cod:String(r.COD_DPTO),tri:String(r.TRIMESTRE),motivo:r.MOTIVO||'',ativo:!!r.ATIVO}));}
 function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):''),enc:[r.ENCERRADO_Q1,r.ENCERRADO_Q2,r.ENCERRADO_Q3,r.ENCERRADO_Q4].map(x=>!!x)};});}
 async function refreshData(){
   busy(true,'Atualizando…');
   try{
-    const [depts,ccs,cats,vincRows,exRows,perfRows]=await Promise.all([
+    const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
       getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
       getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
-      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
+      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
+      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>[])
     ]);
     setCadastros(depts,ccs,cats);
-    setVincs(vincRows);setEx(exRows);setPerfis(perfRows);recalcRole();
+    setVincs(vincRows);setEx(exRows);setReabs(reabRows);setPerfis(perfRows);recalcRole();
     S.dec={};
     document.getElementById('uRole').textContent=roleLabel(myDepts());
     DB.real={};
@@ -1304,17 +1348,18 @@ async function start(){
   try{
     DB.me={email:acct.username.toLowerCase(),name:acct.name||acct.username};
     DB.me.uid=await ensureUser(DB.me.email);
-    const [depts,ccs,cats,vincRows,exRows,perfRows]=await Promise.all([
+    const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
       getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
       getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
-      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null)
+      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
+      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>[])
     ]);
     setPerfis(perfRows);
     setCadastros(depts,ccs,cats);
-    setVincs(vincRows);setEx(exRows);
+    setVincs(vincRows);setEx(exRows);setReabs(reabRows);
 
     recalcRole();
     if(!DB.perfis)toast('Não foi possível carregar os perfis de acesso — funções administrativas ficam ocultas. Avise a TI.','warn');
