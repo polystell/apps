@@ -397,13 +397,14 @@ async function loadReal(ano,dept){
     const res=await fetch(url,{headers:{Authorization:'Bearer '+t,Accept:'application/json'}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
-    DB.real[ano][dept]=Array.isArray(rows)?rows:[];
+    const arr=Array.isArray(rows)?rows:(rows&&Array.isArray(rows.lancamentos)?rows.lancamentos:[]);
+    DB.real[ano][dept]=arr.filter(r=>r&&Number(r.mes)>=1&&Number(r.mes)<=12&&r.cc&&r.cat&&isFinite(Number(r.valor)));
   }catch(e){DB.real[ano][dept]=null;console.warn('Realizado indisponível para',dept,ano,String(e.message||e));}
 }
 
 /* ============================== ESTADO UI ============================= */
 const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false};
-const fmt=n=>Math.round(n).toLocaleString('pt-BR');
+const fmt=n=>{const v=Math.round(n*100)/100;return Number.isInteger(v)?v.toLocaleString('pt-BR'):v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const money=n=>'R$ '+fmt(n);
 const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const moneyC=n=>'R$ '+fmtC(n);
@@ -411,6 +412,7 @@ const fmtD=iso=>{if(!iso)return '—';const d=iso.slice(0,10).split('-');return 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parse(v){v=String(v).trim();if(!v)return 0;v=v.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');const n=Number(v);return isFinite(n)&&n>0?Math.round(n*100)/100:0;}
 const monthsOf=sc=>sc==='ANO'?[0,1,2,3,4,5,6,7,8,9,10,11]:[sc*3,sc*3+1,sc*3+2];
+const mAprovavel=(a,m,d)=>exStatus(a)!=='Encerrado'||reabAtiva(a,Math.floor(m/3),d);
 const pill=s=>s?`<span class="pill p-${s}">${s}</span>`:'';
 const deptName=c=>(DB.deptByCod[c]&&DB.deptByCod[c].DESC_DPTO)||c;
 const ccDesc=c=>DB.ccMap[c]||'';
@@ -982,12 +984,12 @@ function openExtrato(cc,cat,m){
 
 /* ============================== APROVAÇÃO ============================= */
 function pendInfo(d){
-  let v=0,c=0;itemsOf(S.aAno,d).forEach(i=>{let any=false;i.st.forEach((s,m)=>{if(s==='Pendente'&&i.prev[m]>0){v+=i.prev[m];any=true;}});if(any)c++;});
+  let v=0,c=0;itemsOf(S.aAno,d).forEach(i=>{let any=false;i.st.forEach((s,m)=>{if(s==='Pendente'&&i.prev[m]>0&&mAprovavel(S.aAno,m,d)){v+=i.prev[m];any=true;}});if(any)c++;});
   return {v,c};
 }
 function aRows(){
   const ms=monthsOf(S.aScope);
-  return itemsOf(S.aAno,S.aDept).map(i=>{const pm=ms.filter(m=>i.st[m]==='Pendente'&&i.prev[m]>0);return pm.length?{i,pm,prev:pm.reduce((a,m)=>a+i.prev[m],0)}:null;}).filter(Boolean);
+  return itemsOf(S.aAno,S.aDept).map(i=>{const pm=ms.filter(m=>i.st[m]==='Pendente'&&i.prev[m]>0&&mAprovavel(S.aAno,m,S.aDept));return pm.length?{i,pm,prev:pm.reduce((a,m)=>a+i.prev[m],0)}:null;}).filter(Boolean);
 }
 const dKey=r=>`${S.aAno}|${S.aDept}|${S.aScope}|${r.i.key}`;
 function dOf(r){const k=dKey(r);if(!S.dec[k])S.dec[k]={d:null,val:r.prev,mot:'',mode:'lote',months:null};return S.dec[k];}
@@ -1220,7 +1222,9 @@ function renderPrazos(){
   v.querySelectorAll('[data-qenc]').forEach(b=>b.onclick=async()=>{
     const q=Number(b.dataset.qenc);const ex=DB.ex[S.pAno];const novo=!ex.enc[q];
     busy(true);
-    try{await mergeItem(CFG.lists.ex,ex.Id,{['ENCERRADO_Q'+(q+1)]:novo});ex.enc[q]=novo;render();
+    try{await mergeItem(CFG.lists.ex,ex.Id,{['ENCERRADO_Q'+(q+1)]:novo});ex.enc[q]=novo;
+      if(!novo){const st=(DB.reabs||[]).filter(r=>r.ativo&&r.ano===S.pAno&&r.tri==='Q'+(q+1));for(const r of st){await mergeItem(CFG.lists.reab,r.Id,{ATIVO:false});r.ativo=false;}}
+      render();
       toast(novo?`${QLAB[q]} de ${S.pAno} encerrado — os gestores não editam mais esses meses.`:`${QLAB[q]} de ${S.pAno} reaberto para edição.`);}
     catch(e){fail(e);}finally{busy(false);}
   });
@@ -1240,7 +1244,9 @@ function renderPrazos(){
   if(tx)tx.onclick=async()=>{
     const ex=DB.ex[S.pAno];const novo=ex.status==='Aberto'?'Encerrado':'Aberto';
     busy(true);
-    try{await mergeItem(CFG.lists.ex,ex.Id,{STATUS:novo});ex.status=novo;render();
+    try{await mergeItem(CFG.lists.ex,ex.Id,{STATUS:novo});ex.status=novo;
+      if(novo==='Aberto'){const st=(DB.reabs||[]).filter(r=>r.ativo&&r.ano===S.pAno);for(const r of st){await mergeItem(CFG.lists.reab,r.Id,{ATIVO:false});r.ativo=false;}}
+      render();
       toast(novo==='Encerrado'?`Exercício ${S.pAno} encerrado. Agora é somente consulta.`:`Exercício ${S.pAno} reaberto.`);}
     catch(e){fail(e);}finally{busy(false);}
   };
@@ -1314,7 +1320,7 @@ function roleLabel(mine){
   if(S.role.assess)return 'Assessoria';
   return mine.length?'Gestor':'Sem vínculo';
 }
-function setReabs(rows){DB.reabs=(rows||[]).filter(r=>r.ANO&&r.COD_DPTO&&r.TRIMESTRE).map(r=>({Id:r.Id,ano:Number(r.ANO),cod:String(r.COD_DPTO),tri:String(r.TRIMESTRE),motivo:r.MOTIVO||'',ativo:!!r.ATIVO}));}
+function setReabs(rows){DB.reabFail=!rows;DB.reabs=(rows||[]).filter(r=>r.ANO&&r.COD_DPTO&&r.TRIMESTRE).map(r=>({Id:r.Id,ano:Number(r.ANO),cod:String(r.COD_DPTO),tri:String(r.TRIMESTRE),motivo:r.MOTIVO||'',ativo:!!r.ATIVO}));}
 function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):''),enc:[r.ENCERRADO_Q1,r.ENCERRADO_Q2,r.ENCERRADO_Q3,r.ENCERRADO_Q4].map(x=>!!x)};});}
 async function refreshData(){
   busy(true,'Atualizando…');
@@ -1326,7 +1332,7 @@ async function refreshData(){
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
-      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>[])
+      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
     ]);
     setCadastros(depts,ccs,cats);
     setVincs(vincRows);setEx(exRows);setReabs(reabRows);setPerfis(perfRows);recalcRole();
@@ -1335,7 +1341,7 @@ async function refreshData(){
     DB.real={};
     if(S.ano){await loadYear(S.ano,true);}
     if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
-    toast('Dados atualizados.');
+    toast(DB.reabFail?'Dados atualizados — mas as reaberturas não puderam ser carregadas.':'Dados atualizados.',DB.reabFail?'warn':undefined);
   }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
   finally{busy(false);render();}
 }
@@ -1359,7 +1365,7 @@ async function start(){
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
       getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
-      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>[])
+      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
     ]);
     setPerfis(perfRows);
     setCadastros(depts,ccs,cats);
@@ -1367,6 +1373,7 @@ async function start(){
 
     recalcRole();
     if(!DB.perfis)toast('Não foi possível carregar os perfis de acesso — funções administrativas ficam ocultas. Avise a TI.','warn');
+    else if(DB.reabFail)toast('Não foi possível carregar as reaberturas — reaberturas pontuais ficam desativadas. Avise a TI.','warn');
     const mine=myDepts();
 
     const anos=ANOS();const nowY=new Date().getFullYear();
