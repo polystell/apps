@@ -402,7 +402,7 @@ async function loadReal(ano,dept){
 }
 
 /* ============================== ESTADO UI ============================= */
-const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false};
+const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false};
 const fmt=n=>Math.round(n).toLocaleString('pt-BR');
 const money=n=>'R$ '+fmt(n);
 const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1182,8 +1182,10 @@ function renderPrazos(){
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
     h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
     h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];const encEff=st==='Encerrado'||enc;return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${encEff?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${encEff?'draft':'ok'}">${encEff?'Encerrado':'Aberto'}</span>${st==='Encerrado'?'':` <button class="lnk" data-qenc="${q}">${enc?'Reabrir':'Encerrar'}</button>`}</td></tr>`;}).join('')}</tbody></table></div>`;
-    const rl=(DB.reabs||[]).filter(r=>r.ano===S.pAno);
-    h+=`<div class="row" style="margin-top:6px"><b style="font-size:13px">Reaberturas por departamento</b><button class="btn ghost" id="rbNew">Reabrir para um departamento…</button></div>`;
+    const rlAll=(DB.reabs||[]).filter(r=>r.ano===S.pAno);
+    const rl=[...rlAll.filter(r=>r.ativo),...(S.rbHist?rlAll.filter(r=>!r.ativo):[])];
+    const nHist=rlAll.filter(r=>!r.ativo).length;
+    h+=`<div class="row" style="margin-top:6px"><b style="font-size:13px">Reaberturas por departamento</b><span style="display:flex;gap:12px;align-items:center">${nHist?`<button class="lnk" id="rbHist">${S.rbHist?'Ocultar hist\u00f3rico':`Mostrar hist\u00f3rico (${nHist})`}</button>`:''}<button class="btn ghost" id="rbNew">Reabrir para um departamento…</button></span></div>`;
     if(S.rbAdd){
       const opts=planDepts(S.pAno).map(d=>`<option value="${d}">${esc(deptName(d))}</option>`).join('');
       h+=`<div class="tool" role="region" aria-label="Reabrir para um departamento"><h2>Reabrir ${S.pAno} para um departamento</h2>
@@ -1206,7 +1208,7 @@ function renderPrazos(){
     }
   }
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
-  v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);S.rbAdd=false;render();});
+  v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);S.rbAdd=false;S.rbHist=false;render();});
   v.querySelectorAll('input[type="date"]').forEach(inp=>inp.onchange=async()=>{
     if(!inp.value)return;
     const q=Number(inp.dataset.q);const ex=DB.ex[S.pAno];
@@ -1244,6 +1246,8 @@ function renderPrazos(){
   };
   const rbn=document.getElementById('rbNew');
   if(rbn)rbn.onclick=()=>{S.rbAdd=!S.rbAdd;render();};
+  const rbh=document.getElementById('rbHist');
+  if(rbh)rbh.onclick=()=>{S.rbHist=!S.rbHist;render();};
   const rbc=document.getElementById('rbCancel');
   if(rbc)rbc.onclick=()=>{S.rbAdd=false;render();};
   const rbo=document.getElementById('rbOk');
