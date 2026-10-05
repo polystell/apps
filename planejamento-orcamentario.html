@@ -1181,8 +1181,9 @@ function renderPrazos(){
     h+=`<p class="empty">Nenhum exercício aberto ainda.</p><div class="row"><span></span><button class="btn" id="abrirEx">Abrir exercício ${next}</button></div>`;
   }else{
     const st=DB.ex[S.pAno].status;
+    const allQ=st==='Aberto'&&DB.ex[S.pAno].enc.every(Boolean);
     h+=`<div class="row">${yearSeg(S.pAno,'data-pano')}<span class="meta">Hoje: ${new Date().toLocaleDateString('pt-BR')}</span></div>`;
-    h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
+    h+=`<div class="row"><span class="chip c-${st==='Aberto'?'ok':'draft'}">Exercício ${S.pAno} · ${st}${allQ?' · todos os trimestres encerrados':''}</span><div class="actions"><button class="btn ghost" id="abrirEx">Abrir exercício ${next}</button><button class="btn ghost" id="toggleEx">${st==='Aberto'?'Encerrar':'Reabrir'} ${S.pAno}</button></div></div>`;
     h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Trimestre</th><th>Enviar até</th><th>Situação</th></tr></thead><tbody>${[0,1,2,3].map(q=>{const enc=DB.ex[S.pAno].enc[q];const encEff=st==='Encerrado'||enc;return `<tr><td>${QLAB[q]} ${S.pAno}</td><td><input type="date" data-q="${q}" value="${(DB.ex[S.pAno].prazos[q]||'').slice(0,10)}" ${encEff?'disabled':''} aria-label="Prazo do ${QLAB[q]}"></td><td><span class="chip c-${encEff?'draft':'ok'}">${encEff?'Encerrado':'Aberto'}</span>${st==='Encerrado'?'':` <button class="lnk" data-qenc="${q}">${enc?'Reabrir':'Encerrar'}</button>`}</td></tr>`;}).join('')}</tbody></table></div>`;
     const rlAll=(DB.reabs||[]).filter(r=>r.ano===S.pAno);
     const rl=[...rlAll.filter(r=>r.ativo),...(S.rbHist?rlAll.filter(r=>!r.ativo):[])];
