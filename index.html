@@ -4,94 +4,153 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Polystell Apps</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
+  :root{
+    --bg:#E8E9EE; --panel:#FFFFFF; --soft:#F3F4F8; --line:#D7D9E1;
+    --ink:#23252B; --mute:#666B78;
+    --side:#0D1A41; --side-ink:#E3E8F7; --side-mute:#8B96C4; --side-hi:#2141A2;
+    --primary:#2141A2; --primary-ink:#FFFFFF; --primary-soft:#E6EBF8;
+    --warn:#7E5C00; --warn-soft:#FFF2C7;
+    --bad:#B81F46; --bad-soft:#FBE4EA;
+    --sans:"Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   [hidden]{display:none!important}
-  body{font-family:'Inter',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
-  #loading-screen{position:fixed;inset:0;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
-  .spinner{width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#1e3a5f;border-radius:50%;animation:spin .8s linear infinite}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+  /* ---- telas de estado ---- */
+  #loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+  .spinner{width:40px;height:40px;border:3px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
-  .loading-text{font-size:14px;color:#6b7280}
-  #error-screen{position:fixed;inset:0;background:#f3f4f6;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
-  .error-icon{font-size:48px}.error-title{font-size:18px;font-weight:600;color:#dc2626}
-  .error-msg{font-size:13px;color:#6b7280;max-width:420px}
+  .loading-text{font-size:14px;color:var(--mute)}
+  #error-screen{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;z-index:998}
+  .error-title{font-size:18px;font-weight:700;color:var(--bad)}
+  .error-msg{font-size:13px;color:var(--mute);max-width:420px}
+
+  /* ---- entrada ---- */
+  #gate{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;z-index:900;padding:16px}
+  .gcard{background:var(--panel);border-radius:14px;padding:36px 30px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.15)}
+  .gcard img{height:52px;object-fit:contain;margin:0 auto 4px}
+  .gcard h1{font-size:20px;font-weight:800;letter-spacing:.01em}
+  .gcard p{font-size:13px;color:var(--mute);line-height:1.55}
+  .msbtn{font:inherit;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 16px;border:none;border-radius:10px;background:var(--primary);color:var(--primary-ink);cursor:pointer;margin-top:4px}
+  .msbtn:hover{background:#19327D}
+  .msbtn svg{width:17px;height:17px;flex-shrink:0}
+  .gfoot{font-size:11.5px;color:var(--mute)}
+
+  /* ---- layout ---- */
   #app{display:none}
-  .header{background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
-  .header-left{display:flex;align-items:center;gap:14px;min-width:0}
-  .header-title{font-size:16px;font-weight:700}.header-subtitle{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
-  .header-user{font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:8px}
-  .header-user .udot{width:8px;height:8px;border-radius:50%;background:#4ade80}
-  .header-user button{font:inherit;font-size:12px;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:none;padding:5px 10px;border-radius:6px;cursor:pointer}
-  .header-user button:hover{background:rgba(255,255,255,.2)}
-  .main{max-width:1060px;margin:0 auto;padding:26px 16px 60px}
-  .search{position:relative;max-width:420px;margin-bottom:6px}
-  .search input{font:inherit;font-size:14px;width:100%;padding:11px 12px 11px 40px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#1f2937}
-  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:#9ca3af;fill:none;stroke-width:2;stroke-linecap:round}
-  :focus-visible{outline:2px solid #3b82f6;outline-offset:1px}
-  h2.cat{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:24px 0 12px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
-  .tile{position:relative;display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;color:#1f2937;text-decoration:none;cursor:pointer;transition:border-color .12s,transform .12s;font:inherit;text-align:left}
-  .tile:hover{border-color:#1e3a5f;transform:translateY(-2px)}
-  .tile[aria-disabled="true"]{cursor:default;opacity:.7}
-  .tile[aria-disabled="true"]:hover{border-color:#e5e7eb;transform:none}
+  .layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:16px;max-width:1220px;margin:0 auto;padding:16px}
+  .side{background:var(--side);color:var(--side-ink);border-radius:14px;padding:18px 12px;box-shadow:0 8px 24px rgba(13,26,65,.18);display:flex;flex-direction:column;gap:6px;position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px)}
+  .brand{padding:6px 8px 16px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px;text-align:center}
+  .brand img{height:40px;object-fit:contain;margin-bottom:8px}
+  .brand b{display:block;font-size:16px;letter-spacing:.02em}
+  .brand span{font-size:11.5px;color:var(--side-mute)}
+  .nav{display:flex;flex-direction:column;gap:4px;overflow:auto}
+  .nav button{font:inherit;font-size:13.5px;font-weight:600;text-align:left;color:var(--side-ink);background:none;border:none;border-radius:9px;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .nav button:hover{background:rgba(255,255,255,.08)}
+  .nav button[aria-pressed="true"]{background:var(--side-hi)}
+  .nav .n{font-size:11px;font-weight:700;background:rgba(255,255,255,.14);border-radius:999px;padding:2px 8px}
+  .who{margin-top:auto;border-top:1px solid rgba(255,255,255,.1);padding-top:12px;display:flex;align-items:center;gap:10px}
+  .who .av{width:34px;height:34px;border-radius:50%;background:var(--side-hi);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;flex-shrink:0}
+  .who b{display:block;font-size:12.5px;line-height:1.2;word-break:break-word}
+  .who button{font:inherit;font-size:11px;font-weight:600;color:var(--side-mute);background:none;border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:3px 9px;cursor:pointer;margin-top:3px}
+  .who button:hover{color:var(--side-ink);border-color:rgba(255,255,255,.5)}
+
+  .content{min-width:0}
+  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:6px 2px 18px}
+  .pagehead h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
+  .pagehead .sub{font-size:13px;color:var(--mute);margin-top:3px}
+  .search{position:relative;width:min(320px,100%)}
+  .search input{font:inherit;font-size:13.5px;width:100%;padding:11px 12px 11px 38px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+  .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round}
+
+  h2.cat{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:22px 2px 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .tile{position:relative;display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid transparent;border-radius:14px;padding:18px;color:var(--ink);text-decoration:none;cursor:pointer;box-shadow:0 1px 3px rgba(13,26,65,.07);transition:box-shadow .15s,transform .15s,border-color .15s;font:inherit;text-align:left}
+  .tile:hover{border-color:var(--primary);box-shadow:0 8px 24px rgba(13,26,65,.13);transform:translateY(-2px)}
+  .tile[aria-disabled="true"]{cursor:default;opacity:.65}
+  .tile[aria-disabled="true"]:hover{border-color:transparent;box-shadow:0 1px 3px rgba(13,26,65,.07);transform:none}
+  .tile.has-badge{padding-top:36px}
   @media (prefers-reduced-motion:reduce){.tile{transition:none}}
-  .ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#eef2f7}
-  .ico svg{width:22px;height:22px;stroke:#1e3a5f;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .tile b{display:block;font-size:14.5px;line-height:1.3}
-  .tile .d{font-size:12.5px;color:#6b7280;margin-top:3px}
-  .badge{position:absolute;top:10px;right:10px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
-  .badge.impl{background:#fef9c3;color:#854d0e}
-  .badge.man{background:#fee2e2;color:#991b1b}
-  .empty{color:#6b7280;padding:40px 0;text-align:center;font-size:14px}
-  .notice{font-size:12px;color:#854d0e;background:#fef9c3;border-radius:8px;padding:9px 12px;margin-top:10px}
-  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90%}
+  .ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--primary-soft)}
+  .ico svg{width:23px;height:23px;stroke:var(--primary);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .tile b{display:block;font-size:14.5px;font-weight:700;line-height:1.3}
+  .tile .d{font-size:12.5px;color:var(--mute);margin-top:4px;line-height:1.45}
+  .badge{position:absolute;top:12px;right:12px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+  .badge.impl{background:var(--warn-soft);color:var(--warn)}
+  .badge.man{background:var(--bad-soft);color:var(--bad)}
+  .empty{color:var(--mute);padding:48px 0;text-align:center;font-size:14px}
+  .notice{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px 14px;margin:0 2px 6px}
+  .foot{font-size:11.5px;color:var(--mute);display:flex;align-items:center;gap:7px;margin:28px 2px 8px}
+  .foot svg{width:13px;height:13px;stroke:var(--mute);fill:none;stroke-width:1.8;flex-shrink:0}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90%}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .page-footer{background:#fff;border-top:1px solid #e5e7eb;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#9ca3af;flex-wrap:wrap;gap:10px}
-  .footer-left{display:flex;align-items:center;gap:8px}
-  .lock-icon svg{width:14px;height:14px;stroke:#9ca3af;fill:none;stroke-width:1.8}
-  .powered-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;font-weight:500}
-  .sp-icon{width:22px;height:22px;background:#0078d4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+
+  @media(max-width:820px){
+    .layout{display:block;padding:12px}
+    .side{position:static;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px;max-height:none;margin-bottom:14px}
+    .brand{border:0;padding:4px 8px;margin:0;text-align:left;display:flex;align-items:center;gap:10px}
+    .brand img{height:30px;margin:0}
+    .brand span{display:none}
+    .nav{flex-direction:row;flex-wrap:wrap}
+    .who{margin:0 0 0 auto;border:0;padding:0}
+  }
 </style>
 </head>
 <body>
 
-<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Carregando seus aplicativos…</div></div>
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Carregando…</div></div>
 <div id="error-screen">
-  <div class="error-icon">&#9888;&#65039;</div>
   <div class="error-title" id="error-title">Não foi possível carregar</div>
   <div class="error-msg" id="error-msg"></div>
 </div>
 
+<div id="gate">
+  <div class="gcard">
+    <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'">
+    <h1>Polystell Apps</h1>
+    <p>O portal interno de aplicativos da Polystell. Entre com a sua conta corporativa para ver os aplicativos liberados para o seu perfil.</p>
+    <button class="msbtn" id="entrar"><svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022" stroke="none"/><rect x="11" y="1" width="9" height="9" fill="#7fba00" stroke="none"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef" stroke="none"/><rect x="11" y="11" width="9" height="9" fill="#ffb900" stroke="none"/></svg>Entrar com Microsoft</button>
+    <div class="gfoot">Acesso validado pela identidade Microsoft 365 da Polystell.</div>
+  </div>
+</div>
+
 <div id="app">
-  <header class="header">
-    <div class="header-left">
-      <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'" style="height:36px;object-fit:contain;margin-right:12px;">
-      <div style="border-left:1px solid rgba(255,255,255,0.3);padding-left:14px;">
-        <div class="header-title">Polystell Apps</div>
-        <div class="header-subtitle">Portal interno de aplicativos</div>
+  <div class="layout">
+    <aside class="side">
+      <div class="brand">
+        <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'">
+        <div><b>Polystell Apps</b><span>Portal interno</span></div>
       </div>
-    </div>
-    <div id="header-right"></div>
-  </header>
+      <nav class="nav" id="nav" aria-label="Categorias"></nav>
+      <div class="who">
+        <div class="av" id="uav"></div>
+        <div style="min-width:0"><b id="unome"></b><button id="logout">Sair</button></div>
+      </div>
+    </aside>
 
-  <main class="main">
-    <div class="search">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
-      <input id="q" placeholder="Buscar aplicativo" aria-label="Buscar aplicativo">
-    </div>
-    <div id="notice"></div>
-    <section id="tiles"></section>
-  </main>
-
-  <footer class="page-footer">
-    <div class="footer-left">
-      <div class="lock-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-      <span>Você vê apenas os aplicativos liberados para o seu perfil. Acesso validado pela identidade Microsoft 365.</span>
-    </div>
-    <div class="powered-badge">Powered by SharePoint <div class="sp-icon">S</div></div>
-  </footer>
+    <main class="content">
+      <div class="pagehead">
+        <div><h1 id="hello">Olá!</h1><div class="sub" id="hoje"></div></div>
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
+          <input id="q" placeholder="Buscar aplicativo" aria-label="Buscar aplicativo">
+        </div>
+      </div>
+      <div id="notice"></div>
+      <section id="tiles"></section>
+      <div class="foot">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Você vê apenas os aplicativos liberados para o seu perfil. Precisa de acesso a algum módulo? Fale com a TI.</span>
+      </div>
+    </main>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -105,10 +164,9 @@ const CONFIG = {
   sitePath: "/sites/Apps",
   listaCatalogo: "00_Catalogo_Apps"
 };
-/* Escopos: Sites já consentido pelas outras páginas. GroupMember.Read.All permite
-   filtrar os blocos pelos grupos do usuário — exige consentimento do administrador
-   no App Registration (Permissões de API). Sem ele, o hub mostra só os apps de
-   acesso geral e avisa no rodapé. */
+/* GroupMember.Read.All (delegada, com consentimento do administrador) permite
+   filtrar os blocos pelos grupos do usuário. Sem ela, o hub mostra só os apps
+   de acesso geral e avisa na tela. */
 const SCOPES_SITES  = ["Sites.ReadWrite.All"];
 const SCOPES_GROUPS = ["GroupMember.Read.All"];
 
@@ -125,10 +183,10 @@ const ICONS = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-let msalApp = null, account = null, APPS = [], MEUS_GRUPOS = null; // null = não foi possível ler
+let msalApp = null, account = null, APPS = [], MEUS_GRUPOS = null, CAT = "Todos";
 
-function showApp(){ $("#loading-screen").style.display="none"; $("#app").style.display="block"; }
-function showError(t,m){ $("#loading-screen").style.display="none"; $("#error-title").textContent=t; $("#error-msg").textContent=m||""; $("#error-screen").style.display="flex"; }
+function show(id){ ["loading-screen","gate","app","error-screen"].forEach(x => { const el = document.getElementById(x); el.style.display = (x===id) ? (x==="gate"?"grid":(x==="app"?"block":"flex")) : "none"; }); }
+function showError(t,m){ $("#error-title").textContent=t; $("#error-msg").textContent=m||""; show("error-screen"); }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.className="toast show"; setTimeout(()=>t.className="toast",3200); }
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("Não foi possível carregar o login.")); document.head.appendChild(s); setTimeout(()=>rej(new Error("Tempo esgotado ao carregar o login.")),15000); }); }
 
@@ -139,12 +197,21 @@ async function init(){
     msalApp = new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
     const resp = await msalApp.handleRedirectPromise();
     account = resp?.account || msalApp.getAllAccounts()[0] || null;
-    if(!account){ msalApp.loginRedirect({scopes:SCOPES_SITES}); return; }
-    $("#header-right").innerHTML = `<span class="header-user"><span class="udot"></span>${esc(account.name||account.username)}<button id="logout">Sair</button></span>`;
-    $("#logout").onclick = () => { sessionStorage.clear(); msalApp.logoutRedirect(); };
-    await Promise.all([carregarCatalogo(), carregarGrupos()]);
-    showApp(); render();
+    if(!account){ show("gate"); $("#entrar").onclick = () => msalApp.loginRedirect({scopes:SCOPES_SITES}); return; }
+    await entrar();
   }catch(e){ console.error(e); showError("Não foi possível iniciar o portal","Tente novamente ou contate a TI."); }
+}
+
+async function entrar(){
+  const nome = account.name || account.username || "";
+  $("#uav").textContent = nome.split(" ").filter(Boolean).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+  $("#unome").textContent = nome;
+  $("#logout").onclick = () => { sessionStorage.clear(); msalApp.logoutRedirect(); };
+  const h = new Date().getHours();
+  $("#hello").textContent = (h<12?"Bom dia":h<18?"Boa tarde":"Boa noite") + (nome?", "+nome.split(" ")[0]:"") + "!";
+  $("#hoje").textContent = new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  await Promise.all([carregarCatalogo(), carregarGrupos()]);
+  show("app"); render();
 }
 
 async function token(scopes){ const req={scopes,account}; try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; } }
@@ -165,9 +232,9 @@ async function carregarCatalogo(){
       pasta: f.PASTA || "",
       categoria: (f.CATEGORIA && f.CATEGORIA.Value) || f.CATEGORIA || "Outros",
       desc: f.DESCRICAO || "",
-      icone: (f.ICONE||"grid").trim().toLowerCase(),
+      icone: String(f.ICONE||"grid").trim().toLowerCase(),
       grupos: String(f.GRUPOS||"").split(";").map(s=>s.trim()).filter(Boolean),
-      status: ((f.STATUS && f.STATUS.Value) || f.STATUS || "Ativo").trim()
+      status: String((f.STATUS && f.STATUS.Value) || f.STATUS || "Ativo").trim()
     };
   }).filter(a => a.nome && a.status !== "Inativo");
 }
@@ -177,37 +244,41 @@ async function carregarGrupos(){
     let nomes = [], next = `https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=displayName&$top=999`;
     while(next){ const page = await graph(next, SCOPES_GROUPS.concat(["User.Read"])); nomes = nomes.concat((page.value||[]).map(g=>String(g.displayName||""))); next = page["@odata.nextLink"]||null; }
     MEUS_GRUPOS = nomes.map(n=>n.toLowerCase());
-  }catch(e){
-    console.warn("Sem leitura de grupos (consentimento pendente?):", e.message);
-    MEUS_GRUPOS = null; // mostra só apps de acesso geral
-  }
+  }catch(e){ console.warn("Sem leitura de grupos:", e.message); MEUS_GRUPOS = null; }
 }
 
 function podeVer(app){
-  if(!app.grupos.length) return true;                       // acesso geral
-  if(MEUS_GRUPOS === null) return false;                    // sem leitura de grupos: só os gerais
+  if(!app.grupos.length) return true;
+  if(MEUS_GRUPOS === null) return false;
   return app.grupos.some(g => MEUS_GRUPOS.includes(g.toLowerCase()));
 }
 function urlDe(app){ return /^https?:\/\//i.test(app.pasta) ? app.pasta : (location.origin + app.pasta); }
 
 function render(){
+  const meus = APPS.filter(podeVer);
+  const cats = [...new Set(meus.map(a=>a.categoria))];
+  if(CAT!=="Todos" && !cats.includes(CAT)) CAT="Todos";
+  $("#nav").innerHTML = [`<button aria-pressed="${CAT==="Todos"}" data-c="Todos"><span>Todos os aplicativos</span><span class="n">${meus.length}</span></button>`]
+    .concat(cats.map(c=>`<button aria-pressed="${CAT===c}" data-c="${esc(c)}"><span>${esc(c)}</span><span class="n">${meus.filter(a=>a.categoria===c).length}</span></button>`)).join("");
+
   const q = ($("#q").value||"").trim().toLowerCase();
-  const vis = APPS.filter(a => podeVer(a) && (!q || a.nome.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)));
-  const cats = [...new Set(vis.map(a=>a.categoria))];
-  $("#tiles").innerHTML = cats.map(c => `<h2 class="cat">${esc(c)}</h2><div class="grid">${
-    vis.filter(a=>a.categoria===c).map(tile).join("")
-  }</div>`).join("") || `<div class="empty">Nenhum aplicativo disponível para o seu perfil.</div>`;
+  const vis = meus.filter(a => (CAT==="Todos"||a.categoria===CAT) && (!q || a.nome.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)));
+  const vcats = [...new Set(vis.map(a=>a.categoria))];
+  $("#tiles").innerHTML = vcats.map(c => `<h2 class="cat">${esc(c)}</h2><div class="grid">${vis.filter(a=>a.categoria===c).map(tile).join("")}</div>`).join("")
+    || `<div class="empty">Nenhum aplicativo encontrado${q?" para \""+esc(q)+"\"":""}.</div>`;
   $("#notice").innerHTML = (MEUS_GRUPOS===null && APPS.some(a=>a.grupos.length))
-    ? `<div class="notice">Alguns aplicativos restritos podem não aparecer: a leitura de grupos ainda não foi autorizada pela TI (GroupMember.Read.All no App Registration).</div>` : "";
+    ? `<div class="notice">Alguns aplicativos restritos podem não aparecer: a leitura de grupos ainda não foi autorizada pela TI.</div>` : "";
 }
 function tile(a){
   const man = a.status === "Manutenção";
   const badge = a.status === "Em implantação" ? `<span class="badge impl">Em implantação</span>` : man ? `<span class="badge man">Em manutenção</span>` : "";
+  const cls = badge ? "tile has-badge" : "tile";
   const inner = `${badge}<span class="ico"><svg viewBox="0 0 24 24">${ICONS[a.icone]||ICONS.grid}</svg></span><span style="min-width:0"><b>${esc(a.nome)}</b><span class="d">${esc(a.desc)}</span></span>`;
-  if(man) return `<button type="button" class="tile" aria-disabled="true" onclick="toast('${esc(a.nome)} está em manutenção. Tente mais tarde.')">${inner}</button>`;
-  return `<a class="tile" href="${esc(urlDe(a))}">${inner}</a>`;
+  if(man) return `<button type="button" class="${cls}" aria-disabled="true" onclick="toast('${esc(a.nome)} está em manutenção. Tente mais tarde.')">${inner}</button>`;
+  return `<a class="${cls}" href="${esc(urlDe(a))}">${inner}</a>`;
 }
 $("#q").addEventListener("input", render);
+$("#nav").addEventListener("click", e => { const b = e.target.closest("[data-c]"); if(b){ CAT = b.dataset.c; render(); } });
 init();
 </script>
 </body>
