@@ -2,298 +2,242 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Polystell Apps</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Polystell Apps. Seu ambiente de aplicativos corporativos.">
+<title>Polystell Apps | Seu ambiente de trabalho</title>
 <style>
-  :root{
-    --bg:#E8E9EE; --panel:#FFFFFF; --soft:#F3F4F8; --line:#D7D9E1;
-    --ink:#23252B; --mute:#666B78;
-    --side:#0D1A41; --side-ink:#E3E8F7; --side-mute:#8B96C4; --side-hi:#2141A2;
-    --primary:#2141A2; --primary-ink:#FFFFFF; --primary-soft:#E6EBF8;
-    --warn:#7E5C00; --warn-soft:#FFF2C7;
-    --bad:#B81F46; --bad-soft:#FBE4EA;
-    --sans:"Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  }
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  [hidden]{display:none!important}
-  body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh}
-  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+:root{--navy:#101e36;--navy-deep:#0c172a;--blue:#2d5bd1;--blue-hover:#244bb3;--blue-soft:#edf2ff;--bg:#f5f7fa;--surface:#fff;--ink:#1d2a40;--muted:#68778d;--line:#e4e9f0;--green:#257b64;--shadow:0 8px 30px rgba(28,43,69,.055);--radius:16px;--sidebar:248px;--font:"Inter","Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:var(--font);font-size:14px;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button,a,input,select{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button{color:inherit}button:disabled{cursor:not-allowed}a{color:inherit}button,select{touch-action:manipulation}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7297f5;outline-offset:4px}button svg,a svg{pointer-events:none}svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}[hidden]{display:none!important}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.skip-link{position:fixed;top:8px;left:260px;z-index:100;background:white;padding:14px;transform:translateY(-150%);border-radius:8px}.skip-link:focus{transform:translateY(0)}.icon-button{border:1px solid var(--line);background:white;width:38px;height:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}.icon-button:hover{background:var(--bg);border-color:#c6d1e2}.icon-button svg{width:18px;height:18px}.button{display:inline-flex;justify-content:center;align-items:center;gap:9px;min-height:42px;border-radius:9px;padding:10px 16px;border:1px solid var(--line);font-weight:600;font-size:12px;text-decoration:none;background:white}.button:hover{background:#f6f8fc;border-color:#cbd5e5}.button.primary{background:var(--blue);border-color:var(--blue);color:white}.button.primary:hover{background:var(--blue-hover)}.button svg{width:17px;height:17px}.text-button{background:none;border:0;padding:6px 0;display:inline-flex;align-items:center;gap:6px;color:var(--blue);font-size:12px;font-weight:600}.text-button:hover{text-decoration:underline}.text-button svg{width:15px;height:15px}.eyebrow{font-size:10px;font-weight:650;letter-spacing:.13em;text-transform:uppercase}.wordmark{font-size:28px;letter-spacing:-1.3px;font-weight:700;line-height:1}.brand-caption{font-size:9px;letter-spacing:.22em;text-transform:uppercase;font-weight:500;margin-top:10px}.brand-logo{max-width:172px;max-height:46px;object-fit:contain}.brand-fallback{display:flex;flex-direction:column}.brand-lockup{display:flex;align-items:center;min-height:56px}.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar);background:var(--navy);color:#eaf0fa;display:flex;flex-direction:column;padding:32px 18px 18px;z-index:45}.sidebar-brand{padding:0 14px 28px;border-bottom:1px solid rgba(255,255,255,.09)}.sidebar-brand .brand-caption{color:#b3c0d7}.side-navigation{overflow-y:auto;flex:1;padding-top:25px;scrollbar-width:thin;scrollbar-color:#31415d transparent}.nav-label{margin:0 14px 12px;font-size:9px;color:#9eafca;letter-spacing:.15em;font-weight:650;text-transform:uppercase}.nav-items{display:flex;flex-direction:column;gap:5px}.nav-item{width:100%;display:flex;align-items:center;gap:11px;min-height:42px;padding:10px 13px;border:1px solid transparent;border-radius:8px;background:transparent;text-align:left;color:#bfcbde;font-size:12px;font-weight:500;transition:background .15s,color .15s}.nav-item:hover{color:white;background:#192a45}.nav-item[aria-current="page"]{background:#2c52b6;color:white;border-color:#4169d0;box-shadow:0 4px 12px #08172b24}.nav-item svg{width:18px;height:18px;opacity:.9}.nav-item .nav-text{flex:1;min-width:0}.nav-count{font-size:10px;padding:2px 6px;border-radius:5px;color:#bfcce3;background:#ffffff09;line-height:17px;font-variant-numeric:tabular-nums}.nav-item[aria-current="page"] .nav-count{color:#fff;background:#ffffff20}.nav-separator{margin:25px 0 0;padding-top:23px;border-top:1px solid #ffffff0c}.side-help{padding:16px 14px;margin:24px 1px 18px;border:1px solid #ffffff13;border-radius:10px;background:linear-gradient(135deg,#1e3150,#182944)}.side-help-icon{width:30px;height:30px;display:grid;place-items:center;background:#ffffff0b;border-radius:8px;margin-bottom:11px;color:#bdcfff}.side-help-icon svg{width:17px;height:17px}.side-help b{display:block;font-size:12px;font-weight:600}.side-help p{font-size:11px;line-height:1.65;color:#b2c0d6;margin:7px 0 10px}.side-help button{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:none;padding:3px 0;font-size:11px;font-weight:600;color:#d4e0ff}.side-help button svg{width:15px;height:15px}.side-footer{font-size:9px;color:#b1bed3;display:flex;align-items:center;gap:7px;padding:2px 13px}.side-footer svg{width:13px;height:13px}.main-shell{margin-left:var(--sidebar);min-height:100vh;display:flex;flex-direction:column}.topbar{height:80px;display:flex;align-items:center;justify-content:space-between;gap:22px;padding:0 36px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:30}.breadcrumb{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:11px;color:var(--muted)}.breadcrumb>svg{width:13px;height:13px;color:#a4afbd}.breadcrumb b{font-weight:600;color:var(--ink)}.topbar-actions{display:flex;align-items:center;gap:12px}.search-field{position:relative;width:min(330px,25vw);display:flex;align-items:center}.search-field>svg{position:absolute;left:12px;width:17px;height:17px;color:#7e8ba0;pointer-events:none}.search-field input{width:100%;height:39px;padding:0 69px 0 38px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;color:var(--ink);font-size:11px}.search-field input::placeholder{color:#7a879a}.search-field input:focus{background:white;border-color:#a6bcee}.search-shortcut{position:absolute;right:10px;font-size:9px;letter-spacing:0;color:#6d7b90;padding:2px 5px;border:1px solid #dfe5ee;border-radius:4px;background:white;pointer-events:none}.clear-search{position:absolute;right:8px;width:25px;height:25px;border:0;background:transparent;display:grid;place-items:center;color:var(--muted)}.clear-search svg{width:14px;height:14px}.preview-tag{display:flex;align-items:center;gap:6px;color:#765a2f;border:1px solid #ecdfc9;background:#fbf6ed;border-radius:6px;padding:5px 8px;font-size:9px;font-weight:600;white-space:nowrap;cursor:pointer}.preview-tag span{width:5px;height:5px;background:#b18949;border-radius:50%}.user-trigger{border:0;background:none;padding:0 0 0 14px;border-left:1px solid var(--line);display:flex;align-items:center;gap:10px}.avatar{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:#eaf0fb;color:#345994;border:2px solid white;outline:1px solid #e2e8f2;font-size:11px;font-weight:650;overflow:hidden;flex-shrink:0}.avatar img{width:100%;height:100%;object-fit:cover}.user-trigger>svg{width:13px;height:13px;color:var(--muted)}.user-menu{position:absolute;right:32px;top:68px;min-width:250px;max-width:calc(100vw - 32px);padding:14px;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 35px #16244020;z-index:60}.user-menu strong{display:block;font-size:12px;overflow-wrap:anywhere}.user-menu small{display:block;color:var(--muted);font-size:10px;margin:6px 0 14px;overflow-wrap:anywhere}.user-menu button{display:flex;gap:9px;align-items:center;border:0;border-top:1px solid var(--line);background:none;width:100%;padding:13px 0 2px;text-align:left;font-size:12px}.user-menu button svg{width:16px;height:16px}.mobile-toggle{display:none}.page{padding:30px 36px 24px;max-width:1590px;width:100%;margin:0 auto;flex:1}.page-intro{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.page-intro h1{font-size:25px;font-weight:650;letter-spacing:-.9px;margin:0 0 7px;line-height:1.3}.page-intro p{margin:0;font-size:12px;line-height:1.6;color:var(--muted)}.date-block{display:flex;align-items:center;gap:8px;color:#708096;font-size:10px;white-space:nowrap}.date-block svg{width:16px;height:16px}.hero{position:relative;display:grid;grid-template-columns:1fr 270px;align-items:center;min-height:198px;border-radius:15px;overflow:hidden;background:#152946;color:#fff;margin-bottom:29px;isolation:isolate;box-shadow:0 6px 18px #15294608}.hero:after{content:"";position:absolute;width:410px;height:410px;right:-12px;top:-201px;border:1px solid #ffffff0b;border-radius:50%;z-index:-1;box-shadow:0 0 0 53px #ffffff03,0 0 0 105px #ffffff02}.hero:before{content:"";position:absolute;width:360px;height:360px;right:52px;bottom:-312px;border:1px solid #ffffff0c;border-radius:50%;z-index:-1}.hero-content{padding:28px 32px;max-width:610px}.hero .eyebrow{font-size:8px;color:#a9c1f8;display:flex;align-items:center;gap:7px;margin-bottom:13px;letter-spacing:.17em}.hero .eyebrow:before{content:"";width:16px;height:1px;background:#9eb9f1}.hero h2{font-size:29px;line-height:1.2;letter-spacing:-1.1px;font-weight:580;margin:0 0 10px}.hero p{font-size:11px;line-height:1.8;color:#c0cce0;margin:0;max-width:430px}.hero .hero-link{color:#e8efff;font-size:10px;display:inline-flex;align-items:center;gap:8px;margin-top:18px;background:transparent;border:0;padding:0;font-weight:600}.hero-link:hover{text-decoration:underline}.hero-link svg{width:14px;height:14px}.hero-stats{margin:22px 28px 22px 0;padding:16px 22px;background:#ffffff05;border:1px solid #ffffff13;border-radius:12px;backdrop-filter:blur(4px)}.hero-stat{display:flex;align-items:center;gap:13px;padding:9px 0}.hero-stat+.hero-stat{border-top:1px solid #ffffff0d;margin-top:8px;padding-top:17px}.hero-stat-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid #ffffff12;background:#ffffff05;border-radius:8px;color:#b8cfff}.hero-stat-icon svg{width:17px;height:17px}.hero-stat strong{display:block;font-size:22px;font-weight:550;line-height:1;letter-spacing:-.4px;font-variant-numeric:tabular-nums}.hero-stat small{display:block;color:#b1c1d9;font-size:9px;margin-top:6px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.section-title{display:flex;align-items:center;gap:9px;min-width:0}.section-title>svg{width:17px;height:17px;color:#697b98}.section-head h2{font-size:15px;font-weight:650;letter-spacing:-.35px;margin:0;line-height:1.4}.section-note{font-size:10px;color:var(--muted);margin:4px 0 0}.section-head .text-button{font-size:10px}.count-bubble{font-size:9px;min-width:20px;height:20px;display:grid;place-items:center;border-radius:5px;background:#e9edf4;color:#617188;font-weight:600}.favorites-section{margin-bottom:28px}.favorites-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.favorite-card{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--line);border-radius:11px;padding:16px;min-height:80px;transition:border-color .2s,box-shadow .2s;position:relative}.favorite-card:hover{border-color:#b1c4ec;box-shadow:0 5px 15px #1c2b4508}.app-icon{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:10px;flex-shrink:0;background:var(--tint,#edf2ff);color:var(--tone,#365acb)}.app-icon svg{width:22px;height:22px;stroke-width:1.6}.favorite-card .app-icon{width:39px;height:39px;border-radius:9px}.favorite-card .app-icon svg{width:20px;height:20px}.favorite-body{min-width:0;flex:1}.favorite-body h3{font-size:11px;font-weight:600;line-height:1.5;margin:0 0 3px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.favorite-body p{font-size:9px;margin:0;color:var(--muted)}.favorite-open{border:0;background:none;width:25px;height:30px;display:grid;place-items:center;color:#8c9bb2}.favorite-open svg{width:16px;height:16px}.favorite-open:after{content:"";position:absolute;inset:0;border-radius:11px}.favorite-empty{border:1px dashed #ccd7e7;border-radius:11px;padding:18px 20px;display:flex;align-items:center;gap:14px;background:#f9fbfd;font-size:11px;color:var(--muted);line-height:1.7}.favorite-empty svg{color:#8ca1bf}.favorite-empty b{color:#455874;font-weight:600}.catalog-section{scroll-margin-top:98px}.catalog-header{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:17px}.catalog-title-wrap{display:flex;gap:10px;align-items:center}.catalog-title-wrap h2{font-size:17px;letter-spacing:-.5px;font-weight:650;margin:0}.catalog-subtitle{font-size:10px;margin:6px 0 0;color:var(--muted)}.catalog-tools{display:flex;align-items:center;gap:10px}.sort-select{border:1px solid var(--line);border-radius:8px;background:white;padding:8px 28px 8px 11px;font-size:10px;min-height:33px;max-width:175px;color:#64738a;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364738a' stroke-width='1.7'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}.view-switch{display:flex;gap:2px;padding:3px;border:1px solid var(--line);background:white;border-radius:8px}.view-switch button{display:grid;place-items:center;width:28px;height:25px;padding:0;border:0;border-radius:5px;background:transparent;color:#8795a9}.view-switch button[aria-pressed="true"]{color:var(--blue);background:var(--blue-soft)}.view-switch svg{width:15px;height:15px}.filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}.filter-chip{font-size:10px;min-height:32px;display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#6a7a91;white-space:nowrap}.filter-chip:hover{border-color:#b9c9e8}.filter-chip[aria-pressed="true"]{background:#eaf0fd;border-color:#cbdafa;color:#2d58bd;font-weight:600}.filter-chip span{font-size:9px;opacity:.8}.catalog-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.app-card{display:flex;flex-direction:column;min-width:0;background:#fff;border:1px solid var(--line);border-radius:12px;min-height:206px;padding:19px 19px 0;position:relative;transition:border-color .2s,box-shadow .2s,transform .2s}.app-card:hover{border-color:#b0c3e8;box-shadow:var(--shadow);transform:translateY(-2px)}.card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px}.card-top-actions{display:flex;gap:5px;align-items:center}.status-badge{font-size:8px;line-height:1.4;font-weight:500;padding:4px 6px;border-radius:5px;display:flex;align-items:center;gap:4px;white-space:nowrap;background:#edf5f1;color:#397c63}.status-badge:before{content:"";width:4px;height:4px;flex-shrink:0;border-radius:50%;background:currentColor}.status-badge.deploy{color:#8c682a;background:#f9f2e4}.status-badge.maintenance{color:#a75240;background:#fbede8}.status-badge.unknown{color:#6d7b91;background:#f0f3f8}.star-button{display:grid;place-items:center;border:0;background:transparent;border-radius:6px;width:27px;height:28px;color:#9cacc1;position:relative;z-index:2;padding:4px}.star-button svg{width:16px;height:16px}.star-button:hover{background:#f4f7fd;color:#4264a6}.star-button[aria-pressed="true"]{color:#4264a6}.star-button[aria-pressed="true"] svg{fill:#dce6fd;stroke:#4264a6}.app-card h3{margin:0 0 7px;font-size:12px;line-height:1.5;font-weight:600;letter-spacing:-.12px}.app-card h3 a{text-decoration:none}.app-card h3 a:after{content:"";position:absolute;inset:0;border-radius:12px}.app-card h3 a:focus-visible{outline:0}.app-card:has(h3 a:focus-visible){outline:3px solid #7297f5;outline-offset:3px}.app-description{font-size:10px;color:var(--muted);line-height:1.75;margin:0 0 17px;min-height:35px;flex:1;overflow-wrap:anywhere}.card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-top:1px solid #edf0f5}.category-label{display:flex;align-items:center;gap:5px;font-size:8px;color:#7a889c;min-width:0;line-height:1.4}.category-label svg{width:11px;height:11px}.card-action{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:9px;font-weight:600;color:#3c5c96}.card-action svg{width:13px;height:13px}.app-card.is-maintenance{background:#fffdfc}.is-maintenance .card-action{color:#8f756c;font-weight:500}.list-view{grid-template-columns:1fr;gap:9px}.list-view .app-card{min-height:90px;display:grid;grid-template-columns:45px minmax(150px,1fr) minmax(110px,1.2fr) 145px;align-items:center;column-gap:15px;padding:15px 18px}.list-view .card-top{display:contents}.list-view .card-top>.app-icon{grid-column:1;grid-row:1 / span 2}.list-view .card-top-actions{grid-column:4;grid-row:1 / span 2;justify-content:flex-end}.list-view h3{grid-column:2;grid-row:1;margin:0;align-self:end}.list-view .app-description{grid-column:3;grid-row:1 / span 2;min-height:0;margin:0}.list-view .card-footer{grid-column:2;grid-row:2;padding:4px 0 0;border:0;align-self:start}.list-view .card-action{display:none}.empty-state{grid-column:1 / -1;background:white;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:240px;text-align:center;padding:28px}.empty-state>svg{width:32px;height:32px;color:#8ea1bd;margin-bottom:14px}.empty-state h3{font-size:14px;margin:0 0 9px}.empty-state p{font-size:11px;line-height:1.7;max-width:430px;color:var(--muted);margin:0 0 12px}.catalog-bottom{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:9px;color:#7c899d;padding:16px 1px}.catalog-bottom button{font-size:9px}.page-footer{margin:30px 0 0;border-top:1px solid var(--line);padding:19px 0 0;display:flex;justify-content:space-between;align-items:center;gap:15px;color:#7d8a9d;font-size:9px;line-height:1.8}.footer-info{display:flex;align-items:center;gap:6px}.footer-info svg{width:13px;height:13px}.page-footer .footer-brand{font-size:9px;font-weight:600;color:#66778e}.page-footer .footer-brand span{font-weight:400;color:#8995a7;margin-left:7px}.notice{padding:12px 15px;border-radius:9px;background:#fff7e8;border:1px solid #ebdbba;color:#82602d;font-size:11px;line-height:1.7;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.notice span{flex:1;min-width:180px}.notice button{font-size:10px;border:1px solid #d9c49d;background:#fff;border-radius:6px;padding:7px 10px;color:#745321;white-space:nowrap}.toast{position:fixed;bottom:25px;left:calc(50% + var(--sidebar)/2);transform:translate(-50%,20px);max-width:min(510px,calc(100vw - 36px));background:#192943;color:#fff;border:1px solid #ffffff12;box-shadow:0 12px 35px #14213b24;padding:13px 19px;border-radius:10px;font-size:12px;line-height:1.6;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:200}.toast.show{opacity:1;transform:translate(-50%,0)}.mobile-backdrop{position:fixed;inset:0;background:#09132470;z-index:40;border:0}.dialog{border:1px solid var(--line);padding:0;border-radius:17px;max-width:490px;width:calc(100% - 36px);max-height:calc(100dvh - 48px);box-shadow:0 30px 90px #101e3640;color:var(--ink)}.dialog::backdrop{background:#0f1d355c;backdrop-filter:blur(3px)}.dialog-body{padding:30px}.dialog-icon{display:grid;place-items:center;width:46px;height:46px;background:#edf2fc;color:#375cb8;border-radius:12px;margin-bottom:20px}.dialog h2{margin:0 0 12px;font-size:20px;line-height:1.4;letter-spacing:-.6px}.dialog p{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.9;overflow-wrap:anywhere}.dialog-note{background:#f5f7fb;border:1px solid var(--line);border-radius:9px;padding:13px 14px;margin-top:18px;color:#62738e;font-size:11px;line-height:1.8}.dialog-actions{display:flex;justify-content:flex-end;gap:9px;padding:17px 24px;background:#f9fafc;border-top:1px solid var(--line)}.state-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center}.state-card{max-width:430px}.state-card h1{font-size:21px;letter-spacing:-.6px}.state-card p{font-size:12px;line-height:1.9;color:var(--muted)}.spinner{width:32px;height:32px;border:3px solid #dfe7f5;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}@keyframes spin{to{transform:rotate(360deg)}}.loading-text{font-size:12px;color:var(--muted)}.login-screen{min-height:100dvh;display:grid;grid-template-columns:1.05fr 1fr;background:white}.login-story{background:var(--navy);color:white;padding:58px 65px;display:flex;flex-direction:column;position:relative;overflow:hidden;isolation:isolate}.login-story:after{content:"";position:absolute;width:640px;height:640px;bottom:-360px;right:-190px;border:1px solid #ffffff0c;border-radius:50%;box-shadow:0 0 0 80px #ffffff03,0 0 0 160px #ffffff02;z-index:-1}.login-story .brand-caption{color:#bbc9e0}.login-message{margin:auto 0;padding:70px 0;max-width:470px}.login-message .eyebrow{color:#9bb9f9;font-size:9px}.login-message h2{font-size:44px;letter-spacing:-2px;font-weight:550;line-height:1.2;margin:22px 0}.login-message p{font-size:13px;color:#c2cfe2;line-height:1.9;max-width:350px}.login-story-foot{color:#aebed6;font-size:10px;line-height:1.8}.login-panel{display:flex;align-items:center;justify-content:center;padding:50px 32px}.login-form{width:100%;max-width:340px}.login-form>.eyebrow{color:#647b9d;font-size:9px}.login-form h1{font-size:28px;letter-spacing:-.9px;margin:15px 0 12px;font-weight:650}.login-form>p{font-size:12px;line-height:1.85;color:var(--muted);margin-bottom:28px}.microsoft-button{width:100%;height:48px;font-size:12px;gap:12px}.microsoft-button svg{width:18px;height:18px}.login-security{display:flex;gap:8px;font-size:10px;line-height:1.9;color:#73849d;margin-top:19px}.login-security svg{width:15px;height:15px;margin-top:3px}.login-help{border-top:1px solid var(--line);margin-top:32px;padding-top:20px;font-size:10px;color:var(--muted)}.login-help button{font-size:10px}.login-preview-note{border:1px solid #ecdfc9;background:#fbf6ed;color:#806332;border-radius:7px;font-size:10px;line-height:1.8;padding:10px 12px;margin-bottom:20px}
+@media(min-width:1750px){.page{padding-top:38px}.catalog-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.app-card{min-height:217px}.hero{min-height:215px}.hero-content{padding:32px 36px}.hero h2{font-size:34px}.topbar{padding:0 46px}}
+@media(max-width:1280px){:root{--sidebar:222px}.sidebar{padding-left:14px;padding-right:14px}.topbar{padding:0 26px;gap:14px}.page{padding-left:26px;padding-right:26px}.breadcrumb{font-size:10px;gap:7px}.topbar-actions{gap:9px}.search-field{width:min(270px,25vw)}.date-block{font-size:9px}.hero{grid-template-columns:1fr 235px}.hero-content{padding-left:25px;padding-right:20px}.hero h2{font-size:27px}.hero-stats{margin-right:23px;padding:13px 17px}.favorites-grid{gap:12px}.favorite-card{padding:13px;gap:10px}.favorite-body h3{font-size:10px}.app-card{padding:16px 15px 0}.app-card h3{font-size:11px}.catalog-grid{gap:13px}.card-top-actions{gap:1px}.status-badge{font-size:7px}.app-description{font-size:10px}.user-trigger{padding-left:10px}}
+@media(max-width:1080px){.preview-tag{font-size:8px}.breadcrumb>span{display:none}.breadcrumb>svg:first-of-type{display:none}.hero{grid-template-columns:1fr 200px}.hero-stats{margin-right:20px;padding:12px 15px}.hero-stat{gap:9px}.hero-stat-icon{width:28px;height:28px}.hero-stat strong{font-size:21px}.hero-stat small{font-size:8px}.hero h2{font-size:25px}.hero p{font-size:10px}.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app-card h3{font-size:12px}.status-badge{font-size:8px}.favorites-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.favorite-card:nth-child(3){display:none}.favorite-body h3{font-size:11px}.list-view{grid-template-columns:1fr}.list-view .app-card{grid-template-columns:40px minmax(130px,1fr) 125px}.list-view .app-description{display:none}.list-view .card-top-actions{grid-column:3}.date-block{max-width:220px;text-align:right;white-space:normal;line-height:1.5}.filter-chip{padding:6px 10px;font-size:9px}.hero-content{padding-top:25px;padding-bottom:25px}.login-story{padding:42px}.login-message h2{font-size:37px}}
+@media(max-width:820px){:root{--sidebar:0px}.sidebar{width:248px;transform:translateX(-100%);transition:transform .22s ease}.sidebar.open{transform:translateX(0)}.topbar{height:70px;padding:0 20px;gap:14px}.mobile-toggle{display:inline-flex;border:0;width:30px;height:35px;background:none}.breadcrumb{margin-right:auto}.topbar-actions{gap:10px}.search-field{width:min(290px,35vw)}.preview-tag{padding:5px 7px}.user-trigger{padding-left:10px}.page{padding:25px 24px}.hero{grid-template-columns:1fr 245px}.hero h2{font-size:28px}.hero p{font-size:11px}.hero-stats{padding:15px 21px}.hero-stat strong{font-size:23px}.hero-stat small{font-size:9px}.hero-stat-icon{width:33px;height:33px}.favorites-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.favorite-card:nth-child(3){display:flex}.favorite-card{padding:12px;gap:9px}.favorite-card .app-icon{width:32px;height:34px}.favorite-body h3{font-size:10px}.favorite-body p{font-size:8px}.favorite-open{width:15px;padding:0}.catalog-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.app-card{padding:15px 13px 0}.app-card h3{font-size:11px}.app-description{font-size:9px}.status-badge{font-size:7px}.app-icon{width:36px;height:36px}.app-icon svg{width:19px;height:19px}.card-top-actions{gap:0}.star-button{width:24px}.card-top{margin-bottom:12px}.category-label{font-size:7px}.card-action{font-size:8px}.list-view{grid-template-columns:1fr}.toast{left:50%}.skip-link{left:15px}.side-help{margin-top:22px}.login-story{padding:36px}.login-message h2{font-size:32px;letter-spacing:-1px}.login-message p{font-size:11px}.login-form h1{font-size:24px}}
+@media(max-width:680px){.topbar{flex-wrap:wrap;height:auto;min-height:114px;padding:13px 20px 12px;gap:10px}.breadcrumb{font-size:11px}.topbar-actions{display:contents}.search-field{order:5;width:100%}.search-field input{height:35px;font-size:11px}.topbar>.mobile-toggle{height:31px;width:25px;padding:0}.preview-tag{font-size:8px}.user-trigger{padding-left:9px}.avatar{width:30px;height:30px;font-size:10px}.user-trigger>svg{display:none}.user-menu{top:51px;right:16px}.topbar-help{display:none}.page{padding:24px 20px 22px}.page-intro{margin-bottom:21px;align-items:flex-start}.page-intro h1{font-size:23px}.page-intro p{font-size:11px;max-width:250px}.date-block{display:none}.hero{grid-template-columns:1fr;min-height:0;margin-bottom:24px}.hero-content{padding:26px}.hero h2{font-size:28px}.hero p{font-size:10px;max-width:340px}.hero .hero-link{margin-top:14px}.hero-stats{display:none}.hero:after{right:-280px;top:-175px}.favorites-grid{grid-template-columns:1fr 1fr;gap:11px}.favorite-card:nth-child(3){display:none}.favorite-card{min-height:77px;gap:9px;padding:12px}.favorite-body h3{font-size:10px}.favorite-open{display:none}.favorite-body h3{white-space:normal;line-height:1.4}.favorite-body p{font-size:8px;margin-top:4px}.favorite-card .app-icon{width:34px;height:34px}.favorite-card .app-icon svg{width:18px;height:18px}.favorite-card .favorite-open{display:flex;position:absolute;inset:0;width:100%;height:100%;opacity:0}.section-head h2{font-size:14px}.section-head .text-button{font-size:9px}.favorites-section{margin-bottom:25px}.catalog-header{align-items:flex-start;gap:10px}.catalog-title-wrap h2{font-size:16px}.catalog-subtitle{font-size:9px;max-width:230px;line-height:1.7}.sort-select{max-width:136px;font-size:9px;padding-left:9px}.catalog-tools{gap:6px}.view-switch{display:none}.filter-row{gap:7px;margin-bottom:15px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:3px}.filter-chip{min-height:30px;font-size:9px;padding:6px 10px}.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.app-card{min-height:209px;padding:14px 14px 0}.app-card h3{font-size:11px}.app-description{font-size:9px;line-height:1.8;min-height:49px}.card-top{margin-bottom:13px;align-items:flex-start}.card-top-actions{gap:0;flex-direction:column-reverse;align-items:flex-end}.status-badge{font-size:6.5px;padding:3px 4px;gap:3px;margin-top:3px}.star-button{width:21px;height:21px;padding:1px}.star-button svg{width:15px;height:15px}.app-icon{width:35px;height:35px}.category-label{font-size:7px}.category-label svg{display:none}.card-action{font-size:7px;gap:3px}.card-action svg{width:11px;height:11px}.card-footer{padding:10px 0;gap:4px}.catalog-bottom{font-size:8px;align-items:flex-start;line-height:1.7}.page-footer{margin-top:20px;padding-top:16px;font-size:8px;align-items:flex-start;flex-direction:column;gap:10px}.page-footer .footer-brand{font-size:8px}.list-view{grid-template-columns:1fr}.list-view .app-card{min-height:91px;padding:13px;grid-template-columns:36px minmax(0,1fr) 105px;column-gap:10px}.list-view .card-top-actions{flex-direction:row;align-items:center;gap:5px}.list-view .status-badge{font-size:7px;margin:0}.list-view h3{font-size:11px}.list-view .category-label{font-size:8px}.favorite-empty{padding:14px;font-size:10px}.catalog-section{scroll-margin-top:135px}.login-screen{display:flex;flex-direction:column}.login-story{padding:27px 28px 31px;min-height:250px}.login-story .wordmark{font-size:25px}.login-story .brand-caption{font-size:8px}.login-message{padding:25px 0 0;margin:0}.login-message>.eyebrow{display:none}.login-message h2{font-size:29px;margin:12px 0}.login-message p{font-size:11px;margin:0;max-width:400px}.login-story-foot{display:none}.login-panel{padding:36px 26px}.login-form{max-width:430px}.login-form h1{font-size:26px}.login-help{margin-top:25px}}
+@media(max-width:359px){.page{padding-left:15px;padding-right:15px}.topbar{padding-left:15px;padding-right:15px}.preview-tag{display:none}.catalog-grid{grid-template-columns:1fr}.app-card{min-height:190px}.card-top-actions{flex-direction:row;gap:7px}.status-badge{font-size:8px}.app-card h3{font-size:13px}.app-description{font-size:11px;min-height:0}.category-label{font-size:9px}.card-action{font-size:10px}.favorites-grid{grid-template-columns:1fr}.favorite-card:nth-child(2){display:none}.sort-select{max-width:120px}.hero-content{padding:23px}.hero h2{font-size:26px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.app-card:hover{transform:none}}
 
-  /* ---- telas de estado ---- */
-  #loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
-  .spinner{width:40px;height:40px;border:3px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
-  .loading-text{font-size:14px;color:var(--mute)}
-  #error-screen{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;z-index:998}
-  .error-title{font-size:18px;font-weight:700;color:var(--bad)}
-  .error-msg{font-size:13px;color:var(--mute);max-width:420px}
+/* Final typographic scale: readable UI text and consistent responsive density. */
+.nav-label{font-size:10px}.nav-item{font-size:13px;min-height:44px}.nav-count{font-size:10px}.side-help b{font-size:13px}.side-help p{font-size:12px}.side-help button{font-size:12px}.side-footer{font-size:10px}.breadcrumb{font-size:12px}.search-field input{font-size:12px}.search-shortcut{font-size:10px}.preview-tag{font-size:10px}.user-menu strong{font-size:14px}.user-menu small{font-size:12px}.page-intro h1{font-size:29px}.page-intro p{font-size:13px}.date-block{font-size:11px}.hero{min-height:213px}.hero h2{font-size:33px}.hero p{font-size:13px}.hero .eyebrow{font-size:9px}.hero .hero-link{font-size:12px;margin-top:17px}.hero-stat strong{font-size:26px}.hero-stat small{font-size:10px}.hero-stat-icon{width:36px;height:36px}.section-head h2{font-size:17px}.section-head .text-button{font-size:12px}.favorite-body h3{font-size:12px;white-space:normal;line-height:1.5}.favorite-body p{font-size:10px}.favorite-card{min-height:86px}.catalog-title-wrap h2{font-size:19px}.catalog-subtitle{font-size:12px;line-height:1.6}.catalog-tools{align-self:flex-start}.sort-select{font-size:11px;min-height:36px}.view-switch button{height:28px;width:29px}.count-bubble{font-size:10px;min-width:22px;height:22px}.filter-chip{font-size:11px;min-height:34px;padding:7px 13px}.filter-chip span{font-size:10px}.app-card{min-height:224px;padding:20px 20px 0}.app-card h3{font-size:14px;line-height:1.5;margin-bottom:8px}.app-description{font-size:12px;line-height:1.7;min-height:41px}.status-badge{font-size:9px}.card-top{margin-bottom:15px}.category-label{font-size:10px}.card-action{font-size:11px}.card-footer{padding:14px 0}.star-button svg{width:17px;height:17px}.catalog-bottom{font-size:11px}.catalog-bottom .text-button{font-size:11px}.page-footer{font-size:10px}.page-footer .footer-brand{font-size:10px}.empty-state h3{font-size:16px}.empty-state p{font-size:13px}.favorite-empty{font-size:12px}.dialog p{font-size:13px}.dialog-note{font-size:12px}.button{font-size:13px}.login-form>p{font-size:14px}.login-security{font-size:12px}.login-help,.login-help button{font-size:12px}.login-form>.eyebrow{font-size:10px}.login-form h1{font-size:30px}.login-message p{font-size:14px}.login-story-foot{font-size:11px}.login-preview-note{font-size:11px}.login-form{max-width:370px}.microsoft-button{font-size:14px;height:51px}.list-view .app-card{min-height:98px}.list-view h3{font-size:13px}.list-view .app-description{font-size:11px}
+@media(min-width:1750px){.hero h2{font-size:36px}.hero{min-height:225px}.app-card{min-height:232px}.list-view{grid-template-columns:1fr}}
+@media(max-width:1280px){.hero h2{font-size:30px}.hero p{font-size:12px}.hero{grid-template-columns:1fr 230px}.hero-stat small{font-size:9px}.hero-stat strong{font-size:24px}.search-field{width:240px}.preview-tag{font-size:9px}.breadcrumb{font-size:11px}.app-card{padding:18px 17px 0;min-height:235px}.app-card h3{font-size:13px}.app-description{font-size:11px}.status-badge{font-size:8px}.category-label{font-size:9px}.card-action{font-size:10px}.favorite-body h3{font-size:11px}.favorite-body p{font-size:9px}.date-block{font-size:10px}.side-help p{font-size:11px}}
+@media(max-width:1080px){.search-field{width:220px}.hero{grid-template-columns:1fr 195px}.hero h2{font-size:29px}.hero p{font-size:12px}.hero-stat small{font-size:8px}.hero-stat strong{font-size:23px}.hero-stat-icon{width:29px;height:29px}.hero-stats{padding:12px}.app-card h3{font-size:14px}.app-description{font-size:12px}.status-badge{font-size:9px}.category-label{font-size:10px}.card-action{font-size:11px}.app-card{min-height:232px}.catalog-title-wrap h2{font-size:18px}.favorite-body h3{font-size:12px}.favorite-body p{font-size:10px}.filter-chip{font-size:10px;padding:7px 11px}.catalog-tools{gap:6px}.catalog-subtitle{font-size:11px}.hero-content{padding-left:24px}.page-intro h1{font-size:27px}}
+@media(max-width:820px){.search-field{width:min(280px,34vw)}.breadcrumb{font-size:11px}.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app-card{padding:19px 19px 0;min-height:229px}.hero{grid-template-columns:1fr 220px}.hero h2{font-size:30px}.hero-stat small{font-size:9px}.hero-stats{padding:15px}.favorites-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.favorite-card:nth-child(3){display:none}.favorite-card{padding:15px}.favorite-card .app-icon{width:39px;height:39px}.favorite-card .app-icon svg{width:21px;height:21px}.favorite-body h3{font-size:12px}.favorite-body p{font-size:10px}.favorite-open{width:22px}.list-view{grid-template-columns:1fr}.login-message h2{font-size:34px}.login-message p{font-size:12px}.login-form h1{font-size:28px}.login-form>p{font-size:13px}}
+@media(max-width:680px){.search-field{width:100%}.preview-tag{font-size:9px}.page-intro h1{font-size:26px}.page-intro p{font-size:12px}.hero{display:block;min-height:0}.hero-content{padding:25px}.hero h2{font-size:30px;line-height:1.2;max-width:340px}.hero p{font-size:12px}.hero p br{display:none}.hero .hero-link{font-size:11px}.hero .eyebrow{font-size:9px}.hero-stats{display:none}.section-head h2{font-size:16px}.section-head .text-button{font-size:11px}.favorite-card{padding:12px;gap:9px}.favorite-body h3{font-size:11px}.favorite-body p{font-size:9px}.favorite-card .app-icon{width:32px;height:34px}.favorite-card .app-icon svg{width:18px;height:18px}.catalog-header{gap:9px}.catalog-title-wrap h2{font-size:17px}.catalog-subtitle{font-size:10px}.sort-select{max-width:128px;font-size:9px;min-height:33px}.filter-chip{font-size:10px;min-height:32px;padding:6px 11px}.filter-chip span{font-size:9px}.catalog-bottom{font-size:10px;flex-wrap:wrap}.catalog-bottom .text-button{font-size:10px}.page-footer,.page-footer .footer-brand{font-size:9px}.app-card{padding:17px 17px 0}.app-card h3{font-size:13px}.app-description{font-size:11px}.category-label{font-size:9px}.card-action{font-size:10px}.card-top-actions{flex-direction:row;align-items:center;gap:5px}.status-badge{font-size:8px;margin:0}.star-button{width:26px;height:27px}.app-icon{width:39px;height:39px}.app-icon svg{width:21px;height:21px}.card-footer{padding:12px 0}.list-view .card-top-actions{flex-direction:row}.list-view h3{font-size:12px}.list-view .app-card{grid-template-columns:36px minmax(0,1fr) 108px}.list-view .status-badge{font-size:7px}}
+@media(max-width:480px){.catalog-grid{grid-template-columns:1fr;gap:13px}.app-card{min-height:194px;padding:17px 18px 0}.app-card h3{font-size:14px;line-height:1.5;margin-bottom:7px}.app-description{font-size:12px;min-height:0;margin-bottom:14px}.card-top{margin-bottom:12px}.status-badge{font-size:9px}.category-label{font-size:10px}.card-action{font-size:11px}.category-label svg{display:block;width:12px;height:12px}.app-icon{width:40px;height:40px}.app-icon svg{width:22px;height:22px}.star-button{width:29px;height:29px}.card-top-actions{gap:8px}.favorite-card{min-height:88px}.favorite-body h3{font-size:10px}.favorite-body p{font-size:9px}.favorite-card .app-icon{width:29px;height:31px}.favorite-card .app-icon svg{width:16px;height:16px}.catalog-tools .sort-select{max-width:122px}.page-intro p{max-width:100%}.count-bubble{font-size:9px;min-width:20px;height:20px}.catalog-title-wrap{gap:7px}.catalog-title-wrap h2{font-size:16px}.catalog-subtitle{max-width:195px}.list-view .app-card{min-height:97px}.list-view h3{font-size:12px}.list-view .status-badge{font-size:7px}}
 
-  /* ---- entrada ---- */
-  #gate{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;z-index:900;padding:16px}
-  .gcard{background:var(--panel);border-radius:14px;padding:36px 30px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.15)}
-  .gcard img{height:52px;object-fit:contain;margin:0 auto 4px}
-  .gcard h1{font-size:20px;font-weight:800;letter-spacing:.01em}
-  .gcard p{font-size:13px;color:var(--mute);line-height:1.55}
-  .msbtn{font:inherit;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 16px;border:none;border-radius:10px;background:var(--primary);color:var(--primary-ink);cursor:pointer;margin-top:4px}
-  .msbtn:hover{background:#19327D}
-  .msbtn svg{width:17px;height:17px;flex-shrink:0}
-  .gfoot{font-size:11.5px;color:var(--mute)}
-
-  /* ---- layout ---- */
-  #app{display:none}
-  .layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;min-height:100vh;max-width:1440px;margin:0 auto;padding:16px}
-  .side{background:var(--side);color:var(--side-ink);border-radius:14px;padding:20px 14px;box-shadow:0 8px 24px rgba(13,26,65,.18);display:flex;flex-direction:column;gap:6px;position:sticky;top:16px;align-self:start;height:calc(100vh - 32px)}
-  .brand{padding:8px 8px 18px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px;text-align:center}
-  .brand img{height:46px;object-fit:contain}
-  .nav{display:flex;flex-direction:column;gap:4px;overflow:auto}
-  .nav{margin-top:6px}
-  .nav .lbl{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--side-mute);padding:6px 12px 6px}
-  .nav button{font:inherit;font-size:13.5px;font-weight:600;text-align:left;color:var(--side-ink);background:none;border:none;border-radius:9px;padding:11px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .nav button:hover{background:rgba(255,255,255,.08)}
-  .nav button[aria-pressed="true"]{background:var(--side-hi)}
-  .nav .n{font-size:11px;font-weight:700;background:rgba(255,255,255,.14);border-radius:999px;padding:2px 8px}
-  .who{margin-top:auto;border-top:1px solid rgba(255,255,255,.1);padding-top:14px;display:flex;align-items:center;gap:11px}
-  .who .av{width:40px;height:40px;border-radius:50%;background:var(--side-hi);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;flex-shrink:0;overflow:hidden}
-  .who .av img{width:100%;height:100%;object-fit:cover;display:none}
-  .who b{display:block;font-size:12.5px;line-height:1.2;word-break:break-word}
-  .who button{font:inherit;font-size:11px;font-weight:600;color:var(--side-mute);background:none;border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:3px 9px;cursor:pointer;margin-top:3px}
-  .who button:hover{color:var(--side-ink);border-color:rgba(255,255,255,.5)}
-
-  .content{min-width:0;display:flex;flex-direction:column}
-  .inner{width:100%;padding:12px 6px 28px;flex:1}
-  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:2px 2px 20px}
-  .pagehead h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
-  .pagehead .sub{font-size:13px;color:var(--mute);margin-top:3px}
-  .search{position:relative;width:min(320px,100%)}
-  .search input{font:inherit;font-size:13.5px;width:100%;padding:11px 12px 11px 38px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
-  .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round}
-
-  h2.cat{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:22px 2px 10px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-  .tile{position:relative;display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid transparent;border-radius:14px;padding:18px;color:var(--ink);text-decoration:none;cursor:pointer;box-shadow:0 1px 3px rgba(13,26,65,.07);transition:box-shadow .15s,transform .15s,border-color .15s;font:inherit;text-align:left}
-  .tile:hover{border-color:var(--primary);box-shadow:0 8px 24px rgba(13,26,65,.13);transform:translateY(-2px)}
-  .tile[aria-disabled="true"]{cursor:default;opacity:.65}
-  .tile[aria-disabled="true"]:hover{border-color:transparent;box-shadow:0 1px 3px rgba(13,26,65,.07);transform:none}
-  .tile.has-badge{padding-top:36px}
-  @media (prefers-reduced-motion:reduce){.tile{transition:none}}
-  .ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--primary-soft)}
-  .ico svg{width:23px;height:23px;stroke:var(--primary);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .tile b{display:block;font-size:14.5px;font-weight:700;line-height:1.3}
-  .tile .d{font-size:12.5px;color:var(--mute);margin-top:4px;line-height:1.45}
-  .badge{position:absolute;top:12px;right:12px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
-  .badge.impl{background:var(--warn-soft);color:var(--warn)}
-  .badge.man{background:var(--bad-soft);color:var(--bad)}
-  .empty{color:var(--mute);padding:48px 0;text-align:center;font-size:14px}
-  .notice{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px 14px;margin:0 2px 6px}
-  .foot{margin-top:auto;padding:16px 6px 4px;font-size:11.5px;color:var(--mute);display:flex;align-items:center;justify-content:center;gap:7px;text-align:center}
-  .foot svg{width:13px;height:13px;stroke:var(--mute);fill:none;stroke-width:1.8;flex-shrink:0}
-
-  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90%}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-  @media(max-width:820px){
-    .layout{display:block;padding:12px}
-    .inner{padding:14px 2px 28px}
-    .side{position:static;width:100%;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px;margin-bottom:14px}
-    .brand{border:0;padding:4px 8px;margin:0}
-    .brand img{height:32px}
-    .nav{flex-direction:row;flex-wrap:wrap}
-    .who{margin:0 0 0 auto;border:0;padding:0}
-  }
 </style>
 </head>
 <body>
-
-<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Carregando…</div></div>
-<div id="error-screen">
-  <div class="error-title" id="error-title">Não foi possível carregar</div>
-  <div class="error-msg" id="error-msg"></div>
+<a href="#main-content" class="skip-link">Pular para o conte&uacute;do</a>
+<div id="loading-screen" class="state-screen" aria-live="polite"><div><div class="spinner" aria-hidden="true"></div><div class="loading-text">Preparando seu ambiente de trabalho&hellip;</div></div></div>
+<div id="error-screen" class="state-screen" hidden><div class="state-card"><h1 id="error-title">N&atilde;o foi poss&iacute;vel carregar</h1><p id="error-message"></p><button id="retry" class="button primary">Tentar novamente</button></div></div>
+<section id="login-screen" class="login-screen" hidden aria-label="Acesso ao portal">
+ <div class="login-story">
+  <div class="brand-lockup"><img class="brand-logo" data-logo alt="Polystell" hidden><div class="brand-fallback"><span class="wordmark">polystell<span style="color:#89aaff">.</span></span><span class="brand-caption">APLICATIVOS CORPORATIVOS</span></div></div>
+  <div class="login-message"><div class="eyebrow">Conex&atilde;o que simplifica</div><h2>Um ambiente.<br>Mais possibilidades.</h2><p>Seus aplicativos e processos reunidos para um dia a dia mais simples e conectado.</p></div>
+  <div class="login-story-foot">Polystell Apps<br>Tecnologia a servi&ccedil;o das pessoas.</div>
+ </div>
+ <div class="login-panel"><div class="login-form">
+  <div class="eyebrow">SEU AMBIENTE DE TRABALHO</div><h1>Bom ter voc&ecirc; aqui.</h1><p>Acesse os aplicativos da Polystell com a sua conta corporativa Microsoft.</p>
+  <div id="login-preview-note" class="login-preview-note" hidden>Pr&eacute;via visual. O bot&atilde;o abaixo abre a demonstra&ccedil;&atilde;o, sem autenticar ou acessar dados corporativos.</div>
+  <button id="sign-in" class="button primary microsoft-button"><svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022" stroke="none"/><rect x="11" y="1" width="9" height="9" fill="#7fba00" stroke="none"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef" stroke="none"/><rect x="11" y="11" width="9" height="9" fill="#ffb900" stroke="none"/></svg><span id="sign-in-label">Entrar com Microsoft</span></button>
+  <div class="login-security"><span data-icon="shield"></span><span>Use a mesma identidade do Microsoft 365.<br>O portal n&atilde;o solicita nem armazena sua senha.</span></div>
+  <div class="login-help">Precisa de ajuda para acessar? <button class="text-button" data-action="help">Fale com a TI <span data-icon="arrow-up-right"></span></button></div>
+ </div></div>
+</section>
+<div id="workspace" hidden>
+ <button class="mobile-backdrop" id="mobile-backdrop" aria-label="Fechar menu de navega&ccedil;&atilde;o" hidden></button>
+ <aside id="sidebar" class="sidebar" aria-label="Navega&ccedil;&atilde;o do portal">
+  <div class="sidebar-brand"><div class="brand-lockup"><img class="brand-logo" data-logo alt="Polystell" hidden><div class="brand-fallback"><span class="wordmark">polystell<span style="color:#89aaff">.</span></span><span class="brand-caption">APLICATIVOS CORPORATIVOS</span></div></div></div>
+  <nav class="side-navigation" aria-label="Principal"><p class="nav-label">Seu ambiente</p><div class="nav-items" id="main-navigation"></div><div class="nav-separator"><p class="nav-label">&Aacute;reas de trabalho</p><div class="nav-items" id="category-navigation"></div></div></nav>
+  <div class="side-help"><div class="side-help-icon" data-icon="headphones"></div><b>Conte com a nossa TI.</b><p>Ajuda com acessos, aplicativos<br>e o que mais voc&ecirc; precisar.</p><button data-action="help">Central de ajuda <span data-icon="arrow-up-right"></span></button></div>
+  <div class="side-footer"><span data-icon="shield"></span><span id="sidebar-mode">Identidade Microsoft 365</span></div>
+ </aside>
+ <div class="main-shell">
+  <header class="topbar">
+   <button class="icon-button mobile-toggle" id="menu-toggle" aria-label="Abrir menu de navega&ccedil;&atilde;o" aria-expanded="false" aria-controls="sidebar"><span data-icon="menu"></span></button>
+   <div class="breadcrumb"><span>Ambiente de trabalho</span><span data-icon="chevron-right"></span><b id="breadcrumb-page">Vis&atilde;o geral</b></div>
+   <div class="topbar-actions">
+    <div class="search-field" role="search"><span data-icon="search"></span><input id="search" type="search" placeholder="Encontre um aplicativo..." aria-label="Buscar por nome, descri&ccedil;&atilde;o ou &aacute;rea" autocomplete="off"><kbd class="search-shortcut" id="search-shortcut">Ctrl K</kbd><button class="clear-search" id="clear-search" aria-label="Limpar busca" hidden><span data-icon="x"></span></button></div>
+    <button class="preview-tag" id="preview-tag" data-action="about-demo" hidden><span></span>Pr&eacute;via interativa</button>
+    <button class="icon-button topbar-help" aria-label="Central de ajuda" data-action="help"><span data-icon="help"></span></button>
+    <button class="user-trigger" id="user-trigger" aria-label="Abrir op&ccedil;&otilde;es da conta" aria-expanded="false" aria-controls="user-menu"><span class="avatar" id="avatar"><span id="user-initials">LC</span><img id="user-photo" alt="" hidden></span><span data-icon="chevron-down"></span></button>
+   </div>
+   <div class="user-menu" id="user-menu" hidden><strong id="user-name"></strong><small id="user-email"></small><button id="sign-out"><span data-icon="log-out"></span><span id="sign-out-label">Sair da conta</span></button></div>
+  </header>
+  <main id="main-content" class="page" tabindex="-1">
+   <div class="page-intro"><div><h1 id="greeting">Ol&aacute;, Leonardo.</h1><p id="page-subtitle">Um s&oacute; lugar para conectar o seu dia.</p></div><div class="date-block"><span data-icon="calendar"></span><time id="today"></time></div></div>
+   <div id="group-notice" class="notice" hidden><span>Alguns aplicativos restritos n&atilde;o aparecem porque a leitura de grupos n&atilde;o foi autorizada. Apenas o cat&aacute;logo de acesso geral est&aacute; vis&iacute;vel.</span><button id="authorize-groups">Verificar permiss&otilde;es</button></div>
+   <section class="hero" id="hero" aria-label="Seu ambiente de aplicativos"><div class="hero-content"><div class="eyebrow">POLYSTELL APPS</div><h2>Seu trabalho, mais conectado.</h2><p>Acesse seus aplicativos, simplifique processos<br> e encontre o que precisa para seguir em frente.</p><button class="hero-link" id="explore-catalog">Explorar aplicativos <span data-icon="arrow-right"></span></button></div><div class="hero-stats"><div class="hero-stat"><div class="hero-stat-icon" data-icon="grid"></div><div><strong id="app-count">0</strong><small>aplicativos no seu cat&aacute;logo</small></div></div><div class="hero-stat"><div class="hero-stat-icon" data-icon="layers"></div><div><strong id="category-count">0</strong><small>&aacute;reas de trabalho</small></div></div></div></section>
+   <section class="favorites-section" id="favorites-section" aria-labelledby="favorite-title"><div class="section-head"><div><div class="section-title"><span data-icon="star"></span><h2 id="favorite-title">Seus favoritos</h2></div></div><button class="text-button" data-action="view-favorites">Ver todos <span data-icon="arrow-right"></span></button></div><div id="favorite-shortcuts"></div></section>
+   <section class="catalog-section" id="catalog-section" aria-labelledby="catalog-title"><div class="catalog-header"><div><div class="catalog-title-wrap"><h2 id="catalog-title">Todos os aplicativos</h2><span class="count-bubble" id="result-count">0</span></div><p class="catalog-subtitle" id="catalog-subtitle">Encontre a ferramenta certa para cada tarefa.</p></div><div class="catalog-tools"><label for="sort" class="sr-only">Ordenar aplicativos</label><select id="sort" class="sort-select"><option value="relevance">Ordem do cat&aacute;logo</option><option value="az">Nome: A a Z</option><option value="za">Nome: Z a A</option><option value="category">Por &aacute;rea</option></select><div class="view-switch" role="group" aria-label="Visualiza&ccedil;&atilde;o"><button id="grid-view" aria-label="Visualizar em grade" aria-pressed="true"><span data-icon="grid"></span></button><button id="list-view" aria-label="Visualizar em lista" aria-pressed="false"><span data-icon="list"></span></button></div></div></div>
+    <div class="filter-row" id="category-filters" role="group" aria-label="Filtrar por &aacute;rea"></div>
+    <div class="catalog-grid" id="app-grid"></div>
+    <div class="catalog-bottom"><span id="result-summary" role="status" aria-live="polite"></span><button class="text-button" data-action="help">N&atilde;o encontrou o que precisa? <span data-icon="arrow-up-right"></span></button><button class="text-button" id="clear-history" hidden>Limpar hist&oacute;rico</button></div>
+   </section>
+   <footer class="page-footer"><div class="footer-info"><span data-icon="shield"></span><span id="footer-message">Seu cat&aacute;logo &eacute; personalizado conforme o seu perfil de acesso.</span></div><div class="footer-brand">Polystell Apps <span>Tecnologia da Informa&ccedil;&atilde;o</span></div></footer>
+  </main>
+ </div>
 </div>
-
-<div id="gate">
-  <div class="gcard">
-    <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'">
-    <h1>Polystell Apps</h1>
-    <p>O portal interno de aplicativos da Polystell. Entre com a sua conta corporativa para ver os aplicativos liberados para o seu perfil.</p>
-    <button class="msbtn" id="entrar"><svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022" stroke="none"/><rect x="11" y="1" width="9" height="9" fill="#7fba00" stroke="none"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef" stroke="none"/><rect x="11" y="11" width="9" height="9" fill="#ffb900" stroke="none"/></svg>Entrar com Microsoft</button>
-    <div class="gfoot">Acesso validado pela identidade Microsoft 365 da Polystell.</div>
-  </div>
-</div>
-
-<div id="app">
-  <div class="layout">
-    <aside class="side">
-      <div class="brand">
-        <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'">
-      </div>
-      <nav class="nav" id="nav" aria-label="Categorias"></nav>
-      <div class="who">
-        <div class="av" id="uav"><span id="uini"></span><img id="ufoto" alt=""></div>
-        <div style="min-width:0"><b id="unome"></b><button id="logout">Sair</button></div>
-      </div>
-    </aside>
-
-    <main class="content">
-      <div class="inner">
-      <div class="pagehead">
-        <div><h1 id="hello">Olá!</h1><div class="sub" id="hoje"></div></div>
-        <div class="search">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
-          <input id="q" placeholder="Buscar aplicativo" aria-label="Buscar aplicativo">
-        </div>
-      </div>
-      <div id="notice"></div>
-      <section id="tiles"></section>
-      </div>
-      <div class="foot">
-        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Você vê apenas os aplicativos liberados para o seu perfil. Precisa de acesso a algum módulo? Fale com a TI.</span>
-      </div>
-    </main>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
+<dialog class="dialog" id="dialog" aria-labelledby="dialog-title"><div class="dialog-body"><div class="dialog-icon" id="dialog-icon"></div><h2 id="dialog-title"></h2><div id="dialog-content"></div></div><div class="dialog-actions"><button class="button" id="dialog-secondary" hidden></button><button class="button primary" id="dialog-close">Entendi</button></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<noscript><div class="state-screen"><p>Ative o JavaScript no navegador para acessar o Polystell Apps.</p></div></noscript>
 <script>
-/* ===================== CONFIGURAÇÃO ===================== */
-const CONFIG = {
-  clientId: "c066630d-9dc2-4c4a-8c60-8f0056e9e5e2",
-  tenantId: "fdb7cb21-cc9d-4f32-bb70-e71cad1eb164",
-  siteHost: "polystellcombr.sharepoint.com",
-  sitePath: "/sites/Apps",
-  listaCatalogo: "00_Catalogo_Apps"
+'use strict';
+/*
+ POLYSTELL APPS - redesign of the supplied index(4).html.
+ Local file = isolated visual demo. On HTTPS = Microsoft + SharePoint.
+ ?demo=1 forces the isolated demo; ?demo=1&login=1 previews the login.
+ Demo never requests tokens, reads corporate data or opens sample app URLs.
+ Keep the original logo-polystell.png beside this file. A text fallback is used.
+ IMPORTANT: card visibility is UX, NOT authorization. Enforce access in each app/API.
+ Client and tenant IDs are public SPA configuration, NOT client secrets.
+*/
+const CONFIG = Object.freeze({
+ clientId:'c066630d-9dc2-4c4a-8c60-8f0056e9e5e2',
+ tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
+ siteHost:'polystellcombr.sharepoint.com', sitePath:'/sites/Apps',
+ listaCatalogo:'00_Catalogo_Apps', logoUrl:'logo-polystell.png',
+ supportUrl:'', // Set the confirmed IT support URL. Empty = guidance dialog, no fake submission.
+ // Preserved from original to avoid an unannounced Entra permission change.
+ // For a read-only hub, review Sites.Read.All and consent in a test environment.
+ siteScopes:['Sites.ReadWrite.All'], groupScopes:['GroupMember.Read.All','User.Read'],
+ msalUrl:'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js'
+});
+const params=new URLSearchParams(location.search);
+const DEMO=location.protocol==='file:' || params.get('demo')==='1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const asText=v=>String(v?.Value??v??'').trim();
+const collator=new Intl.Collator('pt-BR',{sensitivity:'base',numeric:true});
+const ICONS={
+ 'grid':'<rect x="3.5" y="3.5" width="6" height="6" rx="1.3"/><rect x="14.5" y="3.5" width="6" height="6" rx="1.3"/><rect x="3.5" y="14.5" width="6" height="6" rx="1.3"/><rect x="14.5" y="14.5" width="6" height="6" rx="1.3"/>',
+ 'home':'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/>',
+ 'star':'<path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1.1 6.1-5.6-2.9-5.6 2.9 1.1-6.1L3 9.5l6.2-.9Z"/>',
+ 'clock':'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
+ 'layers':'<path d="m3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5" transform="translate(0 -1)"/>',
+ 'chart':'<path d="M4 4v16h17M8 15v-3m5 3V8m5 7V5"/>',
+ 'money':'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/>',
+ 'wallet':'<path d="M20 8V5a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v12H6a3 3 0 0 1-3-3V6"/><path d="M20 12h-5v5h5m-2-2.5h.01"/>',
+ 'receipt':'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2ZM9 7h6m-6 4h6m-6 4h3"/>',
+ 'alert':'<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01"/>',
+ 'laptop':'<rect x="4" y="4" width="16" height="12" rx="1.5"/><path d="M2 20h20l-2-4H4Zm8-4v1h4v-1"/>',
+ 'gate':'<path d="M4 21V7l8-4 8 4v14M4 11h16M9 21v-6h6v6"/>',
+ 'qr':'<path d="M4 8V4h4m8 0h4v4m0 8v4h-4m-8 0H4v-4"/><rect x="8" y="8" width="3" height="3" rx=".3"/><path d="M14 8h2v3m-8 3h3v2m3-2h2v2"/>',
+ 'brain':'<path d="M12 5a3 3 0 0 0-5-1 3 3 0 0 0-3 5 4 4 0 0 0 0 7 3 3 0 0 0 5 4 3 3 0 0 0 3-1V5Zm0 0a3 3 0 0 1 5-1 3 3 0 0 1 3 5 4 4 0 0 1 0 7 3 3 0 0 1-5 4 3 3 0 0 1-3-1"/><path d="M7 8c2 0 3 1 3 3m7-3c-2 0-3 1-3 3M7 15c2-1 3 0 3 2m7-2c-2-1-3 0-3 2"/>',
+ 'users':'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m3 9v-3a5 5 0 0 0-3-4"/>',
+ 'briefcase':'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12a22 22 0 0 0 18 0m-10 1v3h2v-3"/>',
+ 'tool':'<path d="m14 6 4 4 3-3a6 6 0 0 1-8 7L6 21a2.1 2.1 0 0 1-3-3l7-7a6 6 0 0 1 7-8Z"/>',
+ 'shield':'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',
+ 'leaf':'<path d="M20 3c-8 0-16 2-16 10a7 7 0 0 0 7 7c8 0 9-9 9-17ZM4 21l11-11"/>',
+ 'folder':'<path d="M3 7V5a2 2 0 0 1 2-2h5l3 4h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+ 'headphones':'<path d="M4 15v-3a8 8 0 0 1 16 0v5a4 4 0 0 1-4 4h-3"/><rect x="3" y="11" width="4" height="8" rx="2"/><rect x="17" y="11" width="4" height="8" rx="2"/>',
+ 'help':'<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 1 1 4.4 1.6L12 12v1m0 4h.01"/>',
+ 'search':'<circle cx="10.5" cy="10.5" r="6.8"/><path d="m16 16 4.5 4.5"/>',
+ 'calendar':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M7 15h2m4 0h2m-8 3h2"/>',
+ 'arrow-right':'<path d="M4 12h15m-6-6 6 6-6 6"/>',
+ 'arrow-up-right':'<path d="M6 18 18 6M6 6h12v12"/>',
+ 'chevron-right':'<path d="m9 5 7 7-7 7"/>',
+ 'chevron-down':'<path d="m6 9 6 6 6-6"/>',
+ 'menu':'<path d="M4 6h16M4 12h16M4 18h16"/>',
+ 'x':'<path d="m6 6 12 12M6 18 18 6"/>',
+ 'list':'<path d="M9 5h12M9 12h12M9 19h12M3 5h.01M3 12h.01M3 19h.01"/>',
+ 'log-out':'<path d="M9 3H4v18h5M9 12h12m-5-5 5 5-5 5"/>',
+ 'check':'<path d="m5 12 4 4L19 6"/>'
 };
-/* GroupMember.Read.All (delegada, com consentimento do administrador) permite
-   filtrar os blocos pelos grupos do usuário. Sem ela, o hub mostra só os apps
-   de acesso geral e avisa na tela. */
-const SCOPES_SITES  = ["Sites.ReadWrite.All"];
-const SCOPES_GROUPS = ["GroupMember.Read.All"];
-
-const ICONS = {
-  chart:'<path d="M4 20V10M10 20V4M16 20v-8M4 20h17"/>',
-  money:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/>',
-  alert:'<path d="M12 3L2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
-  laptop:'<rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 19h20"/>',
-  gate:'<path d="M4 20V8l8-4 8 4v12M4 12h16M9 20v-5h6v5"/>',
-  qr:'<path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/>',
-  brain:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M8 8h8M8 16h8"/>',
-  grid:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>'
-};
-
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-let msalApp = null, account = null, APPS = [], MEUS_GRUPOS = null, CAT = "Todos";
-
-function show(id){ ["loading-screen","gate","app","error-screen"].forEach(x => { const el = document.getElementById(x); el.style.display = (x===id) ? (x==="gate"?"grid":(x==="app"?"block":"flex")) : "none"; }); }
-function showError(t,m){ $("#error-title").textContent=t; $("#error-msg").textContent=m||""; show("error-screen"); }
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.className="toast show"; setTimeout(()=>t.className="toast",3200); }
-function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("Não foi possível carregar o login.")); document.head.appendChild(s); setTimeout(()=>rej(new Error("Tempo esgotado ao carregar o login.")),15000); }); }
-
-async function init(){
-  try{
-    if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Publique a página."); return; }
-    await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
-    msalApp = new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
-    const resp = await msalApp.handleRedirectPromise();
-    account = resp?.account || msalApp.getAllAccounts()[0] || null;
-    if(!account){ show("gate"); $("#entrar").onclick = () => msalApp.loginRedirect({scopes:SCOPES_SITES}); return; }
-    await entrar();
-  }catch(e){ console.error(e); showError("Não foi possível iniciar o portal","Tente novamente ou contate a TI."); }
+function icon(name){return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[name]||ICONS.grid)+'</svg>';}
+function hydrateIcons(root=document){root.querySelectorAll('[data-icon]').forEach(el=>{el.outerHTML=icon(el.dataset.icon);});}
+const DEMO_APPS=[
+ {id:'demo-1',nome:'Planejamento Or\u00e7ament\u00e1rio',desc:'Planeje despesas e organize o or\u00e7amento da sua \u00e1rea.',categoria:'Financeiro',icone:'chart',status:'Ativo'},
+ {id:'demo-2',nome:'Reembolso de Despesas',desc:'Registre suas despesas e envie os comprovantes em um s\u00f3 lugar.',categoria:'Financeiro',icone:'receipt',status:'Ativo'},
+ {id:'demo-3',nome:'Solicita\u00e7\u00e3o de Projetos',desc:'Transforme ideias em iniciativas. Cadastre uma nova solicita\u00e7\u00e3o.',categoria:'Gest\u00e3o',icone:'briefcase',status:'Ativo'},
+ {id:'demo-4',nome:'Check-IN',desc:'Registre presen\u00e7as e facilite a organiza\u00e7\u00e3o das atividades.',categoria:'Pessoas',icone:'qr',status:'Ativo'},
+ {id:'demo-5',nome:'Ordem de Servi\u00e7o',desc:'Solicite manuten\u00e7\u00f5es e descreva a necessidade de atendimento.',categoria:'Opera\u00e7\u00f5es',icone:'tool',status:'Ativo'},
+ {id:'demo-6',nome:'Incidente de Seguran\u00e7a',desc:'Reporte ocorr\u00eancias e contribua para a prote\u00e7\u00e3o da informa\u00e7\u00e3o.',categoria:'Tecnologia',icone:'shield',status:'Ativo'},
+ {id:'demo-7',nome:'Cadastro de Colaboradores',desc:'Centralize informa\u00e7\u00f5es e simplifique os processos de pessoas.',categoria:'Pessoas',icone:'users',status:'Ativo'},
+ {id:'demo-8',nome:'PolyAgentes',desc:'Explore assistentes para apoiar consultas e tarefas do dia a dia.',categoria:'Tecnologia',icone:'brain',status:'Em implanta\u00e7\u00e3o'},
+ {id:'demo-9',nome:'Notebook Externo',desc:'Solicite a utiliza\u00e7\u00e3o de equipamentos fora da empresa.',categoria:'Tecnologia',icone:'laptop',status:'Ativo'},
+ {id:'demo-10',nome:'Indicadores Gerenciais',desc:'Encontre os pain\u00e9is e relat\u00f3rios para apoiar suas decis\u00f5es.',categoria:'Gest\u00e3o',icone:'chart',status:'Ativo'},
+ {id:'demo-11',nome:'Adiantamento de Viagem',desc:'Registre uma solicita\u00e7\u00e3o de adiantamento para viagens.',categoria:'Financeiro',icone:'wallet',status:'Ativo'},
+ {id:'demo-12',nome:'Controle de Visitantes',desc:'Organize o registro de visitantes e as informa\u00e7\u00f5es de acesso.',categoria:'Opera\u00e7\u00f5es',icone:'gate',status:'Manuten\u00e7\u00e3o'}
+].map((a,i)=>({...a,grupos:[],pasta:'',order:i}));
+const COLORS=[{tone:'#4564c6',tint:'#edf1fc'},{tone:'#288574',tint:'#e9f5f0'},{tone:'#8766b1',tint:'#f1edf8'},{tone:'#ad7f3d',tint:'#f9f3e7'},{tone:'#557a9d',tint:'#ebf2f8'}];
+function categoryMeta(cat){const n=norm(cat);if(n.includes('finance'))return {...COLORS[0],icon:'wallet'};if(n.includes('gest')||n.includes('projeto'))return {...COLORS[1],icon:'briefcase'};if(n.includes('pessoa')||n.includes('human')||n==='rh')return {...COLORS[2],icon:'users'};if(n.includes('opera')||n.includes('produ')||n.includes('logist'))return {...COLORS[3],icon:'layers'};if(n.includes('tecnol')||n==='ti')return {...COLORS[4],icon:'laptop'};if(n.includes('esg')||n.includes('ambien'))return {...COLORS[1],icon:'leaf'};let hash=0;for(const c of n)hash=(hash+c.charCodeAt(0))%COLORS.length;return {...COLORS[hash],icon:'folder'};}
+let msalApp=null,account=null,APPS=[],GROUPS=null,view='home',category='all',layout='grid';
+let favorites=new Set(),recents=[],toastTimer=null,storageKey='',photoObjectUrl=null,dialogSecondaryAction=null;
+function showScreen(id){['loading-screen','error-screen','login-screen','workspace'].forEach(x=>{document.getElementById(x).hidden=x!==id;});}
+function showError(title,message){$('#error-title').textContent=title;$('#error-message').textContent=message;showScreen('error-screen');}
+function toast(message){const el=$('#toast');clearTimeout(toastTimer);el.textContent=message;el.classList.add('show');toastTimer=setTimeout(()=>el.classList.remove('show'),3400);}
+function readStorage(){storageKey='polystell.apps.v2.'+(DEMO?'demo':account?.homeAccountId||account?.localAccountId||'guest');let saved=null;try{saved=JSON.parse(localStorage.getItem(storageKey)||'null');}catch{}favorites=new Set(Array.isArray(saved?.favorites)?saved.favorites.filter(x=>typeof x==='string'):(DEMO?['demo-1','demo-2','demo-4']:[]));recents=Array.isArray(saved?.recents)?saved.recents.filter(x=>x&&typeof x.id==='string'&&Number.isFinite(x.at)).slice(0,30):[];layout=saved?.layout==='list'?'list':'grid';}
+function persist(){try{localStorage.setItem(storageKey,JSON.stringify({favorites:[...favorites],recents,layout}));return true;}catch{toast('O navegador n\u00e3o permitiu salvar prefer\u00eancias. Elas valem apenas nesta sess\u00e3o.');return false;}}
+function allowed(app){if(!app.grupos.length)return true;if(GROUPS===null)return false;return app.grupos.some(g=>GROUPS.has(String(g).trim().toLowerCase()));}
+function myApps(){return APPS.filter(allowed);}
+function categories(apps=myApps()){return [...new Set(apps.map(a=>a.categoria))];}
+function getVisibleApps(){let apps=myApps();if(view==='favorites')apps=apps.filter(a=>favorites.has(a.id));if(view==='recent')apps=apps.filter(a=>recents.some(r=>r.id===a.id));const query=norm($('#search').value);if(category!=='all')apps=apps.filter(a=>a.categoria===category);if(query)apps=apps.filter(a=>norm(a.nome+' '+a.desc+' '+a.categoria).includes(query));const sort=$('#sort').value;if(sort==='az')apps.sort((a,b)=>collator.compare(a.nome,b.nome));else if(sort==='za')apps.sort((a,b)=>collator.compare(b.nome,a.nome));else if(sort==='category')apps.sort((a,b)=>collator.compare(a.categoria,b.categoria)||collator.compare(a.nome,b.nome));else if(view==='recent')apps.sort((a,b)=>(recents.find(r=>r.id===b.id)?.at||0)-(recents.find(r=>r.id===a.id)?.at||0));else apps.sort((a,b)=>a.order-b.order);return apps;}
+function navButton(label,ico,target,count){const active=target===view;return `<button class="nav-item" data-view="${esc(target)}"${active?' aria-current="page"':''}>${icon(ico)}<span class="nav-text">${esc(label)}</span>${count!=null?`<span class="nav-count">${count}</span>`:''}</button>`;}
+function renderNavigation(){const apps=myApps(),cats=categories(apps);$('#main-navigation').innerHTML=navButton('Vis\u00e3o geral','home','home')+navButton('Aplicativos','grid','catalog',apps.length)+navButton('Favoritos','star','favorites',apps.filter(a=>favorites.has(a.id)).length)+navButton('Acessos recentes','clock','recent');$('#category-navigation').innerHTML=cats.map(c=>`<button class="nav-item" data-category="${esc(c)}"${category===c?' aria-current="page"':''}>${icon(categoryMeta(c).icon)}<span class="nav-text">${esc(c)}</span><span class="nav-count">${apps.filter(a=>a.categoria===c).length}</span></button>`).join('');}
+function renderFilters(){const apps=myApps().filter(a=>view==='favorites'?favorites.has(a.id):view==='recent'?recents.some(r=>r.id===a.id):true);const cats=categories(apps);$('#category-filters').innerHTML=`<button class="filter-chip" data-category="all" aria-pressed="${category==='all'}">Todas as \u00e1reas <span>${apps.length}</span></button>`+cats.map(c=>`<button class="filter-chip" data-category="${esc(c)}" aria-pressed="${category===c}">${esc(c)} <span>${apps.filter(a=>a.categoria===c).length}</span></button>`).join('');}
+function appIcon(app){const meta=categoryMeta(app.categoria);return `<div class="app-icon" style="--tone:${meta.tone};--tint:${meta.tint}">${icon(app.icone)}</div>`;}
+function statusOf(app){const s=norm(app.status);return s==='manutencao'?{name:'Em manuten\u00e7\u00e3o',type:'maintenance',blocked:true}:s==='em implantacao'?{name:'Em implanta\u00e7\u00e3o',type:'deploy',blocked:false}:s==='ativo'?{name:'Ativo',type:'',blocked:false}:{name:app.status||'N\u00e3o informado',type:'unknown',blocked:false};}
+function appUrl(app){try{let raw=String(app.pasta||'').trim();if(!raw)return null;const base=DEMO?'https://preview.invalid/':location.origin+'/';const url=new URL(raw,base);if(!['https:','http:'].includes(url.protocol)||url.username||url.password)return null;return url.href;}catch{return null;}}
+function card(app){const state=statusOf(app),fav=favorites.has(app.id),url=DEMO?'#':appUrl(app);const unavailable=!DEMO&&!url;const appTitle=`${app.nome}${state.blocked?' \u2014 em manuten\u00e7\u00e3o':''}`;return `<article class="app-card${state.blocked?' is-maintenance':''}" data-app-id="${esc(app.id)}"><div class="card-top">${appIcon(app)}<div class="card-top-actions"><span class="status-badge ${state.type}" title="Status cadastrado no cat\u00e1logo; n\u00e3o representa monitoramento em tempo real.">${esc(state.name)}</span><button class="star-button" data-favorite="${esc(app.id)}" aria-pressed="${fav}" aria-label="${fav?'Remover':'Adicionar'} ${esc(app.nome)} ${fav?'dos':'aos'} favoritos" title="${fav?'Remover dos':'Adicionar aos'} favoritos">${icon('star')}</button></div></div><h3><a href="${esc(!state.blocked&&url?url:'#')}" data-open="${esc(app.id)}"${state.blocked?' aria-disabled="true"':''} aria-label="${esc(appTitle)}">${esc(app.nome)}</a></h3><p class="app-description">${esc(app.desc||'Acesse este aplicativo pelo seu cat\u00e1logo corporativo.')}</p><div class="card-footer"><span class="category-label">${icon(categoryMeta(app.categoria).icon)}${esc(app.categoria)}</span><span class="card-action">${state.blocked?'Indispon\u00edvel':unavailable?'Ver detalhes':'Acessar app'}${state.blocked?'':icon('arrow-up-right')}</span></div></article>`;}
+function renderFavorites(){const apps=myApps().filter(a=>favorites.has(a.id));const root=$('#favorite-shortcuts');if(!apps.length){root.className='favorite-empty';root.innerHTML=icon('star')+'<div><b>Seu dia, do seu jeito.</b><br>Marque a estrela de um aplicativo para deix\u00e1-lo sempre por perto.</div>';return;}root.className='favorites-grid';root.innerHTML=apps.slice(0,3).map(a=>`<article class="favorite-card">${appIcon(a)}<div class="favorite-body"><h3>${esc(a.nome)}</h3><p>${esc(a.categoria)}</p></div><button class="favorite-open" data-open="${esc(a.id)}" aria-label="Acessar ${esc(a.nome)}">${icon('arrow-up-right')}</button></article>`).join('');}
+function renderCards(){const apps=getVisibleApps(),all=myApps(),q=$('#search').value.trim();$('#app-grid').classList.toggle('list-view',layout==='list');$('#grid-view').setAttribute('aria-pressed',String(layout==='grid'));$('#list-view').setAttribute('aria-pressed',String(layout==='list'));$('#result-count').textContent=apps.length;$('#clear-search').hidden=!q;$('#search-shortcut').hidden=!!q;$('#clear-history').hidden=view!=='recent'||!recents.length;
+ let title=view==='favorites'?'Seus favoritos':view==='recent'?'Acessados recentemente':category!=='all'?category:'Todos os aplicativos';if(q)title='Resultados da busca';$('#catalog-title').textContent=title;
+ $('#catalog-subtitle').textContent=q?`Resultados para \u201c${q}\u201d`:(view==='favorites'?'Seus atalhos, salvos neste navegador.':view==='recent'?'Aplicativos abertos por voc\u00ea neste navegador.':'Encontre a ferramenta certa para cada tarefa.');
+ $('#app-grid').innerHTML=apps.length?apps.map(card).join(''):`<div class="empty-state">${icon(q?'search':view==='favorites'?'star':'grid')}<h3>${q?'Nenhum aplicativo encontrado':view==='favorites'?'Seus favoritos come\u00e7am aqui':view==='recent'?'Seu hist\u00f3rico ainda est\u00e1 vazio':'Nenhum aplicativo nesta visualiza\u00e7\u00e3o'}</h3><p>${q?'Tente outro nome, descri\u00e7\u00e3o ou \u00e1rea.':view==='favorites'?'Marque a estrela nos aplicativos que voc\u00ea mais utiliza.':view==='recent'?'Ao abrir um aplicativo pelo portal, ele aparecer\u00e1 aqui.':'Verifique os filtros ou fale com a TI sobre o seu acesso.'}</p><button class="button" data-action="reset-filters">${q?'Limpar busca e filtros':'Ver todos os aplicativos'}</button></div>`;
+ $('#result-summary').textContent=`${apps.length} ${apps.length===1?'aplicativo exibido':'aplicativos exibidos'} \u00b7 ${all.length} no seu cat\u00e1logo${DEMO?' ilustrativo':''}`;
 }
-
-async function entrar(){
-  const nome = account.name || account.username || "";
-  $("#uini").textContent = nome.split(" ").filter(Boolean).slice(0,2).map(p=>p[0]).join("").toUpperCase();
-  $("#unome").textContent = nome;
-  $("#logout").onclick = () => { sessionStorage.clear(); msalApp.logoutRedirect(); };
-  const h = new Date().getHours();
-  $("#hello").textContent = (h<12?"Bom dia":h<18?"Boa tarde":"Boa noite") + (nome?", "+nome.split(" ")[0]:"") + "!";
-  $("#hoje").textContent = new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  carregarFoto();
-  await Promise.all([carregarCatalogo(), carregarGrupos()]);
-  show("app"); render();
-}
-
-async function carregarFoto(){
-  try{
-    const t = await token(["User.Read"]);
-    const r = await fetch("https://graph.microsoft.com/v1.0/me/photos/96x96/$value",{headers:{Authorization:`Bearer ${t}`}});
-    if(!r.ok) return;
-    const img = $("#ufoto");
-    img.src = URL.createObjectURL(await r.blob());
-    img.style.display = "block";
-    $("#uini").style.display = "none";
-  }catch(e){}
-}
-async function token(scopes){ const req={scopes,account}; try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; } }
-async function graph(url,scopes){ const t=await token(scopes||SCOPES_SITES); const r=await fetch(url,{headers:{Authorization:`Bearer ${t}`}}); if(!r.ok) throw new Error(`Graph ${r.status}: ${(await r.text()).slice(0,200)}`); return r.json(); }
-
-async function carregarCatalogo(){
-  const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
-  let lista;
-  try{ lista = await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${encodeURIComponent(CONFIG.listaCatalogo)}`); }
-  catch{ const r = await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists?$filter=displayName eq '${CONFIG.listaCatalogo}'`); lista = (r.value||[])[0]; }
-  if(!lista) throw new Error("Lista do catálogo não encontrada");
-  let itens = [], next = `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${lista.id}/items?$expand=fields&$top=200`;
-  while(next){ const page = await graph(next); itens = itens.concat(page.value||[]); next = page["@odata.nextLink"]||null; }
-  APPS = itens.map(it => {
-    const f = it.fields || {};
-    return {
-      nome: f.NOME || f.Title || "",
-      pasta: f.PASTA || "",
-      categoria: (f.CATEGORIA && f.CATEGORIA.Value) || f.CATEGORIA || "Outros",
-      desc: f.DESCRICAO || "",
-      icone: String(f.ICONE||"grid").trim().toLowerCase(),
-      grupos: String(f.GRUPOS||"").split(";").map(s=>s.trim()).filter(Boolean),
-      status: String((f.STATUS && f.STATUS.Value) || f.STATUS || "Ativo").trim()
-    };
-  }).filter(a => a.nome && a.status !== "Inativo");
-}
-
-async function carregarGrupos(){
-  try{
-    let nomes = [], next = `https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=displayName&$top=999`;
-    while(next){ const page = await graph(next, SCOPES_GROUPS.concat(["User.Read"])); nomes = nomes.concat((page.value||[]).map(g=>String(g.displayName||""))); next = page["@odata.nextLink"]||null; }
-    MEUS_GRUPOS = nomes.map(n=>n.toLowerCase());
-  }catch(e){ console.warn("Sem leitura de grupos:", e.message); MEUS_GRUPOS = null; }
-}
-
-function podeVer(app){
-  if(!app.grupos.length) return true;
-  if(MEUS_GRUPOS === null) return false;
-  return app.grupos.some(g => MEUS_GRUPOS.includes(g.toLowerCase()));
-}
-function urlDe(app){ return /^https?:\/\//i.test(app.pasta) ? app.pasta : (location.origin + app.pasta); }
-
-function render(){
-  const meus = APPS.filter(podeVer);
-  const cats = [...new Set(meus.map(a=>a.categoria))];
-  if(CAT!=="Todos" && !cats.includes(CAT)) CAT="Todos";
-  $("#nav").innerHTML = [`<div class="lbl">Menu</div><button aria-pressed="${CAT==="Todos"}" data-c="Todos"><span>Todos os aplicativos</span><span class="n">${meus.length}</span></button>`]
-    .concat(cats.map(c=>`<button aria-pressed="${CAT===c}" data-c="${esc(c)}"><span>${esc(c)}</span><span class="n">${meus.filter(a=>a.categoria===c).length}</span></button>`)).join("");
-
-  const q = ($("#q").value||"").trim().toLowerCase();
-  const vis = meus.filter(a => (CAT==="Todos"||a.categoria===CAT) && (!q || a.nome.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)));
-  const vcats = [...new Set(vis.map(a=>a.categoria))];
-  $("#tiles").innerHTML = vcats.map(c => `<h2 class="cat">${esc(c)}</h2><div class="grid">${vis.filter(a=>a.categoria===c).map(tile).join("")}</div>`).join("")
-    || `<div class="empty">Nenhum aplicativo encontrado${q?" para \""+esc(q)+"\"":""}.</div>`;
-  $("#notice").innerHTML = (MEUS_GRUPOS===null && APPS.some(a=>a.grupos.length))
-    ? `<div class="notice">Alguns aplicativos restritos podem não aparecer: a leitura de grupos ainda não foi autorizada pela TI.</div>` : "";
-}
-function tile(a){
-  const man = a.status === "Manutenção";
-  const badge = a.status === "Em implantação" ? `<span class="badge impl">Em implantação</span>` : man ? `<span class="badge man">Em manutenção</span>` : "";
-  const cls = badge ? "tile has-badge" : "tile";
-  const inner = `${badge}<span class="ico"><svg viewBox="0 0 24 24">${ICONS[a.icone]||ICONS.grid}</svg></span><span style="min-width:0"><b>${esc(a.nome)}</b><span class="d">${esc(a.desc)}</span></span>`;
-  if(man) return `<button type="button" class="${cls}" aria-disabled="true" onclick="toast('${esc(a.nome)} está em manutenção. Tente mais tarde.')">${inner}</button>`;
-  return `<a class="${cls}" href="${esc(urlDe(a))}">${inner}</a>`;
-}
-$("#q").addEventListener("input", render);
-$("#nav").addEventListener("click", e => { const b = e.target.closest("[data-c]"); if(b){ CAT = b.dataset.c; render(); } });
+function render({navigation=true}={}){const query=!!$('#search').value.trim();const home=view==='home'&&category==='all'&&!query;$('#hero').hidden=!home;$('#favorites-section').hidden=!home;$('#app-count').textContent=myApps().length;$('#category-count').textContent=categories().length;$('#breadcrumb-page').textContent=view==='home'?'Vis\u00e3o geral':view==='favorites'?'Favoritos':view==='recent'?'Recentes':'Aplicativos';if(navigation){renderNavigation();renderFilters();}renderFavorites();renderCards();$('#group-notice').hidden=DEMO||GROUPS!==null||!APPS.some(a=>a.grupos.length);}
+function navigate(next,cat='all'){view=next;category=cat;$('#search').value='';render();closeMobileMenu(false);window.scrollTo({top:0,behavior:'auto'});}
+function preserveFocusAfterRender(selector){const scroll=window.scrollY;render();const target=document.querySelector(selector);if(target)target.focus({preventScroll:true});window.scrollTo({top:scroll,behavior:'auto'});}
+function toggleFavorite(id){const app=myApps().find(a=>a.id===id);if(!app)return;if(favorites.has(id)){favorites.delete(id);toast('Aplicativo removido dos favoritos.');}else{favorites.add(id);toast('Aplicativo adicionado aos favoritos.');}persist();preserveFocusAfterRender('[data-favorite="'+CSS.escape(id)+'"]');}
+function rememberApp(id){recents=[{id,at:Date.now()},...recents.filter(r=>r.id!==id)].slice(0,30);persist();}
+function openApp(id,event){const app=myApps().find(a=>a.id===id);if(!app){event?.preventDefault();return;}const state=statusOf(app);if(state.blocked){event?.preventDefault();openDialog('Aplicativo em manuten\u00e7\u00e3o',`<p><strong>${esc(app.nome)}</strong> est\u00e1 sinalizado como em manuten\u00e7\u00e3o no cat\u00e1logo.</p><p>Tente novamente mais tarde. Para orienta\u00e7\u00e3o, entre em contato com a TI.</p>`,'tool');return;}if(DEMO){event?.preventDefault();rememberApp(id);openDialog(app.nome,`<p>${esc(app.desc)}</p><div class="dialog-note"><strong>Esta \u00e9 uma demonstra\u00e7\u00e3o de navega\u00e7\u00e3o.</strong><br>Na vers\u00e3o publicada, o cart\u00e3o abre o endere\u00e7o definido no campo PASTA do cat\u00e1logo. Nenhum aplicativo real foi aberto e nenhum dado corporativo foi consultado.</div>`,app.icone);renderNavigation();return;}const url=appUrl(app);if(!url){event?.preventDefault();openDialog('Endere\u00e7o n\u00e3o configurado',`<p>O aplicativo <strong>${esc(app.nome)}</strong> n\u00e3o tem um endere\u00e7o HTTP/HTTPS v\u00e1lido no campo PASTA.</p><p>Solicite a revis\u00e3o do cadastro \u00e0 TI.</p>`,'alert');return;}rememberApp(id);if(event?.currentTarget instanceof HTMLAnchorElement)return;if(event?.target?.closest('a[data-open]'))return;location.assign(url);}
+function openDialog(title,body,ico='help',secondary=null){$('#dialog-title').textContent=title;$('#dialog-content').innerHTML=body;$('#dialog-icon').innerHTML=icon(ico);const button=$('#dialog-secondary');button.hidden=!secondary;dialogSecondaryAction=secondary?.action||null;if(secondary)button.textContent=secondary.label;if(!$('#dialog').open)$('#dialog').showModal();}
+function showHelp(){const support=appUrl({pasta:CONFIG.supportUrl});const body='<p>Precisa de acesso a um aplicativo ou encontrou alguma dificuldade? Informe \u00e0 TI o nome do aplicativo e uma breve descri\u00e7\u00e3o da sua necessidade.</p><div class="dialog-note">'+(support?'Use o canal de suporte oficial da empresa para registrar sua solicita\u00e7\u00e3o.':'O endere\u00e7o da central de atendimento ainda n\u00e3o foi configurado nesta proposta. Utilize o canal interno habitual da TI. Nenhuma solicita\u00e7\u00e3o \u00e9 enviada por esta janela.')+'</div>';openDialog('Como podemos ajudar?',body,'headphones',support?{label:'Abrir central de atendimento',action:()=>window.open(support,'_blank','noopener,noreferrer')}:null);}
+function aboutDemo(){openDialog('Conhe\u00e7a seu novo ambiente','<p>Esta vers\u00e3o permite experimentar a busca, os filtros, os favoritos, os acessos recentes e a visualiza\u00e7\u00e3o em lista.</p><p>Os nomes, descri\u00e7\u00f5es e status dos aplicativos s\u00e3o <strong>exemplos ilustrativos</strong>. N\u00e3o foram obtidos do seu SharePoint.</p><div class="dialog-note">Favoritos e hist\u00f3rico ficam somente neste navegador. A demonstra\u00e7\u00e3o n\u00e3o autentica, n\u00e3o recebe permiss\u00f5es e n\u00e3o consulta dados corporativos.</div>','grid',{label:'Visualizar tela de entrada',action:()=>{$('#dialog').close();showLogin(true);}});}
+function openMobileMenu(){$('#sidebar').inert=false;$('#sidebar').removeAttribute('aria-hidden');$('#sidebar').classList.add('open');$('#mobile-backdrop').hidden=false;$('#menu-toggle').setAttribute('aria-expanded','true');document.body.style.overflow='hidden';$('#sidebar').querySelector('button')?.focus();}
+function closeMobileMenu(restoreFocus=true){const wasOpen=$('#sidebar').classList.contains('open');$('#sidebar').classList.remove('open');syncSidebar();$('#mobile-backdrop').hidden=true;$('#menu-toggle').setAttribute('aria-expanded','false');document.body.style.overflow='';if(wasOpen&&restoreFocus)$('#menu-toggle').focus();}
+function syncSidebar(){const offscreen=innerWidth<=820&&!$('#sidebar').classList.contains('open');$('#sidebar').inert=offscreen;if(offscreen)$('#sidebar').setAttribute('aria-hidden','true');else $('#sidebar').removeAttribute('aria-hidden');}
+function setupIdentity(){const name=account?.name||account?.username||'Colaborador';const parts=name.split(/\s+/).filter(Boolean);$('#user-name').textContent=name;$('#user-email').textContent=DEMO?'Perfil de demonstra\u00e7\u00e3o':account?.username||'Conta corporativa';$('#user-initials').textContent=(parts[0]?.[0]||'')+(parts.length>1?parts[parts.length-1][0]:'');const hour=new Date().getHours();$('#greeting').textContent=(hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite')+', '+(parts[0]||'colaborador')+'.';const now=new Date();$('#today').textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});$('#today').dateTime=now.toISOString().slice(0,10);$('#preview-tag').hidden=!DEMO;$('#sidebar-mode').textContent=DEMO?'Pr\u00e9via sem dados corporativos':'Identidade Microsoft 365';$('#footer-message').textContent=DEMO?'Cat\u00e1logo ilustrativo. Nenhum dado corporativo foi consultado.':'Seu cat\u00e1logo \u00e9 personalizado conforme o seu perfil de acesso.';$('#sign-out-label').textContent=DEMO?'Visualizar tela de entrada':'Sair da conta';}
+function setupLogos(){document.querySelectorAll('[data-logo]').forEach(img=>{img.addEventListener('load',()=>{img.hidden=false;img.nextElementSibling.hidden=true;});img.addEventListener('error',()=>{img.hidden=true;img.nextElementSibling.hidden=false;});img.src=CONFIG.logoUrl;});}
+function showLogin(isPreview=false){showScreen('login-screen');$('#login-preview-note').hidden=!isPreview;$('#sign-in-label').textContent=isPreview?'Explorar demonstra\u00e7\u00e3o':'Entrar com Microsoft';}
+function startDemo(){account={name:'Leonardo Carolino',username:'',homeAccountId:'demo'};APPS=DEMO_APPS.map(a=>({...a}));GROUPS=new Set();readStorage();setupIdentity();view='home';category='all';$('#search').value='';showScreen('workspace');render();}
+function loadScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');let timer=setTimeout(()=>{script.remove();reject(new Error('Tempo esgotado ao carregar a biblioteca Microsoft.'));},15000);script.src=src;script.onload=()=>{clearTimeout(timer);resolve();};script.onerror=()=>{clearTimeout(timer);reject(new Error('N\u00e3o foi poss\u00edvel carregar a biblioteca Microsoft.'));};document.head.appendChild(script);});}
+async function token(scopes){const result=await msalApp.acquireTokenSilent({scopes,account});return result.accessToken;}
+async function graph(path,scopes=CONFIG.siteScopes,headers={}){const url=new URL(path.startsWith('https://')?path:'https://graph.microsoft.com/v1.0'+path);if(url.origin!=='https://graph.microsoft.com')throw new Error('Destino de API n\u00e3o autorizado.');const accessToken=await token(scopes);for(let attempt=0;attempt<3;attempt++){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);let response;try{response=await fetch(url,{headers:{Authorization:'Bearer '+accessToken,...headers},signal:controller.signal});}finally{clearTimeout(timer);}if([429,503,504].includes(response.status)&&attempt<2){const retryAfter=Number(response.headers.get('Retry-After'));if(retryAfter>5)throw Object.assign(new Error('A API pediu para tentar novamente mais tarde.'),{status:response.status});await new Promise(resolve=>setTimeout(resolve,Math.max(1,retryAfter||attempt+1)*1000));continue;}if(!response.ok)throw Object.assign(new Error('Microsoft Graph retornou '+response.status),{status:response.status});return response.json();}throw new Error('Falha ao consultar o Microsoft Graph.');}
+async function loadCatalog(){const site=await graph('/sites/'+CONFIG.siteHost+':'+CONFIG.sitePath);let list;try{list=await graph('/sites/'+site.id+'/lists/'+encodeURIComponent(CONFIG.listaCatalogo));}catch(error){if(![400,404].includes(error.status))throw error;const filter="displayName eq '"+CONFIG.listaCatalogo.replace(/'/g,"''")+"'";const lists=await graph('/sites/'+site.id+'/lists?$filter='+encodeURIComponent(filter));list=lists.value?.[0];}if(!list)throw new Error('A lista do cat\u00e1logo n\u00e3o foi encontrada.');let items=[],next='/sites/'+site.id+'/lists/'+list.id+'/items?$expand=fields&$top=200';while(next){const page=await graph(next);items.push(...(page.value||[]));next=page['@odata.nextLink']||null;}APPS=items.map((item,i)=>{const f=item.fields||{};return{id:String(item.id),nome:asText(f.NOME||f.Title),pasta:asText(f.PASTA?.Url||f.PASTA?.url||f.PASTA),categoria:asText(f.CATEGORIA)||'Outros',desc:asText(f.DESCRICAO),icone:asText(f.ICONE||'grid').toLowerCase(),grupos:asText(f.GRUPOS).split(';').map(s=>s.trim()).filter(Boolean),status:asText(f.STATUS)||'Ativo',order:i};}).filter(a=>a.nome&&norm(a.status)!=='inativo');}
+async function loadGroups(){try{let next='/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName&$count=true&$top=999';const values=[];while(next){const page=await graph(next,CONFIG.groupScopes,{ConsistencyLevel:'eventual'});values.push(...(page.value||[]));next=page['@odata.nextLink']||null;}GROUPS=new Set(values.flatMap(g=>[String(g.id||''),String(g.displayName||'')]).filter(Boolean).map(s=>s.toLowerCase()));}catch(error){GROUPS=null;console.warn('Leitura de grupos indisponivel:',error?.message||'erro');}}
+async function loadPhoto(){try{const accessToken=await token(['User.Read']);const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);let response;try{response=await fetch('https://graph.microsoft.com/v1.0/me/photos/96x96/$value',{headers:{Authorization:'Bearer '+accessToken},signal:controller.signal});}finally{clearTimeout(timer);}if(!response.ok)return;if(photoObjectUrl)URL.revokeObjectURL(photoObjectUrl);photoObjectUrl=URL.createObjectURL(await response.blob());const img=$('#user-photo');img.onload=()=>{img.hidden=false;$('#user-initials').hidden=true;};img.src=photoObjectUrl;}catch{ /* Photo is optional; initials remain available. */ }}
+async function startLive(){readStorage();setupIdentity();await loadCatalog();await loadGroups();showScreen('workspace');render();loadPhoto();}
+async function init(){hydrateIcons();setupLogos();syncSidebar();if(DEMO){if(params.get('login')==='1')showLogin(true);else startDemo();return;}if(location.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(location.hostname)){showError('Publique em HTTPS','A identidade corporativa exige um ambiente HTTPS. Abra o arquivo local para visualizar a demonstra\u00e7\u00e3o.');return;}try{await loadScript(CONFIG.msalUrl);msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:'https://login.microsoftonline.com/'+CONFIG.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});if(typeof msalApp.initialize==='function')await msalApp.initialize();const redirect=await msalApp.handleRedirectPromise();account=redirect?.account||msalApp.getActiveAccount()||msalApp.getAllAccounts()[0]||null;if(!account){showLogin();return;}msalApp.setActiveAccount(account);await startLive();}catch(error){console.error('Falha ao iniciar portal:',error?.message||'erro');if(window.msal&&error instanceof msal.InteractionRequiredAuthError){showLogin();$('#sign-in-label').textContent='Continuar com Microsoft';return;}showError('N\u00e3o foi poss\u00edvel abrir seu ambiente','Verifique sua conex\u00e3o e as permiss\u00f5es do cat\u00e1logo. Se o problema persistir, contate a TI.');}}
+// Events use delegation; catalog content never becomes executable event attributes.
+document.addEventListener('click',event=>{const open=event.target.closest('[data-open]');if(open){openApp(open.dataset.open,event);return;}const fav=event.target.closest('[data-favorite]');if(fav){toggleFavorite(fav.dataset.favorite);return;}const nav=event.target.closest('[data-view]');if(nav){const target=nav.dataset.view;navigate(target);(innerWidth<=820?$('#main-content'):document.querySelector('[data-view="'+target+'"]'))?.focus({preventScroll:true});return;}const cat=event.target.closest('[data-category]');if(cat){const target=cat.dataset.category;const inSidebar=!!cat.closest('#sidebar');if(inSidebar)navigate('catalog',target);else{category=target;if(view==='home')view='catalog';render();}const root=inSidebar?'#category-navigation':'#category-filters';(inSidebar&&innerWidth<=820?$('#main-content'):document.querySelector(root+' [data-category="'+CSS.escape(target)+'"]'))?.focus({preventScroll:true});return;}const action=event.target.closest('[data-action]')?.dataset.action;if(action==='help')showHelp();if(action==='about-demo')aboutDemo();if(action==='view-favorites')navigate('favorites');if(action==='reset-filters')navigate('catalog');if(!event.target.closest('#user-trigger')&&!event.target.closest('#user-menu')){$('#user-menu').hidden=true;$('#user-trigger').setAttribute('aria-expanded','false');}});
+document.addEventListener('auxclick',event=>{if(event.button!==1)return;const open=event.target.closest('[data-open]');if(open)openApp(open.dataset.open,event);});
+$('#search').addEventListener('input',()=>{render({navigation:false});});
+$('#clear-search').addEventListener('click',()=>{$('#search').value='';render({navigation:false});$('#search').focus();});
+$('#sort').addEventListener('change',renderCards);
+$('#grid-view').addEventListener('click',()=>{layout='grid';persist();renderCards();});
+$('#list-view').addEventListener('click',()=>{layout='list';persist();renderCards();});
+$('#explore-catalog').addEventListener('click',()=>{$('#catalog-section').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});
+$('#menu-toggle').addEventListener('click',()=>{$('#sidebar').classList.contains('open')?closeMobileMenu():openMobileMenu();});
+$('#mobile-backdrop').addEventListener('click',()=>closeMobileMenu());
+$('#user-trigger').addEventListener('click',()=>{const menu=$('#user-menu');menu.hidden=!menu.hidden;$('#user-trigger').setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)$('#sign-out').focus();});
+$('#sign-out').addEventListener('click',async()=>{$('#user-menu').hidden=true;$('#user-trigger').setAttribute('aria-expanded','false');if(DEMO){showLogin(true);return;}try{if(photoObjectUrl)URL.revokeObjectURL(photoObjectUrl);await msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});}catch{toast('N\u00e3o foi poss\u00edvel encerrar a sess\u00e3o. Tente novamente.');}});
+$('#sign-in').addEventListener('click',async()=>{if(DEMO){startDemo();return;}if(!msalApp)return;try{await msalApp.loginRedirect({scopes:[...CONFIG.siteScopes,'User.Read']});}catch{toast('N\u00e3o foi poss\u00edvel iniciar a autentica\u00e7\u00e3o. Tente novamente.');}});
+$('#authorize-groups').addEventListener('click',async()=>{if(DEMO)return;const button=$('#authorize-groups');button.disabled=true;try{await msalApp.acquireTokenPopup({scopes:CONFIG.groupScopes,account});await loadGroups();render();toast(GROUPS===null?'A leitura de grupos continua indispon\u00edvel. Consulte a TI.':'Permiss\u00f5es verificadas. Cat\u00e1logo atualizado.');}catch{toast('A permiss\u00e3o n\u00e3o foi concedida. Consulte a TI.');}finally{button.disabled=false;}});
+$('#clear-history').addEventListener('click',()=>{openDialog('Limpar acessos recentes?','<p>Isso remove somente o hist\u00f3rico deste portal, para esta conta e neste navegador. Seus favoritos ser\u00e3o mantidos.</p>','clock',{label:'Limpar hist\u00f3rico',action:()=>{recents=[];persist();render();$('#dialog').close();toast('Hist\u00f3rico local removido.');}});});
+$('#dialog-close').addEventListener('click',()=>$('#dialog').close());
+$('#dialog-secondary').addEventListener('click',()=>dialogSecondaryAction?.());
+$('#dialog').addEventListener('click',event=>{if(event.target===$('#dialog')){const r=$('#dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('#dialog').close();}});
+$('#retry').addEventListener('click',()=>location.reload());
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!$('#workspace').hidden){event.preventDefault();if($('#dialog').open)return;closeMobileMenu(false);$('#search').focus();$('#search').select();}if(event.key==='Escape'){if(!$('#user-menu').hidden){$('#user-menu').hidden=true;$('#user-trigger').setAttribute('aria-expanded','false');$('#user-trigger').focus();}if($('#sidebar').classList.contains('open'))closeMobileMenu();}if(event.key==='Tab'&&$('#sidebar').classList.contains('open')&&!$('#dialog').open){const focusable=[...$('#sidebar').querySelectorAll('button,a')].filter(el=>!el.disabled&&el.offsetParent!==null);const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}});
+window.addEventListener('resize',()=>{if(innerWidth>820&&$('#sidebar').classList.contains('open'))closeMobileMenu(false);syncSidebar();});
+window.addEventListener('storage',event=>{if(event.key===storageKey){readStorage();render();}});
+window.addEventListener('pagehide',()=>{if(photoObjectUrl)URL.revokeObjectURL(photoObjectUrl);});
 init();
 </script>
 </body>
