@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Portaria · Leitura de crachá | Polystell</title>
+<style>
+:root{--primary:#2141A2;--ok:#1fa374;--err:#d8513f;--warn:#d9a23a;--font:"Open Sans","Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);background:#0D1A41;color:#eef1fa;min-height:100dvh;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.5}
+[hidden]{display:none!important}
+header{display:flex;align-items:center;gap:10px;padding:14px 16px}
+header img{height:26px}
+header b{font-size:15px}
+header .porteiro{margin-left:auto;font-size:11px;color:#aebadb;background:#ffffff12;border:0;border-radius:99px;padding:6px 12px}
+.wrap{flex:1;display:flex;flex-direction:column;padding:0 16px 20px;max-width:480px;width:100%;margin:0 auto}
+.cam{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:1/1;box-shadow:0 10px 30px #00000055}
+.cam video{width:100%;height:100%;object-fit:cover}
+.cam .mira{position:absolute;inset:14%;border:3px solid #ffffffd0;border-radius:18px;box-shadow:0 0 0 999px #0d1a4166;pointer-events:none}
+.cam .hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:12px;color:#fff;text-shadow:0 1px 4px #000}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:52px;border-radius:13px;border:0;background:#ffffff14;color:#fff;font-weight:700;font-size:15px;margin-top:11px}
+.btn.primary{background:var(--primary)}
+.btn.ok{background:var(--ok)}
+.btn.err{background:var(--err)}
+.btn.line{background:transparent;border:1px solid #ffffff2e}
+.card{background:#fff;color:#1c2740;border-radius:18px;padding:20px;margin-top:14px;box-shadow:0 14px 40px #00000040}
+.card h2{margin:0 0 4px;font-size:18px}
+.card .meta{color:#67718a;font-size:13px;line-height:1.6}
+.card .alert{background:#f9e7e4;color:#b23c2e;border-radius:10px;padding:10px 13px;font-size:13px;font-weight:600;margin-top:10px;line-height:1.5}
+.card .okbox{background:#e3f2ec;color:#1e7d5f;border-radius:10px;padding:10px 13px;font-size:13px;font-weight:600;margin-top:10px}
+.modais{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.modais button{border:1px solid #dde1ea;background:#fff;border-radius:11px;padding:12px 8px;font-size:13px;font-weight:600;color:#55607c}
+.modais button.on{background:#e7ecfa;border-color:var(--primary);color:var(--primary)}
+.manual{margin-top:12px;display:flex;gap:8px}
+.manual input{flex:1;border:1px solid #ffffff2e;background:#ffffff10;border-radius:12px;padding:12px 14px;color:#fff;font-size:15px}
+.manual input::placeholder{color:#8e9bbd}
+.manual button{border:0;background:#ffffff1c;border-radius:12px;padding:0 18px;font-weight:700}
+.toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,14px);background:#fff;color:#15223f;padding:12px 17px;border-radius:11px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;z-index:90;max-width:88vw;box-shadow:0 10px 30px #00000050}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:#d8513f;color:#fff}
+.gate{flex:1;display:grid;place-items:center;padding:24px;text-align:center}
+.gate .in{max-width:320px;width:100%}
+.gate img{max-width:150px;margin-bottom:14px}
+.gate p{color:#aebadb;font-size:13px;line-height:1.7}
+.spin{width:28px;height:28px;border:3px solid #ffffff28;border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;margin:14px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.field{margin-top:12px;text-align:left}
+.field label{display:block;font-size:12px;font-weight:700;color:#4a5571;margin-bottom:5px}
+.field input{width:100%;border:1px solid #dde1ea;border-radius:10px;padding:11px 12px;font-size:15px;color:#1c2740}
+</style>
+</head>
+<body>
+<header><img src="../logo-polystell.png" alt="Polystell" onerror="this.hidden=true"><b>Leitura · Portaria</b><button class="porteiro" id="pbtn">👤 <span id="pnome">porteiro</span></button></header>
+
+<div id="gate" class="gate"><div class="in">
+ <img src="../logo-polystell.png" alt="" onerror="this.hidden=true">
+ <p id="gmsg">Entre com a conta da portaria para usar o leitor.</p>
+ <div class="spin" id="gspin" hidden></div>
+ <button class="btn primary" id="gbtn">Entrar com Microsoft</button>
+</div></div>
+
+<div id="app" class="wrap" hidden>
+ <div class="cam"><video id="video" playsinline muted></video><div class="mira"></div><div class="hint" id="camhint">Aponte para o QR do crachá ou do convite</div></div>
+ <div class="manual"><input id="mcode" placeholder="Ou digite matrícula / código do convite" autocomplete="off"><button id="mgo">OK</button></div>
+ <div id="result"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* Leitor QR da portaria (celular Polystell).
+   QR do crachá: PSTL|C|<matricula>|<verificador>  ·  QR do convite: PSTL|A|<codigo>
+   Também aceita matrícula ou código digitados/lidos sem o prefixo. */
+const CONFIG=Object.freeze({
+ clientId:'c066630d-9dc2-4c4a-8c60-8f0056e9e5e2',
+ tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
+ siteHost:'polystellcombr.sharepoint.com', sitePath:'/sites/Apps',
+ scopes:['Sites.ReadWrite.All','User.Read'],
+ msalUrl:'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js',
+ jsqrUrl:'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js',
+ listas:{movP:'09_Mov_Pessoas',agend:'09_Agendamentos',colab:'00_Cadastro_Colaborador',params:'00_Parametros_Apps'}
+});
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const todayLocal=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const hhmm=d=>d?new Date(d).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—';
+function verif(mat){let h=7;for(const c of String(mat))h=(h*31+c.charCodeAt(0))%1296;return h.toString(36).padStart(2,'0').toUpperCase();}
+let msalApp=null,account=null,SITE=null,LISTS={},PARAMS={},toastT=null,scanning=false,lastCode='',lastAt=0,busy=false;
+function toast(m,err){const t=$('#toast');clearTimeout(toastT);t.textContent=m;t.className='toast show'+(err?' err':'');toastT=setTimeout(()=>t.classList.remove('show'),3600);}
+async function token(){return (await msalApp.acquireTokenSilent({scopes:CONFIG.scopes,account})).accessToken;}
+async function graph(path,opt={}){
+ const url=new URL(path.startsWith('https://')?path:'https://graph.microsoft.com/v1.0'+path);
+ if(url.origin!=='https://graph.microsoft.com')throw new Error('Destino não autorizado');
+ const t=await token();
+ const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),25000);let r;
+ try{r=await fetch(url,{method:opt.method||'GET',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json',Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'},body:opt.body?JSON.stringify(opt.body):undefined,signal:ctl.signal});}finally{clearTimeout(tm);}
+ if(r.status===204)return null;
+ if(!r.ok){let d='';try{d=(await r.json())?.error?.message||'';}catch{}throw new Error('Graph '+r.status+(d?' — '+d:''));}
+ return r.json();
+}
+const F=it=>({id:it.id,...(it.fields||{})});
+async function boot(){
+ SITE=(await graph('/sites/'+CONFIG.siteHost+':'+CONFIG.sitePath)).id;
+ const ls=await graph('/sites/'+SITE+'/lists?$select=id,name,displayName&$top=200');
+ const by={};(ls.value||[]).forEach(l=>by[l.displayName]=l.id);
+ for(const[k,n]of Object.entries(CONFIG.listas)){LISTS[k]=by[n];if(!LISTS[k])throw new Error('Lista não encontrada: '+n);}
+ try{const ps=await graph('/sites/'+SITE+'/lists/'+LISTS.params+'/items?$expand=fields&$top=200');
+  (ps.value||[]).map(F).filter(p=>norm(p.APP?.Value||p.APP)==='portaria'&&p.ATIVO!==false).forEach(p=>PARAMS[p.CHAVE]=p.VALOR??'1');}catch{}
+}
+const paramOn=k=>!(k in PARAMS)||!['0','false','nao','não'].includes(norm(PARAMS[k]));
+const PKEY='polystell.portaria.porteiro';
+function porteiro(){try{return localStorage.getItem(PKEY)||'';}catch{return'';}}
+function askPorteiro(){const v=prompt('Nome do porteiro no posto:',porteiro());if(v&&v.trim()){try{localStorage.setItem(PKEY,v.trim());}catch{}$('#pnome').textContent=v.trim();}}
+/* ---------- câmera ---------- */
+let detector=null,videoTrack=null;
+async function startCam(){
+ const video=$('#video');
+ try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}},audio:false});
+  video.srcObject=st;videoTrack=st.getVideoTracks()[0];await video.play();}
+ catch(e){$('#camhint').textContent='Câmera indisponível — use o campo abaixo.';return;}
+ if('BarcodeDetector'in window){try{detector=new BarcodeDetector({formats:['qr_code']});}catch{}}
+ if(!detector){try{await new Promise((ok,no)=>{const s=document.createElement('script');s.src=CONFIG.jsqrUrl;s.onload=ok;s.onerror=no;document.head.appendChild(s);});}catch{}}
+ scanning=true;scanLoop();
+}
+async function scanLoop(){
+ const video=$('#video');const cv=document.createElement('canvas');const cx=cv.getContext('2d',{willReadFrequently:true});
+ const tick=async()=>{
+  if(!scanning)return;
+  if(!busy&&video.readyState>=2){
+   let code=null;
+   try{
+    if(detector){const codes=await detector.detect(video);code=codes[0]?.rawValue||null;}
+    else if(window.jsQR){cv.width=video.videoWidth/2;cv.height=video.videoHeight/2;cx.drawImage(video,0,0,cv.width,cv.height);
+     const img=cx.getImageData(0,0,cv.width,cv.height);const r=jsQR(img.data,cv.width,cv.height,{inversionAttempts:'dontInvert'});code=r?.data||null;}
+   }catch{}
+   if(code&&(code!==lastCode||Date.now()-lastAt>4000)){lastCode=code;lastAt=Date.now();handleCode(code);}
+  }
+  requestAnimationFrame(()=>setTimeout(tick,160));
+ };
+ tick();
+}
+/* ---------- fluxo ---------- */
+async function handleCode(raw){
+ if(busy)return;busy=true;$('#result').innerHTML='<div class="card"><div class="meta">Consultando…</div></div>';
+ try{
+  const txt=String(raw).trim();
+  let kind=null,mat=null,ver=null,codigo=null;
+  const m=txt.match(/^PSTL\|([CA])\|([^|]+)(?:\|(.+))?$/i);
+  if(m){kind=m[1].toUpperCase()==='C'?'colab':'conv';if(kind==='colab'){mat=m[2].trim();ver=(m[3]||'').trim().toUpperCase();}else codigo=m[2].trim();}
+  else if(/^\d{1,10}$/.test(txt)){kind='colab';mat=txt;}
+  else{kind='conv';codigo=txt;}
+  if(kind==='colab')await fluxoColab(mat,ver);else await fluxoConvite(codigo);
+ }catch(e){$('#result').innerHTML='';toast('Erro: '+e.message,1);}
+ busy=false;
+}
+async function fluxoColab(mat,ver){
+ if(ver&&verif(mat)!==ver){$('#result').innerHTML=`<div class="card"><h2>QR inválido</h2><div class="alert">O código do crachá não confere. Confira o crachá ou registre manualmente no computador.</div></div>`;navigator.vibrate?.(200);return;}
+ const rs=await graph('/sites/'+SITE+'/lists/'+LISTS.colab+'/items?$expand=fields($select=NOME,MATRICULA,SITUACAO)&$filter=fields/MATRICULA eq \''+encodeURIComponent(String(mat).replace(/'/g,''))+'\'&$top=2');
+ const c=(rs.value||[]).map(F)[0];
+ if(!c){$('#result').innerHTML=`<div class="card"><h2>Não encontrado</h2><div class="alert">Matrícula <b>${esc(mat)}</b> não consta no cadastro. Não libere; registre manualmente no computador.</div></div>`;return;}
+ if(norm(c.SITUACAO||'').includes('deslig')){$('#result').innerHTML=`<div class="card"><h2>${esc(c.NOME)}</h2><div class="alert">⛔ Colaborador DESLIGADO. Não libere a entrada e comunique a Segurança.</div></div>`;navigator.vibrate?.([120,60,120]);return;}
+ const hoje=new Date(Date.now()-2*864e5).toISOString().slice(0,10);
+ const mv=await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items?$expand=fields&$orderby=fields/ENTRADA desc&$filter=fields/ENTRADA ge \''+hoje+'\'&$top=200');
+ const aberto=(mv.value||[]).map(F).find(x=>String(x.MATRICULA||'')===String(mat)&&!x.SAIDA);
+ if(aberto){
+  $('#result').innerHTML=`<div class="card"><h2>${esc(c.NOME)}</h2><div class="meta">Matrícula ${esc(mat)} · <b style="color:#1e7d5f">dentro desde ${hhmm(aberto.ENTRADA)}</b></div>
+   <button class="btn err" id="rsaida" style="margin-top:14px">Registrar SAÍDA</button></div>`;
+  $('#rsaida').onclick=async()=>{$('#rsaida').disabled=true;
+   try{await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items/'+aberto.id+'/fields',{method:'PATCH',body:{SAIDA:new Date().toISOString(),PORTEIRO_SAI:porteiro()}});
+    ok(c.NOME+' — saída registrada');}catch(e){toast('Erro: '+e.message,1);$('#rsaida').disabled=false;}};
+  return;
+ }
+ let modal=null;const precisa=paramOn('MODAL_OBRIGATORIO');
+ const MODS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'];
+ $('#result').innerHTML=`<div class="card"><h2>${esc(c.NOME)}</h2><div class="meta">Matrícula ${esc(mat)} · crachá válido ✓</div>
+  <div class="meta" style="margin-top:10px;font-weight:700;color:#1c2740">Como veio hoje?${precisa?' *':''}</div>
+  <div class="modais" id="rmods">${MODS.map(x=>`<button data-m="${x}">${x}</button>`).join('')}</div>
+  <button class="btn ok" id="rentrar" style="margin-top:14px">Registrar ENTRADA</button></div>`;
+ $('#rmods').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$('#rmods').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));};
+ $('#rentrar').onclick=async()=>{if(precisa&&!modal){toast('Selecione o modal de transporte.',1);return;}
+  $('#rentrar').disabled=true;
+  try{await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items',{method:'POST',body:{fields:{TIPO:'Colaborador',NOME:c.NOME,MATRICULA:String(mat),MODAL:modal||'',SEM_CRACHA:false,ENTRADA:new Date().toISOString(),PORTEIRO_ENT:porteiro(),CHECKLIST_OK:false}}});
+   ok(c.NOME+' — entrada registrada');}catch(e){toast('Erro: '+e.message,1);$('#rentrar').disabled=false;}};
+}
+async function fluxoConvite(codigo){
+ const rs=await graph('/sites/'+SITE+'/lists/'+LISTS.agend+'/items?$expand=fields&$filter=fields/CODIGO eq \''+encodeURIComponent(String(codigo).replace(/'/g,''))+'\'&$top=2');
+ const a=(rs.value||[]).map(F)[0];
+ if(!a){$('#result').innerHTML=`<div class="card"><h2>Convite não encontrado</h2><div class="alert">Código <b>${esc(codigo)}</b> não localizado nos agendamentos.</div></div>`;return;}
+ const st=a.STATUS?.Value||a.STATUS||'Agendado';
+ const hojeOk=String(a.DATA||'').slice(0,10)===todayLocal();
+ if(st==='Entrou'){
+  $('#result').innerHTML=`<div class="card"><h2>${esc(a.NOME)}</h2><div class="meta">${esc(a.EMPRESA||'—')} · convite ${esc(codigo)} · <b style="color:#1e7d5f">dentro</b></div>
+   <button class="btn err" id="rsaida" style="margin-top:14px">Registrar SAÍDA</button></div>`;
+  $('#rsaida').onclick=async()=>{$('#rsaida').disabled=true;
+   try{const hoje=new Date(Date.now()-2*864e5).toISOString().slice(0,10);
+    const mv=await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items?$expand=fields&$filter=fields/ENTRADA ge \''+hoje+'\'&$top=200');
+    const open=(mv.value||[]).map(F).find(x=>String(x.AGENDAMENTOLookupId||'')===String(a.id)&&!x.SAIDA);
+    if(open)await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items/'+open.id+'/fields',{method:'PATCH',body:{SAIDA:new Date().toISOString(),PORTEIRO_SAI:porteiro()}});
+    await graph('/sites/'+SITE+'/lists/'+LISTS.agend+'/items/'+a.id+'/fields',{method:'PATCH',body:{STATUS:'Saiu'}});
+    ok(a.NOME+' — saída registrada');}catch(e){toast('Erro: '+e.message,1);$('#rsaida').disabled=false;}};
+  return;
+ }
+ $('#result').innerHTML=`<div class="card"><h2>${esc(a.NOME)}</h2>
+  <div class="meta">${esc(a.TIPO?.Value||a.TIPO||'')} · ${esc(a.EMPRESA||'—')}<br>Recebe: <b>${esc(a.ANFITRIAO||'—')}</b> · ${esc(a.HORA||'')}</div>
+  ${hojeOk?'<div class="okbox">Convite válido para hoje ✓</div>':`<div class="alert">Convite de ${esc(String(a.DATA||'').slice(0,10).split('-').reverse().join('/'))} — não é para hoje. Confirme antes de liberar.</div>`}
+  <div class="field"><label>Crachá entregue (nº)</label><input id="rcracha" placeholder="Ex.: V-012"></div>
+  <button class="btn ok" id="rentrar" style="margin-top:12px">Registrar ENTRADA</button></div>`;
+ $('#rentrar').onclick=async()=>{$('#rentrar').disabled=true;
+  try{const f={TIPO:a.TIPO?.Value||a.TIPO||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:$('#rcracha').value.trim(),SEM_CRACHA:false,ENTRADA:new Date().toISOString(),PORTEIRO_ENT:porteiro(),AGENDAMENTOLookupId:Number(a.id),CHECKLIST_OK:false};
+   if(a.ANFITRIAOLookupId)f.ANFITRIAOLookupId=a.ANFITRIAOLookupId;
+   await graph('/sites/'+SITE+'/lists/'+LISTS.movP+'/items',{method:'POST',body:{fields:f}});
+   await graph('/sites/'+SITE+'/lists/'+LISTS.agend+'/items/'+a.id+'/fields',{method:'PATCH',body:{STATUS:'Entrou'}});
+   ok(a.NOME+' — entrada registrada');}catch(e){toast('Erro: '+e.message,1);$('#rentrar').disabled=false;}};
+}
+function ok(msg){$('#result').innerHTML=`<div class="card"><div class="okbox" style="margin:0">✅ ${esc(msg)}</div></div>`;toast(msg);navigator.vibrate?.(80);
+ setTimeout(()=>{if($('#result').querySelector('.okbox'))$('#result').innerHTML='';},3500);}
+/* ---------- init ---------- */
+function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');const t=setTimeout(()=>{s.remove();no(new Error('Tempo esgotado.'));},15000);s.src=src;s.onload=()=>{clearTimeout(t);ok();};s.onerror=()=>{clearTimeout(t);no(new Error('Falha ao carregar biblioteca.'));};document.head.appendChild(s);});}
+async function start(){
+ $('#gspin').hidden=false;$('#gbtn').hidden=true;$('#gmsg').textContent='Preparando o leitor...';
+ try{await boot();}catch(e){$('#gspin').hidden=true;$('#gbtn').hidden=false;$('#gbtn').textContent='Tentar novamente';$('#gmsg').textContent='Não foi possível carregar: '+e.message;return;}
+ $('#gate').hidden=true;$('#app').hidden=false;
+ $('#pnome').textContent=porteiro()||'definir';
+ if(!porteiro())askPorteiro();
+ startCam();
+}
+async function init(){
+ $('#pbtn').onclick=askPorteiro;
+ $('#mgo').onclick=()=>{const v=$('#mcode').value.trim();if(v){$('#mcode').value='';handleCode(v);}};
+ $('#mcode').addEventListener('keydown',e=>{if(e.key==='Enter')$('#mgo').click();});
+ if(location.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(location.hostname)){$('#gmsg').textContent='Acesse pelo endereço oficial (HTTPS).';$('#gbtn').hidden=true;return;}
+ try{
+  await loadScript(CONFIG.msalUrl);
+  msalApp=new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:'https://login.microsoftonline.com/'+CONFIG.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});
+  if(msalApp.initialize)await msalApp.initialize();
+  const red=await msalApp.handleRedirectPromise();
+  account=red?.account||msalApp.getActiveAccount()||msalApp.getAllAccounts()[0]||null;
+  if(account){msalApp.setActiveAccount(account);await start();}
+  else $('#gbtn').onclick=()=>msalApp.loginRedirect({scopes:CONFIG.scopes});
+ }catch(e){$('#gmsg').textContent='Falha ao iniciar: '+(e?.message||'erro');$('#gbtn').textContent='Tentar novamente';$('#gbtn').onclick=()=>location.reload();}
+}
+init();
+</script>
+</body>
+</html>
