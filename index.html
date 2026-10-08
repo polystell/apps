@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polystell Apps</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{font-family:'Inter',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
+  #loading-screen{position:fixed;inset:0;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+  .spinner{width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#1e3a5f;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+  .loading-text{font-size:14px;color:#6b7280}
+  #error-screen{position:fixed;inset:0;background:#f3f4f6;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
+  .error-icon{font-size:48px}.error-title{font-size:18px;font-weight:600;color:#dc2626}
+  .error-msg{font-size:13px;color:#6b7280;max-width:420px}
+  #app{display:none}
+  .header{background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
+  .header-left{display:flex;align-items:center;gap:14px;min-width:0}
+  .header-title{font-size:16px;font-weight:700}.header-subtitle{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
+  .header-user{font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:8px}
+  .header-user .udot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+  .header-user button{font:inherit;font-size:12px;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:none;padding:5px 10px;border-radius:6px;cursor:pointer}
+  .header-user button:hover{background:rgba(255,255,255,.2)}
+  .main{max-width:1060px;margin:0 auto;padding:26px 16px 60px}
+  .search{position:relative;max-width:420px;margin-bottom:6px}
+  .search input{font:inherit;font-size:14px;width:100%;padding:11px 12px 11px 40px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#1f2937}
+  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:#9ca3af;fill:none;stroke-width:2;stroke-linecap:round}
+  :focus-visible{outline:2px solid #3b82f6;outline-offset:1px}
+  h2.cat{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:24px 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .tile{position:relative;display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;color:#1f2937;text-decoration:none;cursor:pointer;transition:border-color .12s,transform .12s;font:inherit;text-align:left}
+  .tile:hover{border-color:#1e3a5f;transform:translateY(-2px)}
+  .tile[aria-disabled="true"]{cursor:default;opacity:.7}
+  .tile[aria-disabled="true"]:hover{border-color:#e5e7eb;transform:none}
+  @media (prefers-reduced-motion:reduce){.tile{transition:none}}
+  .ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#eef2f7}
+  .ico svg{width:22px;height:22px;stroke:#1e3a5f;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .tile b{display:block;font-size:14.5px;line-height:1.3}
+  .tile .d{font-size:12.5px;color:#6b7280;margin-top:3px}
+  .badge{position:absolute;top:10px;right:10px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+  .badge.impl{background:#fef9c3;color:#854d0e}
+  .badge.man{background:#fee2e2;color:#991b1b}
+  .empty{color:#6b7280;padding:40px 0;text-align:center;font-size:14px}
+  .notice{font-size:12px;color:#854d0e;background:#fef9c3;border-radius:8px;padding:9px 12px;margin-top:10px}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90%}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .page-footer{background:#fff;border-top:1px solid #e5e7eb;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#9ca3af;flex-wrap:wrap;gap:10px}
+  .footer-left{display:flex;align-items:center;gap:8px}
+  .lock-icon svg{width:14px;height:14px;stroke:#9ca3af;fill:none;stroke-width:1.8}
+  .powered-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;font-weight:500}
+  .sp-icon{width:22px;height:22px;background:#0078d4;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+</style>
+</head>
+<body>
+
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Carregando seus aplicativos…</div></div>
+<div id="error-screen">
+  <div class="error-icon">&#9888;&#65039;</div>
+  <div class="error-title" id="error-title">Não foi possível carregar</div>
+  <div class="error-msg" id="error-msg"></div>
+</div>
+
+<div id="app">
+  <header class="header">
+    <div class="header-left">
+      <img src="logo-polystell.png" alt="Polystell" onerror="this.style.display='none'" style="height:36px;object-fit:contain;margin-right:12px;">
+      <div style="border-left:1px solid rgba(255,255,255,0.3);padding-left:14px;">
+        <div class="header-title">Polystell Apps</div>
+        <div class="header-subtitle">Portal interno de aplicativos</div>
+      </div>
+    </div>
+    <div id="header-right"></div>
+  </header>
+
+  <main class="main">
+    <div class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
+      <input id="q" placeholder="Buscar aplicativo" aria-label="Buscar aplicativo">
+    </div>
+    <div id="notice"></div>
+    <section id="tiles"></section>
+  </main>
+
+  <footer class="page-footer">
+    <div class="footer-left">
+      <div class="lock-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <span>Você vê apenas os aplicativos liberados para o seu perfil. Acesso validado pela identidade Microsoft 365.</span>
+    </div>
+    <div class="powered-badge">Powered by SharePoint <div class="sp-icon">S</div></div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== CONFIGURAÇÃO ===================== */
+const CONFIG = {
+  clientId: "c066630d-9dc2-4c4a-8c60-8f0056e9e5e2",
+  tenantId: "fdb7cb21-cc9d-4f32-bb70-e71cad1eb164",
+  siteHost: "polystellcombr.sharepoint.com",
+  sitePath: "/sites/Apps",
+  listaCatalogo: "00_Catalogo_Apps"
+};
+/* Escopos: Sites já consentido pelas outras páginas. GroupMember.Read.All permite
+   filtrar os blocos pelos grupos do usuário — exige consentimento do administrador
+   no App Registration (Permissões de API). Sem ele, o hub mostra só os apps de
+   acesso geral e avisa no rodapé. */
+const SCOPES_SITES  = ["Sites.ReadWrite.All"];
+const SCOPES_GROUPS = ["GroupMember.Read.All"];
+
+const ICONS = {
+  chart:'<path d="M4 20V10M10 20V4M16 20v-8M4 20h17"/>',
+  money:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/>',
+  alert:'<path d="M12 3L2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  laptop:'<rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 19h20"/>',
+  gate:'<path d="M4 20V8l8-4 8 4v12M4 12h16M9 20v-5h6v5"/>',
+  qr:'<path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/>',
+  brain:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M8 8h8M8 16h8"/>',
+  grid:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>'
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+let msalApp = null, account = null, APPS = [], MEUS_GRUPOS = null; // null = não foi possível ler
+
+function showApp(){ $("#loading-screen").style.display="none"; $("#app").style.display="block"; }
+function showError(t,m){ $("#loading-screen").style.display="none"; $("#error-title").textContent=t; $("#error-msg").textContent=m||""; $("#error-screen").style.display="flex"; }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.className="toast show"; setTimeout(()=>t.className="toast",3200); }
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("Não foi possível carregar o login.")); document.head.appendChild(s); setTimeout(()=>rej(new Error("Tempo esgotado ao carregar o login.")),15000); }); }
+
+async function init(){
+  try{
+    if(location.protocol==="file:"){ showError("Abra por http/https","A autenticação Microsoft não funciona em file://. Publique a página."); return; }
+    await loadScript("https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js");
+    msalApp = new msal.PublicClientApplication({auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
+    const resp = await msalApp.handleRedirectPromise();
+    account = resp?.account || msalApp.getAllAccounts()[0] || null;
+    if(!account){ msalApp.loginRedirect({scopes:SCOPES_SITES}); return; }
+    $("#header-right").innerHTML = `<span class="header-user"><span class="udot"></span>${esc(account.name||account.username)}<button id="logout">Sair</button></span>`;
+    $("#logout").onclick = () => { sessionStorage.clear(); msalApp.logoutRedirect(); };
+    await Promise.all([carregarCatalogo(), carregarGrupos()]);
+    showApp(); render();
+  }catch(e){ console.error(e); showError("Não foi possível iniciar o portal","Tente novamente ou contate a TI."); }
+}
+
+async function token(scopes){ const req={scopes,account}; try{ return (await msalApp.acquireTokenSilent(req)).accessToken; }catch{ return (await msalApp.acquireTokenPopup(req)).accessToken; } }
+async function graph(url,scopes){ const t=await token(scopes||SCOPES_SITES); const r=await fetch(url,{headers:{Authorization:`Bearer ${t}`}}); if(!r.ok) throw new Error(`Graph ${r.status}: ${(await r.text()).slice(0,200)}`); return r.json(); }
+
+async function carregarCatalogo(){
+  const site = await graph(`https://graph.microsoft.com/v1.0/sites/${CONFIG.siteHost}:${CONFIG.sitePath}`);
+  let lista;
+  try{ lista = await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${encodeURIComponent(CONFIG.listaCatalogo)}`); }
+  catch{ const r = await graph(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists?$filter=displayName eq '${CONFIG.listaCatalogo}'`); lista = (r.value||[])[0]; }
+  if(!lista) throw new Error("Lista do catálogo não encontrada");
+  let itens = [], next = `https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${lista.id}/items?$expand=fields&$top=200`;
+  while(next){ const page = await graph(next); itens = itens.concat(page.value||[]); next = page["@odata.nextLink"]||null; }
+  APPS = itens.map(it => {
+    const f = it.fields || {};
+    return {
+      nome: f.NOME || f.Title || "",
+      pasta: f.PASTA || "",
+      categoria: (f.CATEGORIA && f.CATEGORIA.Value) || f.CATEGORIA || "Outros",
+      desc: f.DESCRICAO || "",
+      icone: (f.ICONE||"grid").trim().toLowerCase(),
+      grupos: String(f.GRUPOS||"").split(";").map(s=>s.trim()).filter(Boolean),
+      status: ((f.STATUS && f.STATUS.Value) || f.STATUS || "Ativo").trim()
+    };
+  }).filter(a => a.nome && a.status !== "Inativo");
+}
+
+async function carregarGrupos(){
+  try{
+    let nomes = [], next = `https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=displayName&$top=999`;
+    while(next){ const page = await graph(next, SCOPES_GROUPS.concat(["User.Read"])); nomes = nomes.concat((page.value||[]).map(g=>String(g.displayName||""))); next = page["@odata.nextLink"]||null; }
+    MEUS_GRUPOS = nomes.map(n=>n.toLowerCase());
+  }catch(e){
+    console.warn("Sem leitura de grupos (consentimento pendente?):", e.message);
+    MEUS_GRUPOS = null; // mostra só apps de acesso geral
+  }
+}
+
+function podeVer(app){
+  if(!app.grupos.length) return true;                       // acesso geral
+  if(MEUS_GRUPOS === null) return false;                    // sem leitura de grupos: só os gerais
+  return app.grupos.some(g => MEUS_GRUPOS.includes(g.toLowerCase()));
+}
+function urlDe(app){ return /^https?:\/\//i.test(app.pasta) ? app.pasta : (location.origin + app.pasta); }
+
+function render(){
+  const q = ($("#q").value||"").trim().toLowerCase();
+  const vis = APPS.filter(a => podeVer(a) && (!q || a.nome.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)));
+  const cats = [...new Set(vis.map(a=>a.categoria))];
+  $("#tiles").innerHTML = cats.map(c => `<h2 class="cat">${esc(c)}</h2><div class="grid">${
+    vis.filter(a=>a.categoria===c).map(tile).join("")
+  }</div>`).join("") || `<div class="empty">Nenhum aplicativo disponível para o seu perfil.</div>`;
+  $("#notice").innerHTML = (MEUS_GRUPOS===null && APPS.some(a=>a.grupos.length))
+    ? `<div class="notice">Alguns aplicativos restritos podem não aparecer: a leitura de grupos ainda não foi autorizada pela TI (GroupMember.Read.All no App Registration).</div>` : "";
+}
+function tile(a){
+  const man = a.status === "Manutenção";
+  const badge = a.status === "Em implantação" ? `<span class="badge impl">Em implantação</span>` : man ? `<span class="badge man">Em manutenção</span>` : "";
+  const inner = `${badge}<span class="ico"><svg viewBox="0 0 24 24">${ICONS[a.icone]||ICONS.grid}</svg></span><span style="min-width:0"><b>${esc(a.nome)}</b><span class="d">${esc(a.desc)}</span></span>`;
+  if(man) return `<button type="button" class="tile" aria-disabled="true" onclick="toast('${esc(a.nome)} está em manutenção. Tente mais tarde.')">${inner}</button>`;
+  return `<a class="tile" href="${esc(urlDe(a))}">${inner}</a>`;
+}
+$("#q").addEventListener("input", render);
+init();
+</script>
+</body>
+</html>
