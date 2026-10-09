@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.5">
+<link rel="stylesheet" href="/core/polystell.css?v=2.6">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -47,8 +47,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.5"></script>
-<script src="comum.js?v=2.5"></script>
+<script src="/core/polystell.js?v=2.6"></script>
+<script src="comum.js?v=2.6"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -121,15 +121,17 @@ async function colab(mat,ver,origem){
  /* saída vem antes do bloqueio: encerrar um movimento aberto é sempre permitido */
  if(aberto){setMode('confirm');
   card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+' · <b style="color:var(--ok)">dentro desde '+quando(aberto.ENTRADA)+'</b></div>'+(deslig?'<div class="banner err">'+icon('lock')+'<span>Situação no diretório: <b>'+esc(c.sit||'não informada')+'</b>. Registre a saída e comunique a Segurança.</span></div>':''),
-   '<button class="btn danger solid" type="button" id="go">'+icon('out')+'Registrar SAÍDA</button>'+btnNova);
-  $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;setMode('busy');
-   try{const r=await P.saidaPessoa(aberto,porteiro());if(r.jaSaiu){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>A saída já tinha sido registrada'+(r.mov.SAIDA?' às '+fmt.hm(r.mov.SAIDA):'')+'.</span></div>',btnNova);return;}
-    sucesso(c.nome+' — saída registrada',r.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
+   '<button class="btn danger solid" type="button" id="go">'+icon('out')+'Saída final</button><button class="btn" type="button" id="gotmp">'+icon('clock')+'Saída temporária (almoço)</button>'+btnNova);
+  const sair=async temp=>{if(needTurno())return;$$('#go,#gotmp').forEach(x=>x.disabled=true);setMode('busy');
+   try{const r=await P.saidaPessoa(aberto,porteiro(),{temporaria:temp});if(r.jaSaiu){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>A saída já tinha sido registrada'+(r.mov.SAIDA?' às '+fmt.hm(r.mov.SAIDA):'')+'.</span></div>',btnNova);return;}
+    sucesso(c.nome+(temp?' — saída temporária registrada':' — saída registrada'),r.parcial);}catch(e){setMode('confirm');$$('#go,#gotmp').forEach(x=>x.disabled=false);falha(e);}};
+  $('#go').onclick=()=>sair(false);$('#gotmp').onclick=()=>sair(true);
   return;}
  if(deslig){setMode('confirm');navigator.vibrate?.([120,60,120]);card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span><b>Situação no diretório: '+esc(c.sit||'não informada')+'.</b> Não libere a entrada e comunique a Segurança.</span></div>',btnNova);return;}
- const precisa=P.on('MODAL_OBRIGATORIO');let modal=null;setMode('confirm');
+ let ret=null;try{ret=await P.saidaTempHoje(c.mat);}catch{}
+ const precisa=P.on('MODAL_OBRIGATORIO')&&!ret;let modal=ret&&val(ret.MODAL)?val(ret.MODAL):null;setMode('confirm');
  const origemTxt=origem==='digitado'?'<span class="chip warn dot">Matrícula digitada</span><div class="detail">Colaborador localizado no diretório, sem leitura do crachá. Confira um documento com foto.</div>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR sem verificador</span><div class="detail">Crachá lido, mas sem o código de conferência. Confira o crachá.</div>';
- card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="false">'+esc(x)+'</button>').join('')+'</div>',
+ card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+(ret?' <span class="chip blue dot">Retorno</span><div class="detail">Saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</div>':'')+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="'+(modal===x)+'">'+esc(x)+'</button>').join('')+'</div>',
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
  $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));};
  $('#go').onclick=async()=>{if(needTurno())return;if(precisa&&!modal){toast('Selecione como o colaborador veio hoje.','err');return;}const b=$('#go');b.disabled=true;setMode('busy');

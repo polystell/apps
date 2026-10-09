@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.5">
+<link rel="stylesheet" href="/core/polystell.css?v=2.6">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -36,14 +36,16 @@
 .rtab th{color:var(--muted);font-weight:600;border-top:0}
 .rtab td:nth-child(n+2),.rtab th:nth-child(n+2){text-align:right}
 .rprintonly{display:none}
+.rtabw{overflow-x:auto}
+.rtab tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 @media print{.ps-side,.ps-top,.ps-backdrop,.toolbar,.seg,#banners,.ps-pagehead p,.ps-sess,#ps-toast{display:none!important}.ps-main{margin:0!important}.ps-page{padding:0!important}.panel{border:0;padding:0}.rprintonly{display:block;margin-bottom:8px}}
 pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0 0 12px;color:#44526a}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.5"></script>
-<script src="comum.js?v=2.5"></script>
+<script src="/core/polystell.js?v=2.6"></script>
+<script src="comum.js?v=2.6"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -110,7 +112,7 @@ async function refresh(){if(running){again=true;return running;}
 async function doRefresh(){
  const prevR=()=>P.prevEntre(-1,P.JANELA_PREV);
  const plan=ST.posto?[['openP',P.abertosP],['openV',P.abertosV],['movVHoje',P.veicHoje],['movPHoje',P.pessoasHoje],['agenda',P.agendaHoje],['agendaRec',P.agendaRecente],['prev',P.prevHoje],['merc',P.mercAguardando],['ocor',P.ocorAbertas],['turno',P.turnoAtual],['params',P.loadParams]]
-  :[...(ST.log?[['openV',P.abertosV],['movVHoje',P.veicHoje]]:[]),...(ST.rh?[['openP',P.abertosP]]:[]),['params',P.loadParams]];
+  :[...(ST.log?[['openV',P.abertosV],['movVHoje',P.veicHoje]]:[]),...(ST.rh?[['openP',P.abertosP],['movPHoje',P.pessoasHoje]]:[]),['params',P.loadParams]];
  if(ST.log)plan.push(['prevR',prevR]);
  const pendAntes=ST.sync.at?new Set(ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').map(v=>v.id)):new Set();
  const rs=await Promise.allSettled(plan.map(([,f])=>f()));const fails=[];
@@ -175,7 +177,7 @@ VIEWS.painel={
  update(){banners();if(!$('#kpis'))return;const pd=pend(),D=ST.d;
   const prevAg=D.agenda.filter(a=>['Agendado','Na portaria'].includes(val(a.STATUS))&&!P.abertoDoAgend(D.openP,a.id)).length;
   const npend=pd.p.length+pd.v.length+pd.m.length;
-  $('#kpis').innerHTML=[['pessoas',D.openP.length,'pessoas na planta',pd.p.length],['veiculos',D.openV.length,'veículos no pátio',pd.v.length],['mercadorias',D.merc.length,'mercadorias aguardando',pd.m.length]].map(([g,n,l,a])=>'<button class="kpi'+(a?' alert':'')+'" data-go="'+g+'"><b>'+n+'</b><span>'+l+(a?' · '+a+' pendente(s)':'')+'</span></button>').join('')+
+  $('#kpis').innerHTML=[['pessoas',D.openP.length,'pessoas na planta'+(P.foraTemporario(D.movPHoje,D.openP).length?' · '+P.foraTemporario(D.movPHoje,D.openP).length+' fora (temporário)':''),pd.p.length],['veiculos',D.openV.length,'veículos no pátio',pd.v.length],['mercadorias',D.merc.length,'mercadorias aguardando',pd.m.length]].map(([g,n,l,a])=>'<button class="kpi'+(a?' alert':'')+'" data-go="'+g+'"><b>'+n+'</b><span>'+l+(a?' · '+a+' pendente(s)':'')+'</span></button>').join('')+
    '<div class="kpi"><b>'+prevAg+'</b><span>visitas ainda previstas hoje</span></div>';
   $('#pdc').textContent=npend+D.ocor.length;
   const ag=D.agenda.slice().sort((a,b)=>String(a.HORA||'').localeCompare(String(b.HORA||'')));
@@ -211,13 +213,18 @@ async function outraEntradaMesmoNome(a,dup,fields){
   actions:[{label:'Fechar',value:null},{label:'Saída do registro anterior',value:'s'},{label:'É outra pessoa',kind:'primary',value:'n'}]});
  if(ch==='s'){doSaidaPessoa(dup);return;}if(ch!=='n')return;
  try{const r=await P.entradaPessoa(fields,{agId:a.id,permitirHomonimo:true});if(r.bloq)toast(r.bloq,'err');else if(r.dup)toast(a.NOME+' já está dentro por este convite.','warn');else toast(r.parcial||'Entrada registrada: '+a.NOME,r.parcial?'warn':'ok');refresh();}catch(e){writeErr(e);}}
-async function doSaidaPessoa(m){if(needTurno())return;
- await dialog({title:'Registrar saída',html:'<p><b>'+esc(m.NOME)+'</b> · entrou '+quando(m.ENTRADA)+' ('+fmt.dur(idade(m.ENTRADA))+')</p>'+(m.CRACHA?'<div class="banner info">'+icon('check')+'<span>Recolha o crachá <b>'+esc(m.CRACHA)+'</b>.</span></div>':''),
+async function doSaidaPessoa(m){if(needTurno())return;let temp=false;
+ const p=dialog({title:'Registrar saída',html:'<p><b>'+esc(m.NOME)+'</b> · entrou '+quando(m.ENTRADA)+' ('+fmt.dur(idade(m.ENTRADA))+')</p>'+
+   '<div class="seg" id="dst" style="margin-bottom:12px"><button type="button" data-st="0" aria-pressed="true">Saída final</button><button type="button" data-st="1" aria-pressed="false">Saída temporária (almoço, banco, médico…)</button></div>'+
+   '<div class="note" id="dstn">Encerra a presença do dia.</div>'+(m.CRACHA?'<div class="banner info">'+icon('check')+'<span>Recolha o crachá <b>'+esc(m.CRACHA)+'</b>.</span></div>':''),
   actions:[{label:'Cancelar',value:null},{label:'Confirmar saída',kind:'primary',onClick:async()=>{
-   try{const r=await P.saidaPessoa(m,porteiro());
+   try{const r=await P.saidaPessoa(m,porteiro(),{temporaria:temp});
     if(r.jaSaiu)toast('A saída já tinha sido registrada'+(r.mov.SAIDA?' às '+fmt.hm(r.mov.SAIDA):'')+' (outro dispositivo).','warn');
-    else if(r.parcial)toast(r.parcial,'warn');else toast('Saída registrada: '+m.NOME);
-    refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
+    else if(r.parcial)toast(r.parcial,'warn');else toast((temp?'Saída temporária registrada: ':'Saída registrada: ')+m.NOME);
+    refresh();return true;}catch(e){writeErr(e);return false;}}}]});
+ setTimeout(()=>{const g=$('#dst');if(g)g.onclick=e=>{const b=e.target.closest('[data-st]');if(!b)return;temp=b.dataset.st==='1';$$('#dst [data-st]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  $('#dstn').textContent=temp?'A pessoa aparece em "Fora temporariamente" até voltar. Na volta, registre a entrada normalmente — o transporte do dia é aproveitado.':'Encerra a presença do dia.';};},0);
+ await p;}
 /* ================= PESSOAS ================= */
 VIEWS.pessoas={
  mount(){const F=ST.f.p;
@@ -225,7 +232,8 @@ VIEWS.pessoas={
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('in')+'<h2>Registrar entrada</h2></div><div class="seg solid" id="ptipo" role="group" aria-label="Tipo">'+TIPOS_P.map(t=>'<button type="button" data-t="'+t+'" aria-pressed="'+(F.tipo===t)+'">'+t+'</button>').join('')+'</div><div id="pform" style="margin-top:16px"></div></div>'+
    '<div class="panel"><div class="panel-h">'+icon('users')+'<h2>Na planta agora</h2><span class="sp"><span class="count" id="pcount"></span></span></div>'+
    '<div class="toolbar"><input type="search" data-bind="p.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar nome, empresa, crachá, anfitrião…" aria-label="Buscar na planta"></div>'+
-   '<div class="seg" id="pft" style="margin-bottom:8px"></div><div class="rows" id="plist"></div></div></div>');
+   '<div class="seg" id="pft" style="margin-bottom:8px"></div><div class="rows" id="plist"></div>'+
+   '<div class="panel-h" style="margin-top:18px">'+icon('clock')+'<h2>Fora temporariamente</h2><span class="sp"><span class="count" id="ftcount"></span></span></div><div class="rows" id="ftlist"></div></div></div>');
   bindInputs(()=>this.update());
   drawPForm();
   SHELL.page.onclick=e=>{
@@ -234,7 +242,7 @@ VIEWS.pessoas={
    const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);return;}
    const md=e.target.closest('[data-m]');if(md){ST.f.p.modal=md.dataset.m;$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b===md)));return;}
    if(e.target.closest('#pgo-c'))regColab();if(e.target.closest('#pgo-v'))regVisit();};},
- update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));
+ update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount');
   let rows=ST.d.openP.slice().sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));
   const cnt=k=>FILTROS[k]?ST.d.openP.filter(m=>FILTROS[k].includes(val(m.TIPO))).length:ST.d.openP.length;
   $('#pft').innerHTML=Object.keys(FILTROS).map(k=>'<button type="button" data-ft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
@@ -276,13 +284,14 @@ function drawColab(){const F=ST.f.p,box=$('#colabbox');if(!box)return;const c=F.
  if(!c){box.innerHTML='<div class="field"><span class="lbl">Colaborador (sem crachá)</span><div id="cpick"></div><span class="hint">Com crachá, use o celular da portaria para ler o QR. Aqui é o registro manual de quem esqueceu o crachá.</span></div>';
   picker($('#cpick'),{value:null,label:'Colaborador',placeholder:'Nome ou matrícula…',onPick:x=>{F.colab=x;F.modal=null;drawColab();}});return;}
  const dentro=P.abertoDaMatricula(ST.d.openP,c.mat);
- box.innerHTML='<div class="field"><span class="lbl">Colaborador</span><div id="csel"></div></div>'+
+ const ret=!dentro&&P.foraTemporario(ST.d.movPHoje,ST.d.openP).find(m=>String(m.MATRICULA||'').trim()===c.mat);F.retorno=ret||null;if(ret&&!F.modal&&val(ret.MODAL))F.modal=val(ret.MODAL);
+ box.innerHTML='<div class="field"><span class="lbl">Colaborador</span><div id="csel"></div></div>'+(ret?'<div class="banner info">'+icon('clock')+'<span><b>Retorno</b> — saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</span></div>':'')+
   (P.desligado(c)?'<div class="banner err">'+icon('lock')+'<span><b>Situação no diretório: '+esc(c.sit||'não informada')+'.</b> Não libere a entrada e comunique a Segurança.'+(dentro?' Consta uma entrada aberta — registre a saída na lista ao lado.':'')+'</span></div>'
   :dentro?'<div class="banner warn">'+icon('alert')+'<span>Já está dentro desde '+quando(dentro.ENTRADA)+'. Para registrar a saída, use a lista ao lado.</span></div>'
-  :'<div class="field"><span class="lbl">Como veio hoje? (ESG)'+(P.on('MODAL_OBRIGATORIO')?' *':'')+'</span><div class="seg esg" id="esg">'+MODAIS.map(m=>'<button type="button" data-m="'+esc(m)+'" aria-pressed="'+(F.modal===m)+'">'+esc(m)+'</button>').join('')+'</div></div><button class="btn primary block" id="pgo-c" type="button">'+icon('in')+'Registrar entrada (sem crachá)</button>');
+  :'<div class="field"><span class="lbl">Como veio hoje? (ESG)'+(P.on('MODAL_OBRIGATORIO')&&!F.retorno?' *':'')+'</span><div class="seg esg" id="esg">'+MODAIS.map(m=>'<button type="button" data-m="'+esc(m)+'" aria-pressed="'+(F.modal===m)+'">'+esc(m)+'</button>').join('')+'</div></div><button class="btn primary block" id="pgo-c" type="button">'+icon('in')+'Registrar entrada (sem crachá)</button>');
  picker($('#csel'),{value:c,onClear:()=>{F.colab=null;F.modal=null;drawColab();setTimeout(()=>$('#cpick input')?.focus(),0);}});}
 async function regColab(){if(needTurno())return;const F=ST.f.p,c=F.colab;if(!c||P.desligado(c))return;
- if(P.on('MODAL_OBRIGATORIO')&&!F.modal){toast('Selecione como o colaborador veio hoje (ESG).','err');return;}
+ if(P.on('MODAL_OBRIGATORIO')&&!F.modal&&!F.retorno){toast('Selecione como o colaborador veio hoje (ESG).','err');return;}
  const b=$('#pgo-c');b.disabled=true;
  try{const r=await P.entradaPessoa({TIPO:F.tipo,NOME:c.nome,MATRICULA:c.mat,MODAL:F.modal||'',SEM_CRACHA:true,PORTEIRO_ENT:porteiro(),ORIGEM:'PC'},{mat:c.mat||null,nome:c.mat?null:c.nome});
   if(r.bloq){toast(r.bloq,'err');return;}
@@ -303,6 +312,8 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
    catch(e){msg+='. Não foi possível salvar no cadastro de pessoas'+(e.status===403?' (sem permissão — avise a TI)':'')+'.';kind='warn';}}
   toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true});drawPForm();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
+function desenhaFora(lista,cont){const el=$(lista);if(!el)return;const ft=P.foraTemporario(ST.d.movPHoje,ST.d.openP);const c=$(cont);if(c)c.textContent=ft.length;
+ el.innerHTML=ft.length?ft.map(m=>'<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA].filter(Boolean).join(' · '))+'</div><div class="detail">Saiu às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+')'+(m.PORTEIRO_SAI?' · '+esc(m.PORTEIRO_SAI):'')+'</div></div></div>').join(''):'<div class="empty">Ninguém fora temporariamente.</div>';}
 /* ================= VEÍCULOS ================= */
 const prevsAbertas=()=>ST.d.prev.filter(p=>!['Concluído','Cancelado','Não veio'].includes(P.situacaoPrev(p,ST.d.movVHoje)));
 /* só as opções do seletor são refeitas na atualização; o formulário fica como está */
@@ -445,13 +456,15 @@ async function dlgTurno(opt={}){const auto=opt&&opt.auto instanceof Date?opt.aut
 VIEWS.seguranca={
  mount(){if(!ST.isTI){page('Segurança (TI)','','<div class="panel"><p>Acesso restrito à TI.</p></div>');return;}
   page('Segurança (TI)','Como a Portaria funciona. Quem acessa o app é definido no hub (grupos).',
-   '<div class="cols"><div><div class="panel"><div class="panel-h">'+icon('gear')+'<h2>Funções</h2></div><div id="sfun"></div></div><div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Prazos e alertas</h2></div><div id="spz"></div><button class="btn primary" id="spzsave" type="button" style="margin-top:12px">Salvar prazos</button></div></div>'+
+   '<div class="cols"><div><div class="panel"><div class="panel-h">'+icon('gear')+'<h2>Funções</h2></div><div id="sfun"></div></div><div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Prazos e alertas</h2></div><div id="spz"></div><button class="btn primary" id="spzsave" type="button" style="margin-top:12px">Salvar prazos</button></div>'+
+   '<div class="panel"><div class="panel-h">'+icon('leaf')+'<h2>ESG — fatores de emissão</h2></div><div id="sesg"></div><button class="btn primary" id="sesgsave" type="button" style="margin-top:12px">Salvar fatores</button></div></div>'+
    '<div class="panel"><div class="panel-h">'+icon('user')+'<h2>Porteiros</h2><span class="sp"><span class="count" id="spc"></span></span></div><div class="grid2"><div class="field"><label for="snm">Nome do porteiro *</label><input id="snm" maxlength="60"></div><div class="field"><label for="sob">Empresa / observação</label><input id="sob" maxlength="80"></div></div><button class="btn primary" id="sadd" type="button">'+icon('plus')+'Cadastrar porteiro</button><div class="rows" id="spl" style="margin-top:14px"></div></div></div>'+
    '<div class="note">As alterações ficam em 00_Parametros_Apps (APP = Portaria) e valem para o computador e o celular na próxima atualização.</div>');
-  SHELL.page.oninput=e=>{const i=e.target.closest('[data-pz],[data-pzt]');if(i)i.dataset.dirty='1';};
+  SHELL.page.oninput=e=>{const i=e.target.closest('[data-pz],[data-pzt],[data-pzd]');if(i)i.dataset.dirty='1';};
   SHELL.page.onchange=async e=>{const sw=e.target.closest('[data-flag]');if(!sw)return;sw.disabled=true;
    try{await P.saveParam(sw.dataset.flag,sw.checked?'Sim':'Não');await P.loadParams();toast('Função '+(sw.checked?'ativada':'desativada')+'.');}catch(er){sw.checked=!sw.checked;writeErr(er);}finally{sw.disabled=false;}};
   SHELL.page.onclick=async e=>{
+   if(e.target.closest('#sesgsave')){const b=e.target.closest('#sesgsave');b.disabled=true;try{for(const i of $$('[data-pzd]')){const v=i.value.trim().replace(',','.');if(v!==''&&!(/^\d+(\.\d{1,5})?$/.test(v))){i.setAttribute('aria-invalid','true');throw new Error('Fator: número maior ou igual a zero (ex.: 0,12).');}i.removeAttribute('aria-invalid');const atual=P.param(i.dataset.pzd);const novo=v===''?null:Number(v);if(novo!==atual)await P.saveParam(i.dataset.pzd,v===''?'':String(novo));}await P.loadParams();this.drawConfig();toast('Fatores de emissão salvos.');}catch(er){writeErr(er);}finally{b.disabled=false;}}
    if(e.target.closest('#spzsave')){const b=e.target.closest('#spzsave');b.disabled=true;try{for(const i of $$('[data-pz]')){const n=Number(i.value);if(!(n>0)){i.setAttribute('aria-invalid','true');throw new Error('Prazos devem ser números maiores que zero.');}i.removeAttribute('aria-invalid');if(n!==P.param(i.dataset.pz))await P.saveParam(i.dataset.pz,n);}
     for(const i of $$('[data-pzt]')){const v=i.value.trim();if(i.dataset.pzt==='TURNO_HORARIOS'&&v!=='-'&&!/^([01]\d|2[0-3]):[0-5]\d(\s*,\s*([01]\d|2[0-3]):[0-5]\d)*$/.test(v)){i.setAttribute('aria-invalid','true');throw new Error('Horários no formato 06:00,18:00.');}i.removeAttribute('aria-invalid');if(v!==String(P.param(i.dataset.pzt)))await P.saveParam(i.dataset.pzt,v);}await P.loadParams();this.drawConfig();toast('Prazos salvos.');chrome();}catch(er){writeErr(er);}finally{b.disabled=false;}}
    if(e.target.closest('#sadd')){const n=$('#snm').value.trim();if(n.length<3){$('#snm').setAttribute('aria-invalid','true');toast('Informe o nome completo do porteiro.','err');return;}
@@ -461,13 +474,18 @@ VIEWS.seguranca={
   this.drawConfig();},
  drawConfig(){if(!$('#sfun'))return;
   const f2='<span class="chip warn" title="Depende de fluxo do Power Automate ainda não implantado">Fase 2 — fluxo ainda não implantado</span>';
-  $('#sfun').innerHTML=P.PARAM_DEF.filter(p=>p.t==='bool').map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div><label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label></div>').join('');
+  const sw=p=>'<label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label>';
+  $('#sesg').innerHTML='<div class="note" style="margin-top:0">kg CO₂e por km, <b>por pessoa</b>. Use os fatores do inventário de emissões da empresa. Bicicleta e a pé = 0. Carona: fator do carro dividido pela ocupação média. Campo vazio = não configurado (o relatório avisa).</div>'+
+   P.PARAM_DEF.filter(p=>p.esg).map(p=>p.t==='bool'?'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+' · distância do cadastro do colaborador (DISTANCIA_KM, ida)</span></div>'+sw(p)+'</div>'
+    :'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span></div><input type="text" inputmode="decimal" style="width:130px" data-pzd="'+p.k+'" value="'+esc(P.param(p.k)==null?'':String(P.param(p.k)).replace('.',','))+'" placeholder="a definir" aria-label="Fator de emissão — '+esc(p.d)+'"></div>').join('');
+  $('#sfun').innerHTML=P.PARAM_DEF.filter(p=>p.t==='bool'&&!p.esg).map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div><label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label></div>').join('');
   $('#spz').innerHTML=P.PARAM_DEF.filter(p=>p.t==='num'||p.t==='text').map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div>'+(p.t==='text'?'<input type="text" style="width:150px" data-pzt="'+p.k+'" value="'+esc(P.param(p.k))+'" aria-label="'+esc(p.d)+'">':'<input type="number" min="1" step="1" data-pz="'+p.k+'" value="'+esc(P.param(p.k))+'" aria-label="'+esc(p.d)+'">')+'</div>').join('');},
  update(){banners();if(!$('#spl'))return;
   /* funções: refletem o servidor (gravam na hora, não têm rascunho); prazos: só os não editados */
   $$('[data-flag]').forEach(i=>{if(!i.disabled)i.checked=P.on(i.dataset.flag);});
   $$('[data-pz]').forEach(i=>{if(!i.dataset.dirty&&document.activeElement!==i)i.value=P.param(i.dataset.pz);});
   $$('[data-pzt]').forEach(i=>{if(!i.dataset.dirty&&document.activeElement!==i)i.value=P.param(i.dataset.pzt);});
+  $$('[data-pzd]').forEach(i=>{if(!i.dataset.dirty&&document.activeElement!==i){const v=P.param(i.dataset.pzd);i.value=v==null?'':String(v).replace('.',',');}});
   const ps=P.porteiros;$('#spc').textContent=ps.filter(p=>p.ativo).length;
   $('#spl').innerHTML=ps.length?ps.map(p=>'<div class="row"><div class="main"><div class="t">'+esc(p.nome)+'</div><div class="meta">'+esc(p.obs||'—')+'</div></div><div class="act"><span class="chip dot '+(p.ativo?'ok':'')+'">'+(p.ativo?'Ativo':'Inativo')+'</span><button class="btn sm" data-pt="'+p.id+'" data-on="'+(p.ativo?'0':'1')+'">'+(p.ativo?'Desativar':'Reativar')+'</button></div></div>').join(''):'<div class="empty">Nenhum porteiro cadastrado.</div>';}
 };
@@ -594,10 +612,11 @@ const TIPO_GRUPO={'Todos':null,'Colaboradores':['Colaborador','Diretoria'],'Visi
 VIEWS.presenca={
  mount(){page('Na planta agora','Quem está dentro neste momento, conforme os registros da portaria. Somente consulta.',
   '<div class="panel"><div class="toolbar"><input type="search" data-bind="r.q" data-live="1" value="'+esc(ST.f.r.q)+'" placeholder="Buscar nome, matrícula, empresa, anfitrião…" aria-label="Buscar na planta"><button class="btn" type="button" id="rprint">Imprimir lista</button></div>'+
-  '<div class="seg" id="rft" style="margin-bottom:8px"></div><div class="rows" id="rlist"></div></div>');
+  '<div class="seg" id="rft" style="margin-bottom:8px"></div><div class="rows" id="rlist"></div>'+
+  '<div class="panel-h" style="margin-top:18px">'+icon('clock')+'<h2>Fora temporariamente</h2><span class="sp"><span class="count" id="rftc"></span></span></div><div class="rows" id="rftl"></div></div>');
   bindInputs(()=>this.update());
   SHELL.page.onclick=e=>{const f=e.target.closest('[data-rft]');if(f){ST.f.r.ft=f.dataset.rft;this.update();return;}if(e.target.closest('#rprint'))window.print();};},
- update(){banners();if(!$('#rlist'))return;const F=ST.f.r;const all=ST.d.openP;
+ update(){banners();if(!$('#rlist'))return;const F=ST.f.r;const all=ST.d.openP;desenhaFora('#rftl','#rftc');
   const cnt=k=>TIPO_GRUPO[k]?all.filter(m=>TIPO_GRUPO[k].includes(val(m.TIPO))).length:all.length;
   $('#rft').innerHTML=Object.keys(TIPO_GRUPO).map(k=>'<button type="button" data-rft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
   let rows=all.slice().sort((a,b)=>String(a.NOME).localeCompare(String(b.NOME),'pt-BR'));
@@ -623,11 +642,11 @@ function filtraRH(rows){const F=ST.f.r;let r=rows;if(TIPO_GRUPO[F.tipo])r=r.filt
 async function consultarRH(){const F=ST.f.r;const b=$('#rgo');
  const erro=P.validarPeriodo(F.de,F.ate);if(erro){toast(erro,'err');return;}
  b.disabled=true;$('#rres').innerHTML='<div class="panel"><div class="empty">Consultando…</div></div>';
- try{const rows=await P.movimentosPeriodo(F.de,F.ate);ST.r={de:F.de,ate:F.ate,rows:filtraRH(rows),truncated:!!rows.truncated};desenhaRH();}
+ try{const [rows,dist]=await Promise.all([P.movimentosPeriodo(F.de,F.ate),P.distancias()]);ST.r={de:F.de,ate:F.ate,rows:filtraRH(rows),truncated:!!rows.truncated,dist};desenhaRH();}
  catch(e){$('#rres').innerHTML='';toast(e.message||'Erro na consulta.','err');}finally{const x=$('#rgo');if(x)x.disabled=false;}}
 function desenhaRH(){const el=$('#rres');if(!el||!ST.r)return;const R=ST.r,rows=R.rows;const MAXL=300;
  const pessoas=new Set(rows.map(m=>m.MATRICULA?'M:'+m.MATRICULA:'N:'+norm(m.NOME))).size;
- const esg=P.resumoESG(rows);
+ const esg=P.resumoESG(rows,R.dist);const n1=v=>(Math.round(v*10)/10).toLocaleString('pt-BR');
  const cb=$('#rcsv');if(cb)cb.disabled=!rows.length;
  el.innerHTML=(R.truncated?'<div class="banner warn">'+icon('alert')+'<span>O período tem mais registros do que o limite de leitura. Reduza o período — o resultado abaixo está incompleto.</span></div>':'')+
   '<div class="cols"><div class="panel"><div class="panel-h">'+icon('users')+'<h2>Movimentos</h2><span class="sp"><span class="count">'+rows.length+'</span></span></div><div class="detail" style="margin-bottom:6px">'+esc(fmt.data(R.de)+' a '+fmt.data(R.ate))+' · '+rows.length+' movimento(s) · '+pessoas+' pessoa(s)</div>'+
@@ -635,10 +654,14 @@ function desenhaRH(){const el=$('#rres');if(!el||!ST.r)return;const R=ST.r,rows=
    return '<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,val(m.MODAL)&&'veio de '+val(m.MODAL)].filter(Boolean).join(' · '))+'</div>'+
     '<div class="detail">Entrada '+esc(fmt.dmhm(m.ENTRADA))+(m.PORTEIRO_ENT?' ('+esc(m.PORTEIRO_ENT)+')':'')+(m.SAIDA?' · Saída '+esc(fmt.dmhm(m.SAIDA))+(m.PORTEIRO_SAI?' ('+esc(m.PORTEIRO_SAI)+')':'')+' · '+esc(perm):' · ainda dentro')+(m.SEM_CRACHA===true?' · sem crachá':'')+'</div></div></div>';}).join('')+(rows.length>MAXL?'<div class="empty">Mostrando '+MAXL+' de '+rows.length+'. Exporte para ver todos.</div>':''):'<div class="empty">Nenhum movimento no período para o filtro.</div>')+'</div></div>'+
   '<div class="panel"><div class="panel-h">'+icon('leaf')+'<h2>ESG — como os colaboradores vieram</h2></div>'+
-  (esg.total?'<div class="detail" style="margin-bottom:8px">'+esg.total+' colaborador-dia(s) no período (cada pessoa conta uma vez por dia).</div><table class="rtab"><thead><tr><th>Meio de transporte</th><th>Colaborador-dia</th><th>%</th></tr></thead><tbody>'+
-    esg.linhas.map(l=>'<tr><td>'+esc(l.modal)+'</td><td>'+l.n+'</td><td>'+l.pct.toFixed(1).replace('.',',')+'%</td></tr>').join('')+'</tbody></table>'
+  (esg.total?'<div class="detail" style="margin-bottom:8px">'+esg.total+' colaborador-dia(s) no período (cada pessoa conta uma vez por dia)'+(esg.comDist?' · km '+(esg.mult===2?'ida e volta':'só ida')+' pela distância do cadastro':'')+'.</div><div class="rtabw"><table class="rtab"><thead><tr><th>Meio de transporte</th><th>Colab.-dia</th><th>%</th>'+(esg.comDist?'<th>km</th><th>kg CO₂e</th>':'')+'</tr></thead><tbody>'+
+    esg.linhas.map(l=>'<tr><td>'+esc(l.modal)+'</td><td>'+l.n+'</td><td>'+l.pct.toFixed(1).replace('.',',')+'%</td>'+(esg.comDist?'<td>'+n1(l.km)+'</td><td>'+(l.modal==='Não informado'?'—':l.semFator?'<span title="Fator não configurado">—*</span>':n1(l.kg))+'</td>':'')+'</tr>').join('')+
+    (esg.comDist?'<tr class="tot"><td>Total</td><td>'+esg.total+'</td><td>100%</td><td>'+n1(esg.km)+'</td><td>'+n1(esg.kg)+(esg.kgParcial?'*':'')+'</td></tr>':'')+'</tbody></table></div>'+
+    (!esg.comDist?'<div class="note">km e CO₂ não calculados: sua conta não lê a 00_Cadastro_Colaborador (distância casa–trabalho). Peça à TI.</div>':
+     (esg.semDist?'<div class="note">'+esg.semDist+' colaborador-dia(s) sem DISTANCIA_KM no cadastro — fora do cálculo de km e CO₂.</div>':'')+
+     (esg.semFator.length?'<div class="note">* Fator de emissão não configurado para: '+esc(esg.semFator.join(', '))+'. Configure em Segurança (TI) → ESG.</div>':''))
    :'<div class="empty">Sem entradas de colaboradores no período.</div>')+'</div></div>';}
-function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMovimentos(ST.r.rows);
+function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMovimentos(ST.r.rows,ST.r.dist);
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='portaria-movimentos_'+ST.r.de+'_a_'+ST.r.ate+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
  toast('Arquivo gerado: '+ST.r.rows.length+' movimento(s).');}
 /* ================= início ================= */
