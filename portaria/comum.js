@@ -18,11 +18,11 @@
 (function(){
 'use strict';
 const {sp,norm,val,dateKey,todayKey}=PS;
-const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas'};
-const OPCIONAIS=new Set(['transp','pessoas']);
+const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador'};
+const OPCIONAIS=new Set(['transp','pessoas','cadColab']);
 /* ---------- contrato com o SharePoint (conferido na abertura) ---------- */
 const ESTRUTURA={
- movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA'],
+ movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA','SAIDA_TIPO'],
  movV:['PLACA','MOTORISTA','EMPRESA','FINALIDADE','NF','PREVISAO','ENTRADA','SAIDA','AUT_EXPEDICAO','AUT_POR','STATUS_MOV','PORTEIRO_ENT','PORTEIRO_SAI','CHAVE_ABERTA'],
  agend:['CODIGO','TIPO','NOME','EMPRESA','DOC_MASC','DATA','HORA','MOTIVO','STATUS','ANFITRIAO_NOME','ANFITRIAO_MATRICULA'],
  prevV:['TIPO','DATA','HORA','TRANSPORTADORA','REMETENTE','PLACA','MOTORISTA','NF','ORDEM','AREA','STATUS'],
@@ -37,7 +37,7 @@ const UNICOS={movP:['CHAVE_ABERTA'],movV:['CHAVE_ABERTA']};
 const TIPOS={dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'}};
 const TIPO_NOME={text:'Texto (uma linha)',choice:'Escolha'};
 const OPCOES={
- movP:{STATUS_MOV:['Aberto','Encerrado'],TIPO:['Colaborador','Diretoria','Visitante','Prestador','Terceiro'],MODAL:['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'],ORIGEM:['PC','Celular (QR)','Celular (digitado)']},
+ movP:{STATUS_MOV:['Aberto','Encerrado'],TIPO:['Colaborador','Diretoria','Visitante','Prestador','Terceiro'],MODAL:['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'],ORIGEM:['PC','Celular (QR)','Celular (digitado)'],SAIDA_TIPO:['Final','Temporária']},
  movV:{STATUS_MOV:['Aberto','Encerrado'],FINALIDADE:['Coleta','Entrega','Serviço','Visita','Outro'],AUT_EXPEDICAO:['Pendente','Autorizado','Exceção']},
  agend:{STATUS:['Agendado','Na portaria','Entrou','Saiu','Não veio','Cancelado']},
  prevV:{TIPO:['Coleta','Entrega'],STATUS:['Previsto','Cancelado']},
@@ -57,6 +57,14 @@ const PARAM_DEF=[
  {mod:'Funções',k:'ENVIA_QR_WA',d:'Enviar o QR do convite por WhatsApp ao visitante',t:'bool',v:'Não',fase2:true},
  {mod:'Funções',k:'AVISO_MERCADORIA',d:'Avisar chegada e entrega de mercadoria no WhatsApp',t:'bool',v:'Não',fase2:true},
  {mod:'Funções',k:'LIBERACAO_WHATSAPP',d:'Anfitrião libera a entrada respondendo 1/2 no WhatsApp',t:'bool',v:'Não',fase2:true},
+ {mod:'ESG',k:'ESG_IDA_VOLTA',d:'Calcular ida e volta (distância × 2 por dia)',t:'bool',v:'Sim',esg:true},
+ {mod:'ESG',k:'CO2_KM_CARRO',d:'Carro',t:'dec',v:null,esg:true},
+ {mod:'ESG',k:'CO2_KM_MOTO',d:'Moto',t:'dec',v:null,esg:true},
+ {mod:'ESG',k:'CO2_KM_ONIBUS',d:'Ônibus/Fretado',t:'dec',v:null,esg:true},
+ {mod:'ESG',k:'CO2_KM_CARONA',d:'Carona',t:'dec',v:null,esg:true},
+ {mod:'ESG',k:'CO2_KM_BICICLETA',d:'Bicicleta',t:'dec',v:0,esg:true},
+ {mod:'ESG',k:'CO2_KM_A_PE',d:'A pé',t:'dec',v:0,esg:true},
+ {mod:'ESG',k:'CO2_KM_OUTRO',d:'Outro',t:'dec',v:null,esg:true},
  {mod:'Turno',k:'TURNO_HORARIOS',d:'Horários de troca de turno (HH:MM, separados por vírgula)',t:'text',v:'06:00,18:00'},
  {mod:'Turno',k:'TURNO_TOLERANCIA',d:'Tolerância para passar o turno depois do horário (minutos)',t:'num',v:60},
  {mod:'Prazos',k:'ALERTA_PERMANENCIA',d:'Pessoa com entrada aberta há mais de (horas) vira pendência',t:'num',v:14},
@@ -83,7 +91,7 @@ async function boot({posto=true,log=false,agendar=false,rh=false}={}){
  const all=await sp.lists();
  const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[])]);
  const faltando=[];
- for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n];if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
+ for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n]||(k==='cadColab'?all['00_Cadastro_Colaboradores']:undefined);if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
  if(faltando.length)return {ok:false,faltando};
  const checks=await Promise.all(Object.entries(ESTRUTURA).filter(([k])=>precisa.has(k)&&L[k]).map(async([k,cols])=>{try{const have=await sp.columns(L[k]);COLS[k]=have;const out=[],nm=LISTAS[k];
   cols.filter(c=>!have.has(c)).forEach(c=>out.push(nm+': falta a coluna '+c));
@@ -109,7 +117,10 @@ async function loadParams(){
   P2[r.CHAVE]={id:r.id,valor:r.VALOR,ativo,mod:r.MODULO};});
  PARAMS=P2;PORTEIROS=PT.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));PARAMS_AT=Date.now();
 }
-function param(k){const def=PARAM_DEF.find(p=>p.k===k);const r=PARAMS[k];const v=(r&&r.ativo&&r.valor!=null&&r.valor!=='')?r.valor:def?.v;return def?.t==='num'?Number(v)||Number(def.v):v;}
+function param(k){const def=PARAM_DEF.find(p=>p.k===k);const r=PARAMS[k];const v=(r&&r.ativo&&r.valor!=null&&r.valor!=='')?r.valor:def?.v;
+ if(def?.t==='dec'){if(v==null||String(v).trim()==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)&&n>=0?n:null;}
+ return def?.t==='num'?Number(v)||Number(def.v):v;}
+const chaveCO2=modal=>'CO2_KM_'+norm(modal).toUpperCase().replace(/\/.*$/,'').replace(/[^A-Z]+/g,'_').replace(/^_|_$/g,'');
 const on=k=>isTrue(param(k));
 async function saveParam(k,valor){const def=PARAM_DEF.find(p=>p.k===k);const r=PARAMS[k];const v=String(valor);
  if(r)await sp.patch(L.params,r.id,{VALOR:v,ATIVO:true});
@@ -241,9 +252,9 @@ function regraConvite(a,aberto){
 function situacaoPrev(p,movsHoje){const ms=movsHoje.filter(m=>lid(m.PREVISAOLookupId)===String(p.id));
  if(ms.some(m=>val(m.STATUS_MOV)==='Aberto'))return 'Na portaria';if(ms.length)return 'Concluído';return val(p.STATUS)||'Previsto';}
 function resumoTurno(d){
- const p=d.openP||[],v=d.openV||[],m=d.merc||[],o=d.ocor||[];
+ const p=d.openP||[],v=d.openV||[],m=d.merc||[],o=d.ocor||[];const ft=foraTemporario(d.movPHoje,d.openP);
  const nomes=p.slice(0,12).map(x=>x.NOME).join(', ')+(p.length>12?'…':'');
- return ['Na planta: '+p.length+(p.length?' ('+nomes+')':''),'Veículos no pátio: '+v.length+(v.length?' ('+v.map(x=>x.PLACA).join(', ')+')':''),'Mercadorias aguardando: '+m.length,'Ocorrências abertas: '+o.length].join('\n');}
+ return ['Na planta: '+p.length+(p.length?' ('+nomes+')':''),'Veículos no pátio: '+v.length+(v.length?' ('+v.map(x=>x.PLACA).join(', ')+')':''),...(ft.length?['Fora temporariamente: '+ft.length+' ('+ft.slice(0,12).map(x=>x.NOME).join(', ')+')']:[]),'Mercadorias aguardando: '+m.length,'Ocorrências abertas: '+o.length].join('\n');}
 /* ---------- gravações ---------- */
 const isDupErr=e=>e&&(e.status===409||/duplica|unique|exclusiv|already exists|valores duplicados/i.test(String(e.detail||'')+' '+String(e.message||'')));
 /* cria o movimento; se o servidor recusar ou não confirmar, relê pela chave:
@@ -293,11 +304,11 @@ async function entradaPessoa(fields,{agId=null,mat=null,nome=null,permitirHomoni
  if(agId&&!(await statusConvite(agId,'Entrou')))parcial='Entrada registrada. A atualização do convite ficou pendente — o computador da portaria corrige automaticamente.';
  return {ok:true,novo:res.novo,confirmado:!!res.confirmado,parcial};
 }
-async function saidaPessoa(mov,porteiro){
+async function saidaPessoa(mov,porteiro,{temporaria=false}={}){
  await conferirTurno(porteiro);
  const atual=await getItem('movP',mov.id);
  if(val(atual.STATUS_MOV)!=='Aberto')return {jaSaiu:true,mov:atual};
- const r=await patchVersao('movP',mov.id,{SAIDA:now(),STATUS_MOV:'Encerrado',PORTEIRO_SAI:porteiro,CHAVE_ABERTA:(atual.CHAVE_ABERTA||'')+'#'+mov.id},atual._etag,at=>val(at.STATUS_MOV)==='Aberto');
+ const r=await patchVersao('movP',mov.id,{SAIDA:now(),STATUS_MOV:'Encerrado',PORTEIRO_SAI:porteiro,SAIDA_TIPO:temporaria?'Temporária':'Final',CHAVE_ABERTA:(atual.CHAVE_ABERTA||'')+'#'+mov.id},atual._etag,at=>val(at.STATUS_MOV)==='Aberto');
  if(r.conflito)return {jaSaiu:true,mov:r.mov};
  let parcial=null;const ag=lid(atual.AGENDAMENTOLookupId);
  if(ag&&!(await statusConvite(ag,'Saiu')))parcial='Saída registrada. A atualização do convite ficou pendente — o computador da portaria corrige automaticamente.';
@@ -379,6 +390,16 @@ async function autorizarPelaExpedicao(id,quem,obs){const at=await getItem('movV'
  const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
  const r=await patchVersao('movV',id,{AUT_EXPEDICAO:'Autorizado',AUT_POR:('Expedição (no app): '+quem+' às '+hm+(obs?' — '+obs:'')).slice(0,250)},at._etag,x=>val(x.STATUS_MOV)==='Aberto'&&val(x.AUT_EXPEDICAO)!=='Autorizado');
  return r.conflito?(val(r.mov.STATUS_MOV)!=='Aberto'?{jaSaiu:true}:{jaAut:true,mov:r.mov}):{ok:true};}
+/* quem saiu temporariamente hoje e ainda não voltou (última movimentação do dia = saída temporária) */
+const chavePessoa=m=>m.MATRICULA?'M:'+String(m.MATRICULA).trim():'N:'+norm(m.NOME)+'|'+norm(m.EMPRESA);
+function foraTemporario(movsHoje,abertos){const dentro=new Set((abertos||[]).map(chavePessoa));const ult=new Map();
+ (movsHoje||[]).filter(m=>m.SAIDA&&ehHoje(m.SAIDA)).forEach(m=>{const k=chavePessoa(m);const u=ult.get(k);if(!u||new Date(m.SAIDA)>new Date(u.SAIDA))ult.set(k,m);});
+ return [...ult.entries()].filter(([k,m])=>!dentro.has(k)&&val(m.SAIDA_TIPO)==='Temporária').map(([,m])=>m).sort((a,b)=>new Date(a.SAIDA)-new Date(b.SAIDA));}
+/* retorno no mesmo dia: devolve a saída temporária de hoje (para não pedir o transporte de novo) */
+async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return null;
+ const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/SAIDA ge '"+desdeHoje()+"'&$top=999");
+ const meus=rs.filter(x=>String(x.MATRICULA||'').trim()===m&&ehHoje(x.SAIDA)).sort((a,b)=>new Date(b.SAIDA)-new Date(a.SAIDA));
+ return meus[0]&&val(meus[0].SAIDA_TIPO)==='Temporária'?meus[0]:null;}
 /* ---------- RH: consulta por período, ESG e exportação (somente leitura) ---------- */
 const CONSULTA_MAX_DIAS=31;
 function validarPeriodo(de,ate){const ok=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'');if(!ok(de)||!ok(ate))return 'Informe as datas De e Até.';
@@ -387,16 +408,34 @@ function validarPeriodo(de,ate){const ok=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'');if
 /* entradas no período (dia civil local), pelo índice de ENTRADA */
 async function movimentosPeriodo(de,ate){const a=new Date(de+'T00:00:00').toISOString(),b=new Date(ate+'T23:59:59').toISOString();
  const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/ENTRADA ge '"+a+"' and fields/ENTRADA le '"+b+"'&$top=999");return rs;}
-/* cada colaborador conta uma vez por dia; quem não informou entra como "Não informado" */
-function resumoESG(rows){const vistos=new Map();
- rows.filter(m=>['Colaborador','Diretoria'].includes(val(m.TIPO))).forEach(m=>{const k=(m.MATRICULA?'M:'+String(m.MATRICULA).trim():'N:'+norm(m.NOME))+'|'+new Date(m.ENTRADA).toDateString();
-  const md=val(m.MODAL)||'';if(!vistos.has(k)||(!vistos.get(k)&&md))vistos.set(k,md);});
- const cont={};vistos.forEach(md=>{const x=md||'Não informado';cont[x]=(cont[x]||0)+1;});const total=vistos.size;
- const linhas=Object.entries(cont).map(([modal,n])=>({modal,n,pct:total?n*100/total:0})).sort((a,b)=>(a.modal==='Não informado')-(b.modal==='Não informado')||b.n-a.n);return {total,linhas};}
-function csvMovimentos(rows){const q=v=>{const s=String(v??'');return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+/* distância casa–trabalho (km, ida) da 00_Cadastro_Colaborador — só matrícula e distância são lidas */
+let DIST=null,DIST_AT=0;
+async function distancias(){if(!L.cadColab)return null;if(DIST&&Date.now()-DIST_AT<20*60e3)return DIST;
+ try{const rs=await sp.items(L.cadColab,'$expand=fields($select=MATRICULA,DISTANCIA_KM)&$top=999');const m=new Map();
+  rs.forEach(r=>{const k=String(r.MATRICULA??'').trim();const d=Number(String(r.DISTANCIA_KM??'').replace(',','.'));if(k&&Number.isFinite(d)&&d>0)m.set(k,d);});DIST=m;DIST_AT=Date.now();return m;}
+ catch(e){console.warn('Distâncias indisponíveis',e.message);return null;}}
+/* cada colaborador conta uma vez por dia; km = distância × 2 (ida e volta, se ligado); CO2 = km × fator do meio de transporte */
+function diasColaborador(rows){const dias=new Map();
+ rows.filter(m=>['Colaborador','Diretoria'].includes(val(m.TIPO))).slice().sort((a,b)=>new Date(a.ENTRADA)-new Date(b.ENTRADA)).forEach(m=>{
+  const k=(m.MATRICULA?'M:'+String(m.MATRICULA).trim():'N:'+norm(m.NOME))+'|'+new Date(m.ENTRADA).toDateString();
+  const md=val(m.MODAL)||'';const d=dias.get(k);if(!d)dias.set(k,{mov:m,modal:md,mat:String(m.MATRICULA||'').trim()});else if(!d.modal&&md){d.modal=md;}});
+ return dias;}
+function resumoESG(rows,dist){const dias=diasColaborador(rows);const mult=on('ESG_IDA_VOLTA')?2:1;
+ const ag={};let semDist=0,kmT=0,kgT=0,kgParcial=false;const semFator=new Set();
+ dias.forEach(d=>{const modal=d.modal||'Não informado';const a=ag[modal]||(ag[modal]={modal,n:0,km:0,kg:0,semFator:false});a.n++;
+  const km=dist&&d.mat&&dist.has(d.mat)?dist.get(d.mat)*mult:null;
+  if(dist&&km==null)semDist++;
+  if(km!=null){a.km+=km;kmT+=km;const f=d.modal?param(chaveCO2(d.modal)):null;if(f==null){a.semFator=true;kgParcial=true;if(d.modal)semFator.add(d.modal);}else{a.kg+=km*f;kgT+=km*f;}}});
+ const total=dias.size;
+ const linhas=Object.values(ag).map(a=>({...a,pct:total?a.n*100/total:0})).sort((a,b)=>(a.modal==='Não informado')-(b.modal==='Não informado')||b.n-a.n);
+ return {total,linhas,km:kmT,kg:kgT,semDist,semFator:[...semFator],kgParcial,comDist:!!dist,mult};}
+/* km e CO2 do dia ficam só na primeira entrada do colaborador no dia (somar a coluna no Excel não duplica) */
+function esgPorMovimento(rows,dist){const out=new Map();if(!dist)return out;const mult=on('ESG_IDA_VOLTA')?2:1;
+ diasColaborador(rows).forEach(d=>{const km=d.mat&&dist.has(d.mat)?dist.get(d.mat)*mult:null;if(km==null)return;const f=d.modal?param(chaveCO2(d.modal)):null;out.set(d.mov.id,{km,kg:f==null?null:km*f});});return out;}
+function csvMovimentos(rows,dist){const esg=esgPorMovimento(rows,dist);const n2=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');const q=v=>{const s=String(v??'');return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
  const dt=v=>v?new Date(v).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(',',''):'';
- const cab=['Entrada','Saída','Permanência (min)','Tipo','Nome','Matrícula','Empresa','Anfitrião','Meio de transporte','Sem crachá','Origem','Porteiro entrada','Porteiro saída'];
- const lin=rows.map(m=>[dt(m.ENTRADA),dt(m.SAIDA),m.SAIDA?Math.round((new Date(m.SAIDA)-new Date(m.ENTRADA))/6e4):'',val(m.TIPO),m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,val(m.MODAL),m.SEM_CRACHA===true?'Sim':'',val(m.ORIGEM),m.PORTEIRO_ENT,m.PORTEIRO_SAI].map(q).join(';'));
+ const cab=['Entrada','Saída','Tipo de saída','Permanência (min)','Tipo','Nome','Matrícula','Empresa','Anfitrião','Meio de transporte','Distância do dia (km)','kg CO2e do dia','Sem crachá','Origem','Porteiro entrada','Porteiro saída'];
+ const lin=rows.map(m=>{const e=esg.get(m.id);return [dt(m.ENTRADA),dt(m.SAIDA),val(m.SAIDA_TIPO),m.SAIDA?Math.round((new Date(m.SAIDA)-new Date(m.ENTRADA))/6e4):'',val(m.TIPO),m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,val(m.MODAL),e?n2(e.km):'',e?n2(e.kg):'',m.SEM_CRACHA===true?'Sim':'',val(m.ORIGEM),m.PORTEIRO_ENT,m.PORTEIRO_SAI].map(q).join(';');});
  return '﻿'+[cab.join(';'),...lin].join('\r\n');}
 /* ---------- agendamento pelo colaborador (agendar.html) ---------- */
 const ALFA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -454,7 +493,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
- CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,
+ CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
