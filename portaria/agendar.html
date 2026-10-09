@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Agendar visita | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.3">
+<link rel="stylesheet" href="/core/polystell.css?v=2.4">
 <style>
 .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:14px;margin:4px 0 12px}
 .kv dt{color:var(--muted)}
@@ -25,8 +25,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para agendar visitas.</p></div></noscript>
-<script src="/core/polystell.js?v=2.3"></script>
-<script src="comum.js?v=2.3"></script>
+<script src="/core/polystell.js?v=2.4"></script>
+<script src="comum.js?v=2.4"></script>
 <script>
 'use strict';
 /* Agendar visita — página do colaborador (Portaria v2.2).
@@ -88,7 +88,7 @@ async function salvar(){const F=ST.f;
  const f={TIPO:F.tipo,NOME:F.nome,EMPRESA:F.empresa,DOC:F.doc,WHATSAPP:waOn()?F.wa:'',dia:F.dia,HORA:F.hora,MOTIVO:F.motivo};
  const erro=P.validarConvite(f);if(erro){toast(erro,'err');return;}
  const b=$('#vgo');b.disabled=true;
- try{const a=await P.criarConvite(f,ST.me);
+ try{const a=await P.criarConvite(f,ST.me);ST.me.criados.add(String(a.id));
   ST.f={tipo:F.tipo,nome:'',empresa:'',doc:'',wa:'',dia:F.dia,hora:'',motivo:''};desenhaForm();
   toast('Visita agendada: '+a.NOME);await refresh();const novo=ST.lista.find(x=>x.id===a.id)||a;convite(novo);}
  catch(e){if(e.code==='validacao')toast(e.message,'err');else if(e.uncertain){toast('Sem confirmação do servidor. Confira a lista antes de agendar de novo.','warn');refresh();}else toast(e.message||'Erro ao agendar.','err');}
@@ -132,7 +132,8 @@ async function refresh(){if(running)return running;
   if(!b.ok){PS.screens.error('Agendamento indisponível','A página precisa destes itens no SharePoint. Avise a TI:',{details:b.faltando});return;}
   PS.auth.ready();window.addEventListener('ps:session',()=>refresh());
   const c=await P.meuCadastro(acc.username);
-  ST.me={nome:c?.nome||acc.name||acc.username,mat:c?.mat||'',dep:c?.dep||'',email:String(acc.username||'').toLowerCase()};
+  ST.me={nome:c?.nome||acc.name||acc.username,mat:c?.mat||'',dep:c?.dep||'',email:String(acc.username||'').toLowerCase(),
+   id:String(acc.localAccountId||String(acc.homeAccountId||'').split('.')[0]||'').toLowerCase(),criados:new Set()};
   SHELL=PS.mount({app:'Portaria',nav:[{id:'visitas',label:'Minhas visitas',icon:'calendar',section:'Visitas'}],current:'visitas',onNav:()=>{},account:acc});
   SHELL.setCurrent('visitas','Minhas visitas');tela();await refresh();qrLib();
   setInterval(()=>{if(!document.hidden)refresh();},120000);

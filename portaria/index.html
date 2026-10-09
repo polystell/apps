@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.3">
+<link rel="stylesheet" href="/core/polystell.css?v=2.4">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -30,16 +30,17 @@
 .lrot2 input{flex:1;min-width:0}
 .lrot2 .btn{flex:none}
 @media(max-width:560px){.lrot2{flex-direction:column}}
+@media(max-width:600px){.setrow{flex-wrap:wrap}.setrow .main{flex-basis:100%}.setrow .chip{white-space:normal;max-width:100%}.setrow input[type=text],.setrow input[type=number]{width:100%!important}}
 pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0 0 12px;color:#44526a}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.3"></script>
-<script src="comum.js?v=2.3"></script>
+<script src="/core/polystell.js?v=2.4"></script>
+<script src="comum.js?v=2.4"></script>
 <script>
 'use strict';
-/* Portaria · Controle de Acesso — PC da guarita + Logística (v2.2).
+/* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
    Correções do parecer: formulário preservado (atualização automática não
    recria formulários), checagem de entrada aberta no servidor, presença
    por STATUS_MOV, gravação parcial reconciliada, regras de convite,
@@ -50,13 +51,15 @@ const ST={view:'painel',isTI:false,isExp:false,posto:true,log:false,turno:null,b
  d:{openP:[],openV:[],movVHoje:[],movPHoje:[],agenda:[],agendaRec:[],prev:[],prevR:[],merc:[],ocor:[],trunc:false},
  sync:{at:null,err:null},
  f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
-    v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:''},
+    v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:'',auto:{}},
     m:{dest:null,setor:'',vol:'1',rem:'',desc:'',modo:'pessoa',setorDest:''},
     o:{tipo:'Segurança',grav:'Baixa',desc:''},
     h:{k:'p',q:''},
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
     lv:{canc:false}}};
-const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao';
+const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_GUARITA='grp-portaria-guarita';
+/* a guarita é a conta da portaria (permissão direta) ou quem estiver no grupo da guarita */
+const CONTAS_POSTO=['portaria@polystell.com.br'];
 let SHELL=null,TRANSP={};
 const TITLES={painel:'Painel do posto',pessoas:'Pessoas',veiculos:'Veículos',mercadorias:'Mercadorias',ocorrencias:'Ocorrências',turno:'Turno',historico:'Histórico do dia',logistica:'Coletas e entregas',autorizar:'Autorizar coletas',seguranca:'Segurança (TI)'};
 /* menu por papel: guarita (portaria@ e TI), Logística (Expedição e TI), Segurança (TI).
@@ -95,7 +98,7 @@ async function refresh(){if(running){again=true;return running;}
  running=(async()=>{do{again=false;await doRefresh();}while(again);})();
  try{await running;}finally{running=null;}}
 async function doRefresh(){
- const prevR=()=>P.prevEntre(-1,14);
+ const prevR=()=>P.prevEntre(-1,P.JANELA_PREV);
  const plan=ST.posto?[['openP',P.abertosP],['openV',P.abertosV],['movVHoje',P.veicHoje],['movPHoje',P.pessoasHoje],['agenda',P.agendaHoje],['agendaRec',P.agendaRecente],['prev',P.prevHoje],['merc',P.mercAguardando],['ocor',P.ocorAbertas],['turno',P.turnoAtual],['params',P.loadParams]]
   :[['openV',P.abertosV],['movVHoje',P.veicHoje],['params',P.loadParams]];
  if(ST.log)plan.push(['prevR',prevR]);
@@ -126,7 +129,8 @@ function banners(){const el=$('#banners');if(!el)return;let h='';
  if(ST.d.trunc)h+='<div class="banner warn">'+icon('alert')+'<span>Algumas listas passaram do limite de leitura e não foram carregadas por completo. Avise a TI.</span></div>';
  el.innerHTML=h;}
 function needTurno(){if(tAtivo()||!ST.posto)return false;dlgTurno();return true;}
-function writeErr(e){if(e.code==='session'){toast(e.message,'warn');return;}if(e.uncertain){toast('Sem confirmação do servidor. Confira a lista antes de repetir.','warn');refresh();}else toast(e.message||'Erro ao gravar.','err');}
+function writeErr(e){if(e.code==='session'){toast(e.message,'warn');return;}
+ if(e.code==='turno'){toast(e.message,'warn');refresh().then(()=>{if(!tAtivo())dlgTurno();});return;}if(e.uncertain){toast('Sem confirmação do servidor. Confira a lista antes de repetir.','warn');refresh();}else toast(e.message||'Erro ao gravar.','err');}
 /* ---------------- navegação ---------------- */
 const VIEWS={};
 function page(title,sub,body,acts=''){SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>'+esc(title)+'</h1>'+(sub?'<p>'+esc(sub)+'</p>':'')+'</div>'+acts+'</div><div id="banners"></div>'+body;banners();}
@@ -185,11 +189,18 @@ async function chegada(id){if(needTurno())return;const a=ST.d.agenda.find(x=>x.i
    (r.reentrada?'<div class="note">Convite de hoje, já utilizado. Reentrada permitida no mesmo dia.</div>':'')+
    '<div class="field"><label for="dcr">Crachá entregue (nº)</label><input id="dcr" maxlength="12" placeholder="Ex.: V-012"></div>',
   actions:[{label:'Cancelar',value:null},{label:'Registrar entrada',kind:'primary',onClick:async d=>{
-   try{const res=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:d.querySelector('#dcr').value.trim(),SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'PC',AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
+   const fields={TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:d.querySelector('#dcr').value.trim(),SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'PC',AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''};
+   try{const res=await P.entradaPessoa(fields,{agId:a.id});
     if(res.bloq){toast(res.bloq,'err');refresh();return true;}
+    if(res.dup&&res.outroCanal){setTimeout(()=>outraEntradaMesmoNome(a,res.dup,fields),60);return true;}
     if(res.dup)toast(a.NOME+' já está registrado(a) como dentro desde '+quando(res.dup.ENTRADA)+'.','warn');
     else if(res.parcial)toast(res.parcial,'warn');else toast('Entrada registrada: '+a.NOME);
     refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
+async function outraEntradaMesmoNome(a,dup,fields){
+ const ch=await dialog({title:'Já existe entrada aberta com este nome',html:'<p><b>'+esc(dup.NOME)+'</b>'+(dup.EMPRESA?' · '+esc(dup.EMPRESA):'')+' entrou '+quando(dup.ENTRADA)+' por outro registro (sem este convite) e não tem saída.</p><p>Se for a mesma pessoa, ela já está dentro — não registre de novo. Se for outra pessoa com o mesmo nome, confirme.</p>',
+  actions:[{label:'Fechar',value:null},{label:'Saída do registro anterior',value:'s'},{label:'É outra pessoa',kind:'primary',value:'n'}]});
+ if(ch==='s'){doSaidaPessoa(dup);return;}if(ch!=='n')return;
+ try{const r=await P.entradaPessoa(fields,{agId:a.id,permitirHomonimo:true});if(r.bloq)toast(r.bloq,'err');else if(r.dup)toast(a.NOME+' já está dentro por este convite.','warn');else toast(r.parcial||'Entrada registrada: '+a.NOME,r.parcial?'warn':'ok');refresh();}catch(e){writeErr(e);}}
 async function doSaidaPessoa(m){if(needTurno())return;
  await dialog({title:'Registrar saída',html:'<p><b>'+esc(m.NOME)+'</b> · entrou '+quando(m.ENTRADA)+' ('+fmt.dur(idade(m.ENTRADA))+')</p>'+(m.CRACHA?'<div class="banner info">'+icon('check')+'<span>Recolha o crachá <b>'+esc(m.CRACHA)+'</b>.</span></div>':''),
   actions:[{label:'Cancelar',value:null},{label:'Confirmar saída',kind:'primary',onClick:async()=>{
@@ -283,25 +294,33 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
   toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true});drawPForm();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
 /* ================= VEÍCULOS ================= */
+const prevsAbertas=()=>ST.d.prev.filter(p=>!['Concluído','Cancelado','Não veio'].includes(P.situacaoPrev(p,ST.d.movVHoje)));
+/* só as opções do seletor são refeitas na atualização; o formulário fica como está */
+function drawPrevSel(){const box=$('#vprevbox');if(!box)return;const F=ST.f.v;const prevs=prevsAbertas();
+ if(F.prev&&!prevs.some(p=>p.id===F.prev)){const era=ST.d.prev.find(p=>p.id===F.prev);F.prev='';if(era)toast('A previsão vinculada ficou "'+P.situacaoPrev(era,ST.d.movVHoje)+'" — o vínculo foi retirado. Confira com a Expedição.','warn');}
+ const html=prevs.length?'<div class="field"><label for="vprev">Vincular a uma previsão de hoje</label><select id="vprev"><option value="">— sem vínculo —</option>'+prevs.map(p=>'<option value="'+p.id+'"'+(F.prev===p.id?' selected':'')+'>'+esc([val(p.TIPO),TRANSP[P.lid(p.TRANSPORTADORALookupId)]||p.REMETENTE,p.NF&&'NF '+p.NF,p.HORA].filter(Boolean).join(' · '))+'</option>').join('')+'</select></div>':'';
+ if(box.dataset.h!==html){const foco=document.activeElement&&document.activeElement.id==='vprev';box.innerHTML=html;box.dataset.h=html;if(foco)$('#vprev')?.focus();}}
 VIEWS.veiculos={
- mount(){const F=ST.f.v;const prevs=ST.d.prev.filter(p=>!['Concluído','Cancelado','Não veio'].includes(P.situacaoPrev(p,ST.d.movVHoje)));
+ mount(){const F=ST.f.v;
   page('Veículos','Movimento no pátio, coletas e entregas.',
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('in')+'<h2>Registrar entrada no pátio</h2></div>'+
-   (prevs.length?'<div class="field"><label for="vprev">Vincular a uma previsão de hoje</label><select id="vprev" data-bind="v.prev"><option value="">— sem vínculo —</option>'+prevs.map(p=>'<option value="'+p.id+'"'+(F.prev===p.id?' selected':'')+'>'+esc([val(p.TIPO),TRANSP[P.lid(p.TRANSPORTADORALookupId)]||p.REMETENTE,p.NF&&'NF '+p.NF,p.HORA].filter(Boolean).join(' · '))+'</option>').join('')+'</select></div>':'')+
+   '<div id="vprevbox"></div>'+
    '<div class="grid3"><div class="field"><label for="vpl">Placa *</label><input id="vpl" data-bind="v.placa" maxlength="8" style="text-transform:uppercase" placeholder="ABC1D23" value="'+esc(F.placa)+'"><span class="hint" id="vplh"></span></div><div class="field"><label for="vmo">Motorista</label><input id="vmo" data-bind="v.mot" maxlength="60" value="'+esc(F.mot)+'"></div><div class="field"><label for="vem">Empresa</label><input id="vem" data-bind="v.emp" maxlength="60" value="'+esc(F.emp)+'"></div></div>'+
    '<div class="grid2"><div class="field"><label for="vfi">Finalidade</label><select id="vfi" data-bind="v.fin">'+['Coleta','Entrega','Serviço','Visita','Outro'].map(o=>'<option'+(F.fin===o?' selected':'')+'>'+o+'</option>').join('')+'</select></div><div class="field"><label for="vnf">Nota fiscal</label><input id="vnf" data-bind="v.nf" maxlength="20" value="'+esc(F.nf)+'"></div></div>'+
    '<button class="btn primary block" id="vgo" type="button">'+icon('in')+'Registrar entrada</button><div class="note">Coleta só sai com autorização da Expedição registrada. Sem ela, a saída vira <b>exceção com motivo</b> e abre uma ocorrência para a Segurança.</div></div>'+
    '<div class="panel"><div class="panel-h">'+icon('truck')+'<h2>No pátio agora</h2><span class="sp"><span class="count" id="vcount"></span></span></div><div class="rows" id="vlist"></div></div></div>');
   bindInputs();
   const pl=$('#vpl');const ph=()=>{$('#vplh').textContent=pl.value&&!P.placaValida(pl.value)?'Fora do padrão ABC1D23 / ABC1234 — confira.':'';};pl.addEventListener('input',ph);ph();
-  const sel=$('#vprev');if(sel)sel.addEventListener('change',()=>{const p=ST.d.prev.find(x=>x.id===sel.value);if(!p)return;
-   if(!F.emp){F.emp=TRANSP[P.lid(p.TRANSPORTADORALookupId)]||p.REMETENTE||'';$('#vem').value=F.emp;}
-   if(!F.nf&&p.NF){F.nf=p.NF;$('#vnf').value=F.nf;}
-   if(!F.placa&&p.PLACA){F.placa=p.PLACA;pl.value=F.placa;ph();}
-   if(!F.mot&&p.MOTORISTA){F.mot=p.MOTORISTA;$('#vmo').value=F.mot;}
-   const t=val(p.TIPO);if(t==='Coleta'||t==='Entrega'){F.fin=t;$('#vfi').value=t;}});
+  drawPrevSel();
+  /* troca de previsão: campos que vieram da previsão anterior são trocados; o que o porteiro digitou fica */
+  $('#vprevbox').addEventListener('change',e=>{if(e.target.id!=='vprev')return;F.prev=e.target.value;const p=prevsAbertas().find(x=>x.id===F.prev);
+   const novo=p?{emp:TRANSP[P.lid(p.TRANSPORTADORALookupId)]||p.REMETENTE||'',nf:String(p.NF??''),placa:String(p.PLACA??''),mot:String(p.MOTORISTA??'')}:{emp:'',nf:'',placa:'',mot:''};
+   const ids={emp:'#vem',nf:'#vnf',placa:'#vpl',mot:'#vmo'};
+   Object.keys(ids).forEach(k=>{const atual=String(F[k]??'');if(atual===''||atual===String(F.auto[k]??'')){F[k]=novo[k];$(ids[k]).value=novo[k];}});
+   F.auto=novo;ph();
+   const t=p&&val(p.TIPO);if(t==='Coleta'||t==='Entrega'){F.fin=t;$('#vfi').value=t;}});
   SHELL.page.onclick=e=>{if(e.target.closest('#vgo'))regVeic();const a=e.target.closest('[data-aut]');if(a)autorizar(a.dataset.aut);const s=e.target.closest('[data-vsaida]');if(s)saidaVeic(s.dataset.vsaida);};},
- update(){banners();if(!$('#vlist'))return;const pd=new Set(pend().v.map(v=>v.id));
+ update(){banners();if(!$('#vlist'))return;drawPrevSel();const pd=new Set(pend().v.map(v=>v.id));
   const rows=ST.d.openV.slice().sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));$('#vcount').textContent=rows.length;
   $('#vlist').innerHTML=rows.length?rows.map(v=>{const fin=val(v.FINALIDADE),aut=val(v.AUT_EXPEDICAO),old=pd.has(v.id);
    const tag=fin==='Coleta'?(aut==='Autorizado'?'<span class="chip ok dot">Autorizada</span>':'<span class="chip warn dot">Aguardando autorização</span>'):'';
@@ -309,14 +328,15 @@ VIEWS.veiculos={
    return '<div class="row'+(old?' flag':'')+'"><div class="main"><div class="t">'+esc(v.PLACA)+' · '+esc(fin||'—')+'</div><div class="meta">'+esc([v.MOTORISTA,v.EMPRESA,'entrou '+quando(v.ENTRADA)+' · '+fmt.dur(idade(v.ENTRADA)),v.NF&&'NF '+v.NF].filter(Boolean).join(' · '))+'</div>'+
     autTxt+'<div class="tags">'+tag+(old?'<span class="chip warn dot">No pátio há '+fmt.dur(idade(v.ENTRADA))+'</span>':'')+(v.PORTEIRO_ENT?'<span class="chip">'+esc(v.PORTEIRO_ENT)+'</span>':'')+'</div></div><div class="act">'+(fin==='Coleta'&&aut!=='Autorizado'?'<button class="btn sm" data-aut="'+v.id+'">Registrar autorização</button>':'')+'<button class="btn sm" data-vsaida="'+v.id+'">'+icon('out')+'Saída</button></div></div>';}).join(''):'<div class="empty">Pátio vazio.</div>';}
 };
-async function regVeic(){if(needTurno())return;const F=ST.f.v;const placa=P.normPlaca(F.placa);
+async function regVeic(){if(needTurno())return;const F=ST.f.v;['placa','mot','emp','nf'].forEach(k=>{F[k]=String(F[k]??'');});const placa=P.normPlaca(F.placa);
  if(!placa){$('#vpl').setAttribute('aria-invalid','true');$('#vpl').focus();toast('Informe a placa.','err');return;}$('#vpl').removeAttribute('aria-invalid');
  if(!P.placaValida(placa)){const ok=await dialog({title:'Placa fora do padrão',html:'<p>A placa <b>'+esc(placa)+'</b> não segue o padrão brasileiro (ABC1D23 ou ABC1234). Confira com o motorista.</p>',actions:[{label:'Corrigir',value:false},{label:'Registrar assim mesmo',kind:'primary',value:true}]});if(!ok)return;}
  const fields={PLACA:placa,MOTORISTA:F.mot.trim(),EMPRESA:F.emp.trim(),FINALIDADE:F.fin,NF:F.nf.trim()};if(F.prev)fields.PREVISAOLookupId=Number(F.prev);
  const b=$('#vgo');b.disabled=true;
  try{const r=await P.entradaVeiculo(fields,{porteiro:porteiro()});
+  if(r.bloq){toast(r.bloq,'err');if(r.prevInvalida){F.prev='';F.auto={};refresh();}return;}
   if(r.dup){b.disabled=false;const ch=await dialog({title:'Placa já está no pátio',html:'<p><b>'+esc(placa)+'</b> entrou '+quando(r.dup.ENTRADA)+' e não tem saída registrada.</p>',actions:[{label:'Fechar',value:null},{label:'Registrar a saída',kind:'primary',value:'s'}]});if(ch==='s')saidaVeic(r.dup.id,r.dup);return;}
-  toast('Veículo registrado: '+placa);Object.assign(F,{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:''});if(ST.view==='veiculos'){VIEWS.veiculos.mount();VIEWS.veiculos.update();}refresh();}
+  toast('Veículo registrado: '+placa);Object.assign(F,{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:'',auto:{}});if(ST.view==='veiculos'){VIEWS.veiculos.mount();VIEWS.veiculos.update();}refresh();}
  catch(e){writeErr(e);}finally{const x=$('#vgo');if(x)x.disabled=false;}}
 function autorizar(id){if(needTurno())return;const v=ST.d.openV.find(x=>x.id===id);if(!v)return;
  dialog({title:'Registrar autorização da Expedição',html:'<p>Coleta — placa <b>'+esc(v.PLACA)+'</b>'+(v.NF?' · NF '+esc(v.NF):'')+'.</p><div class="note">Registre somente a autorização que você recebeu de alguém da Expedição (rádio, telefone ou pessoalmente). O registro mostra que foi informada à portaria.</div><div class="field"><label for="dau">Quem da Expedição autorizou *</label><input id="dau" maxlength="60"></div>',
@@ -361,7 +381,7 @@ async function regMerc(){if(needTurno())return;const F=ST.f.m;
  const destNome=setorial?(F.setorDest==='__geral'?SETOR_GERAL:'Setor: '+F.setorDest):F.dest.nome;
  const vol=Number(F.vol);const vi=$('#mvo');if(!Number.isInteger(vol)||vol<1||vol>999){vi.setAttribute('aria-invalid','true');vi.focus();toast('Volumes: informe um número inteiro de 1 a 999.','err');return;}vi.removeAttribute('aria-invalid');
  const b=$('#mgo');b.disabled=true;
- try{await P.add('merc',{DESTINATARIO_NOME:destNome,DESTINATARIO_MATRICULA:setorial?'':(F.dest.mat||''),SETOR:F.setor.trim(),REMETENTE:F.rem.trim(),DESCRICAO:F.desc.trim(),VOLUMES:vol,CHEGADA:new Date().toISOString(),STATUS:'Aguardando retirada',RETIRADA_PROPRIA:!setorial,PORTEIRO_RECEB:porteiro()});
+ try{await P.conferirTurno(porteiro());await P.add('merc',{DESTINATARIO_NOME:destNome,DESTINATARIO_MATRICULA:setorial?'':(F.dest.mat||''),SETOR:F.setor.trim(),REMETENTE:F.rem.trim(),DESCRICAO:F.desc.trim(),VOLUMES:vol,CHEGADA:new Date().toISOString(),STATUS:'Aguardando retirada',RETIRADA_PROPRIA:!setorial,PORTEIRO_RECEB:porteiro()});
   toast('Mercadoria registrada para '+destNome);Object.assign(F,{dest:null,setor:'',vol:'1',rem:'',desc:'',setorDest:''});if(ST.view==='mercadorias'){VIEWS.mercadorias.mount();VIEWS.mercadorias.update();}refresh();}
  catch(e){writeErr(e);}finally{const x=$('#mgo');if(x)x.disabled=false;}}
 function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id);if(!m)return;const setorial=destSetorial(m);let outro=setorial;
@@ -369,7 +389,7 @@ function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id)
   '<div id="dt"'+(setorial?'':' hidden')+'><div class="field"><label for="drp">Quem está retirando *</label><input id="drp" maxlength="60"></div><div class="field"><label for="dri">Matrícula ou documento</label><input id="dri" maxlength="20"><span class="hint">Documento é gravado mascarado.</span></div></div>',
   actions:[{label:'Cancelar',value:null},{label:'Confirmar entrega',kind:'ok',onClick:async d=>{
    const por=outro?d.querySelector('#drp').value.trim():'';if(outro&&!por){d.querySelector('#drp').setAttribute('aria-invalid','true');toast('Informe quem está retirando.','err');return false;}
-   try{const at=await P.get('merc',id);if(val(at.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue (outro registro).','warn');refresh();return true;}
+   try{await P.conferirTurno(porteiro());const at=await P.get('merc',id);if(val(at.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue (outro registro).','warn');refresh();return true;}
     await P.patch('merc',id,{STATUS:'Entregue',RETIRADA_PROPRIA:!outro,RETIRADO_POR:outro?por:(m.DESTINATARIO_NOME||''),RETIRADO_IDENT:outro?P.maskDoc(d.querySelector('#dri').value):(m.DESTINATARIO_MATRICULA||''),DATA_RETIRADA:new Date().toISOString(),PORTEIRO_ENTREGA:porteiro()});
     toast('Entrega registrada.');refresh();return true;}catch(e){writeErr(e);return false;}}}]});
  setTimeout(()=>{const q=$('#dq');if(q)q.onclick=e=>{const b=e.target.closest('[data-q]');if(!b)return;outro=b.dataset.q==='1';$$('#dq [data-q]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('#dt').hidden=!outro;if(outro)$('#drp').focus();};},0);}
@@ -389,7 +409,7 @@ VIEWS.ocorrencias={
 async function regOcor(){if(needTurno())return;const F=ST.f.o;const d=F.desc.trim();const t=$('#od');
  if(d.length<5){t.setAttribute('aria-invalid','true');t.focus();toast('Descreva a ocorrência.','err');return;}t.removeAttribute('aria-invalid');
  const b=$('#ogo');b.disabled=true;
- try{await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro()});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:''});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
+ try{await P.conferirTurno(porteiro());await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro()});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:''});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#ogo');if(x)x.disabled=false;}}
 /* ================= TURNO ================= */
 VIEWS.turno={
@@ -476,7 +496,7 @@ VIEWS.logistica={
  drawForm(){const el=$('#lform');if(!el)return;const F=ST.f.l;const col=F.tipo==='Coleta';const ts=P.transportadoras;const areas=P.opcoes('prevV','AREA');
   el.innerHTML='<div class="panel-h">'+icon(F.id?'refresh':'plus')+'<h2>'+(F.id?'Editar previsão':'Nova previsão')+'</h2></div>'+
    '<div class="seg" id="ltipo" style="margin-bottom:14px">'+['Coleta','Entrega'].map(x=>'<button type="button" data-lt="'+x+'" aria-pressed="'+(F.tipo===x)+'"'+(F.id&&F.tipo!==x?' disabled':'')+'>'+x+'</button>').join('')+'</div>'+
-   '<div class="grid2"><div class="field"><label for="ldia">Data *</label><input id="ldia" type="date" min="'+todayKey()+'" data-bind="l.dia" value="'+esc(F.dia)+'"></div><div class="field"><label for="lhora">Hora prevista</label><input id="lhora" type="time" data-bind="l.hora" value="'+esc(F.hora)+'"></div></div>'+
+   '<div class="grid2"><div class="field"><label for="ldia">Data *</label><input id="ldia" type="date" min="'+todayKey()+'" max="'+P.diaMais(todayKey(),P.JANELA_PREV)+'" data-bind="l.dia" value="'+esc(F.dia)+'"></div><div class="field"><label for="lhora">Hora prevista</label><input id="lhora" type="time" data-bind="l.hora" value="'+esc(F.hora)+'"></div></div>'+
    (col?'<div class="field"><div class="lrot"><label for="ltr">Transportadora *</label><button class="btn sm" id="lnt" type="button">'+icon('plus')+'Nova transportadora</button></div>'+(ts.length?'<select id="ltr" data-bind="l.transp"><option value="">— escolha no cadastro —</option>'+ts.map(x=>'<option value="'+x.id+'"'+(String(F.transp)===x.id?' selected':'')+'>'+esc(x.nome)+(x.cnpj?' · '+esc(x.cnpj):'')+'</option>').join('')+'</select><span class="hint">Não está na lista? Cadastre em 00_Cadastro_Transportador, com razão social e CNPJ conferidos.</span>':'<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Nenhuma transportadora no cadastro 00_Cadastro_Transportador.</span></div>')+'</div>'
     :'<div class="field"><label for="lrem">Remetente (quem envia) *</label><input id="lrem" maxlength="80" data-bind="l.rem" placeholder="Fornecedor, cliente…" value="'+esc(F.rem)+'"><span class="hint">Na entrega a transportadora costuma ser desconhecida — informe quem envia.</span></div>')+
    '<div class="grid2"><div class="field"><label for="lnf">Nota fiscal</label><input id="lnf" maxlength="20" data-bind="l.nf" value="'+esc(F.nf)+'"></div><div class="field"><label for="lord">'+(col?'Ordem de carregamento':'Pedido / ordem')+'</label><input id="lord" maxlength="30" data-bind="l.ordem" value="'+esc(F.ordem)+'"></div></div>'+
@@ -490,29 +510,29 @@ VIEWS.logistica={
    const s=situPrev(p)||'Previsto';const pode=s==='Previsto'&&k>=todayKey();
    h+='<div class="row"><div class="main"><div class="t">'+esc(val(p.TIPO))+' · '+esc(quemPrev(p))+'</div><div class="meta">'+esc([p.HORA||'sem horário',p.NF&&'NF '+p.NF,p.ORDEM&&'ordem '+p.ORDEM,val(p.AREA),p.PLACA,p.MOTORISTA].filter(Boolean).join(' · '))+'</div>'+(p._by?'<div class="detail">Lançada por '+esc(p._by)+'</div>':'')+'<div class="tags"><span class="chip dot '+chipPrev(s)+'">'+esc(s)+'</span></div></div>'+
     '<div class="act">'+(pode?'<button class="btn sm" data-led="'+p.id+'">Editar</button><button class="btn sm" data-lcan="'+p.id+'">Cancelar</button>':'')+'</div></div>';});
-  $('#llist').innerHTML=rows.length?h:'<div class="empty">Nenhuma coleta ou entrega prevista entre ontem e os próximos 14 dias.</div>';}
+  $('#llist').innerHTML=rows.length?h:'<div class="empty">Nenhuma coleta ou entrega prevista entre ontem e os próximos '+P.JANELA_PREV+' dias.</div>';}
 };
 function dlgTransportadora(){
- dialog({title:'Nova transportadora',html:'<div class="field"><label for="tcn">CNPJ *</label><div class="lrot2"><input id="tcn" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00"><button class="btn sm" id="tcq" type="button">'+icon('search')+'Consultar na Receita</button></div><span class="hint" id="tst">O CNPJ é conferido (dígitos) e a razão social vem da Receita, quando disponível.</span></div>'+
+ dialog({title:'Nova transportadora',html:'<div class="field"><label for="tcn">CNPJ *</label><div class="lrot2"><input id="tcn" maxlength="18" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="00.000.000/0000-00 ou 12.ABC.345/01DE-35"><button class="btn sm" id="tcq" type="button">'+icon('search')+'Consultar CNPJ</button></div><span class="hint" id="tst">Aceita CNPJ numérico e alfanumérico. A consulta é pública, pela BrasilAPI (dados da Receita Federal).</span></div>'+
   '<div class="field"><label for="trz">Razão social *</label><input id="trz" maxlength="120"></div>'+
   '<div class="grid2"><div class="field"><label for="ttl">Telefone</label><input id="ttl" maxlength="20" inputmode="tel"></div><div class="field"><label for="tct">Contato</label><input id="tct" maxlength="60"></div></div>'+
   '<div class="field"><label for="tem">E-mail</label><input id="tem" type="email" maxlength="80"></div>',
   actions:[{label:'Cancelar',value:null},{label:'Cadastrar',kind:'primary',onClick:async d=>{
    const cn=d.querySelector('#tcn'),rz=d.querySelector('#trz');
-   if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');toast('CNPJ inválido — confira os números.','err');return false;}cn.removeAttribute('aria-invalid');
+   if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');toast('CNPJ inválido — confira os caracteres e os dígitos verificadores.','err');return false;}cn.removeAttribute('aria-invalid');
    if(rz.value.trim().length<3){rz.setAttribute('aria-invalid','true');toast('Informe a razão social.','err');return false;}
    try{const r=await P.salvarTransportadora({razao:rz.value,cnpj:cn.value,tel:d.querySelector('#ttl').value,contato:d.querySelector('#tct').value,email:d.querySelector('#tem').value});
     const t=r.ja||r.novo;ST.f.l.transp=String(t.id);
     toast(r.ja?'Esta transportadora já estava cadastrada ('+r.ja.nome+') — selecionada.':'Transportadora cadastrada e selecionada.',r.ja?'warn':'ok');VIEWS.logistica.drawForm();return true;}
    catch(e){if(e.code==='validacao'){toast(e.message,'err');return false;}if(e.status===403){toast('Sem permissão para cadastrar transportadoras (00_Cadastro_Transportador). Peça à TI.','err');return false;}writeErr(e);return false;}}}]});
  setTimeout(()=>{const cn=$('#tcn'),bq=$('#tcq'),st=$('#tst');if(!cn)return;
-  const consulta=async()=>{if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');st.textContent='CNPJ inválido — confira os números.';return;}cn.removeAttribute('aria-invalid');cn.value=P.fmtCnpj(cn.value);
-   bq.disabled=true;st.textContent='Consultando a Receita…';const r=await P.consultaCnpj(cn.value);bq.disabled=false;
+  const consulta=async()=>{if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');st.textContent='CNPJ inválido — confira os caracteres e os dígitos verificadores.';return;}cn.removeAttribute('aria-invalid');cn.value=P.fmtCnpj(cn.value);
+   bq.disabled=true;st.textContent='Consultando a BrasilAPI…';const r=await P.consultaCnpj(cn.value);bq.disabled=false;
    if(r&&r.razao){$('#trz').value=r.razao;if(r.tel&&!$('#ttl').value)$('#ttl').value=r.tel;if(r.email&&!$('#tem').value)$('#tem').value=r.email;
-    st.innerHTML=(/ativa/i.test(r.situacao)?'<span class="chip ok dot">Receita: '+esc(r.situacao)+'</span>':'<span class="chip err dot">Receita: '+esc(r.situacao||'situação não informada')+'</span> Confira antes de cadastrar.')+(r.fantasia?' · '+esc(r.fantasia):'');}
-   else if(r&&r.naoEncontrado)st.innerHTML='<span class="chip err dot">CNPJ não encontrado na Receita</span> Confira os números.';
-   else st.textContent='Consulta à Receita indisponível agora — confira no cartão CNPJ e digite a razão social.';};
-  bq.onclick=consulta;cn.addEventListener('input',()=>{if(String(cn.value).replace(/\D/g,'').length===14)consulta();});},0);}
+    st.innerHTML=(/ativa/i.test(r.situacao)?'<span class="chip ok dot">Situação: '+esc(r.situacao)+'</span>':'<span class="chip err dot">Situação: '+esc(r.situacao||'não informada')+'</span> Confira antes de cadastrar.')+(r.fantasia?' · '+esc(r.fantasia):'');}
+   else if(r&&r.naoEncontrado)st.innerHTML=r.alfa?'<span class="chip warn dot">CNPJ alfanumérico não encontrado na consulta</span> A base pública pode ainda não ter este formato — confira no cartão CNPJ e digite a razão social.':'<span class="chip err dot">CNPJ não encontrado</span> Confira os números.';
+   else st.textContent='Consulta indisponível agora (BrasilAPI) — confira no cartão CNPJ e digite a razão social.';};
+  bq.onclick=consulta;cn.addEventListener('input',()=>{if(String(cn.value).replace(/[^A-Za-z0-9]/g,'').length===14)consulta();});},0);}
 async function salvarPrevisao(){const F=ST.f.l;
  const f={TIPO:F.tipo,dia:F.dia,HORA:F.hora,transp:F.transp,REMETENTE:F.rem,NF:F.nf,ORDEM:F.ordem,AREA:F.area,PLACA:F.placa,MOTORISTA:F.mot};
  const erro=P.validarPrev(f);if(erro){toast(erro,'err');return;}
@@ -524,7 +544,7 @@ async function salvarPrevisao(){const F=ST.f.l;
   ST.f.l=LFORM0();VIEWS.logistica.drawForm();refresh();}
  catch(e){if(e.code==='validacao')toast(e.message,'err');else writeErr(e);}finally{const x=$('#lgo');if(x)x.disabled=false;}}
 function editarPrevisao(id){const p=ST.d.prevR.find(x=>x.id===id);if(!p)return;
- ST.f.l={id:p.id,etag:p._etag,tipo:val(p.TIPO)||'Coleta',dia:dateKey(p.DATA),hora:p.HORA||'',transp:P.lid(p.TRANSPORTADORALookupId),rem:p.REMETENTE||'',nf:p.NF||'',ordem:p.ORDEM||'',area:val(p.AREA)||'',placa:p.PLACA||'',mot:p.MOTORISTA||''};
+ ST.f.l={id:p.id,etag:p._etag,tipo:val(p.TIPO)||'Coleta',dia:dateKey(p.DATA),hora:p.HORA||'',transp:P.lid(p.TRANSPORTADORALookupId),rem:p.REMETENTE||'',nf:String(p.NF??''),ordem:String(p.ORDEM??''),area:String(val(p.AREA)??''),placa:String(p.PLACA??''),mot:String(p.MOTORISTA??'')};
  VIEWS.logistica.drawForm();$('#lform').scrollIntoView({block:'start'});}
 function cancelarPrevisao(id){const p=ST.d.prevR.find(x=>x.id===id);if(!p)return;
  dialog({title:'Cancelar previsão',html:'<p><b>'+esc(val(p.TIPO))+' · '+esc(quemPrev(p))+'</b><br>'+esc([ROTULO_DIA(dateKey(p.DATA)),p.HORA,p.NF&&'NF '+p.NF].filter(Boolean).join(' · '))+'</p><div class="note">A previsão continua na lista como <b>Cancelado</b>, e a portaria deixa de oferecê-la ao registrar a entrada.</div>',
@@ -569,7 +589,11 @@ function autorizarExpedicao(id){const v=ST.d.openV.find(x=>x.id===id);if(!v)retu
  try{
   const g=await PS.groups();
   ST.isTI=!!g&&g.has(GRUPO_TI);ST.isExp=!!g&&g.has(GRUPO_EXP);
-  ST.posto=ST.isTI||!ST.isExp;ST.log=ST.isTI||ST.isExp;
+  ST.isGuarita=(!!g&&g.has(GRUPO_GUARITA))||CONTAS_POSTO.includes(String(acc.username||'').toLowerCase());
+  ST.posto=ST.isTI||ST.isGuarita;ST.log=ST.isTI||ST.isExp;
+  if(!ST.posto&&!ST.log){PS.screens.error('Sem perfil na Portaria','Sua conta não tem perfil de guarita, Expedição ou TI neste aplicativo.',{retry:g===null,
+    details:[...(g===null?['Não foi possível ler seus grupos no Microsoft 365 — tente novamente ou fale com a TI.']:[]),'Para agendar uma visita, use "Minhas visitas".','Se você precisa de acesso, peça à TI.'],
+    action:{label:'Agendar uma visita',onClick:()=>{location.href='agendar.html';}}});return;}
   const b=await P.boot({posto:ST.posto,log:ST.log});
   if(!b.ok){const det=b.faltando.slice();if(g===null)det.push('Não foi possível ler seus grupos no Microsoft 365 (a Expedição e a TI dependem disso). Peça à TI para conferir a permissão GroupMember.Read.All do app.');
    PS.screens.error('Estrutura incompleta no SharePoint','A Portaria precisa destes itens antes de operar. Ajuste e tente novamente:',{details:det});return;}

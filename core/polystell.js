@@ -185,10 +185,10 @@ const sp={
  /* paginação completa; para em max e marca .truncated (nunca corta em silêncio) */
  async items(listId,query,max=5000){const s=await sp.site();let out=[],next='/sites/'+s+'/lists/'+listId+'/items?'+query,trunc=false;
   while(next){const p=await graph(next,{headers:{Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}});out.push(...(p.value||[]));next=p['@odata.nextLink']||null;if(next&&out.length>=max){trunc=true;break;}}
-  const rows=out.map(it=>({id:String(it.id),_etag:it['@odata.etag']||it.eTag||'',_by:it.createdBy?.user?.displayName||'',...(it.fields||{})}));rows.truncated=trunc;return rows;},
+  const rows=out.map(it=>({id:String(it.id),_etag:it['@odata.etag']||it.eTag||'',_by:it.createdBy?.user?.displayName||'',_byEmail:String(it.createdBy?.user?.email||'').toLowerCase(),_byId:String(it.createdBy?.user?.id||''),...(it.fields||{})}));rows.truncated=trunc;return rows;},
  async add(listId,fields){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items',{method:'POST',body:{fields}});return {id:String(r.id),...(r.fields||{})};},
  async patch(listId,id,fields,{etag}={}){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'/fields',{method:'PATCH',body:fields,headers:etag?{'If-Match':etag}:{}});},
- async get(listId,id){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'?$expand=fields');return {id:String(r.id),_etag:r['@odata.etag']||r.eTag||'',_by:r.createdBy?.user?.displayName||'',...(r.fields||{})};}
+ async get(listId,id){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'?$expand=fields');return {id:String(r.id),_etag:r['@odata.etag']||r.eTag||'',_by:r.createdBy?.user?.displayName||'',_byEmail:String(r.createdBy?.user?.email||'').toLowerCase(),_byId:String(r.createdBy?.user?.id||''),...(r.fields||{})};}
 };
 async function groups(){try{let next='/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName&$top=999';const out=new Set();
  while(next){const p=await graph(next,{scopes:CFG.groupScopes,optional:true,headers:{ConsistencyLevel:'eventual'}});(p.value||[]).forEach(g=>{if(g.id)out.add(String(g.id).toLowerCase());if(g.displayName)out.add(String(g.displayName).toLowerCase());});next=p['@odata.nextLink']||null;}
