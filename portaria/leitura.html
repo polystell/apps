@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.2">
+<link rel="stylesheet" href="/core/polystell.css?v=2.3">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -47,8 +47,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.2"></script>
-<script src="comum.js?v=2.2"></script>
+<script src="/core/polystell.js?v=2.3"></script>
+<script src="comum.js?v=2.3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -78,12 +78,14 @@ function shell(){
  $('#mf').onsubmit=e=>{e.preventDefault();const v=$('#mc').value.trim();if(!v)return;if(S.mode==='busy'){toast('Aguarde a consulta em andamento.','warn');return;}$('#mc').value='';$('#mc').blur();if(S.mode==='confirm'||S.mode==='done')nova();handle(v,'digitado');};
 }
 function paintTurno(){const b=$('#tb');if(!b)return;const ok=tAtivo();b.className='lt-turno'+(ok?'':' off');b.textContent=ok?'Plantão: '+S.turno.PARA:'Abrir turno';
- $('#ban').innerHTML=(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
-async function loadTurno(){try{const [t]=await Promise.all([P.turnoAtual(),P.loadParams()]);S.turno=t.turno;S.lidoEm=t.lidoEm;S.syncErr=null;}catch(e){S.syncErr=e.message||'erro';}paintTurno();}
+ $('#ban').innerHTML=(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(P.trocaPendente(S.turno)?'<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(P.trocaPendente(S.turno))+').</b> Toque em Plantão para passar o turno.</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
+/* na hora da troca, abre a passagem sozinho uma vez (só com o leitor livre) */
+function checaTroca(){const fim=P.trocaPendente(S.turno);if(!fim||S.trocaAvisada===+fim||S.mode!=='scan')return;const d=$('#ps-dlg');if(d&&d.open)return;S.trocaAvisada=+fim;dlgTurno();}
+async function loadTurno(){try{const [t]=await Promise.all([P.turnoAtual(),P.loadParams()]);S.turno=t.turno;S.lidoEm=t.lidoEm;S.syncErr=null;}catch(e){S.syncErr=e.message||'erro';}paintTurno();checaTroca();}
 async function dlgTurno(){const ativos=P.porteiros.filter(p=>p.ativo);
  if(!ativos.length){dialog({title:'Nenhum porteiro cadastrado',html:'<p>A TI cadastra os porteiros em Segurança (TI), no computador da portaria.</p>'});return;}
- const de=tAtivo()?S.turno.PARA:'';
- await dialog({title:de?'Passagem de turno':'Abrir turno',html:(de?'<p>Sai do posto: <b>'+esc(de)+'</b>. O resumo completo da passagem fica no computador.</p>':'')+'<div class="field"><label for="tp">'+(de?'Assume o posto *':'Porteiro de plantão *')+'</label><select id="tp"><option value="">— selecione —</option>'+ativos.filter(p=>p.nome!==de).map(p=>'<option>'+esc(p.nome)+'</option>').join('')+'</select></div>',
+ const de=tAtivo()?S.turno.PARA:'';const fimT=P.trocaPendente(S.turno);
+ await dialog({title:fimT?'Hora da troca de turno — '+fmt.hm(fimT):de?'Passagem de turno':'Abrir turno',html:(de?'<p>Sai do posto: <b>'+esc(de)+'</b>. O resumo completo da passagem fica no computador.</p>':'')+'<div class="field"><label for="tp">'+(de?'Assume o posto *':'Porteiro de plantão *')+'</label><select id="tp"><option value="">— selecione —</option>'+ativos.filter(p=>p.nome!==de).map(p=>'<option>'+esc(p.nome)+'</option>').join('')+'</select></div>',
   actions:[{label:'Cancelar',value:null},{label:'Confirmar',kind:'primary',onClick:async d=>{const para=d.querySelector('#tp').value;if(!para){toast('Selecione o porteiro.','err');return false;}
    try{await P.abrirTurno({de,para,resumo:'Turno aberto pelo celular da portaria.'});await loadTurno();toast('Plantão: '+para);return true;}catch(e){toast(e.message,'err');return false;}}}]});}
 function needTurno(){if(tAtivo())return false;paintTurno();dlgTurno();return true;}
@@ -176,6 +178,7 @@ async function camera(){const v=$('#video');
   PS.auth.ready();window.addEventListener('ps:session',()=>loadTurno());
   shell();await loadTurno();if(!tAtivo())dlgTurno();camera();
   setInterval(()=>{if(!document.hidden)loadTurno();},120000);
+  setInterval(()=>{paintTurno();checaTroca();},30000);
  }catch(e){console.error(e);PS.screens.error('Não foi possível abrir o leitor',e.message);}
 })();
 </script>

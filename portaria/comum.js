@@ -18,8 +18,8 @@
 (function(){
 'use strict';
 const {sp,norm,val,dateKey,todayKey}=PS;
-const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador'};
-const OPCIONAIS=new Set(['transp']);
+const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas'};
+const OPCIONAIS=new Set(['transp','pessoas']);
 /* ---------- contrato com o SharePoint (conferido na abertura) ---------- */
 const ESTRUTURA={
  movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA'],
@@ -57,6 +57,8 @@ const PARAM_DEF=[
  {mod:'Funções',k:'ENVIA_QR_WA',d:'Enviar o QR do convite por WhatsApp ao visitante',t:'bool',v:'Não',fase2:true},
  {mod:'Funções',k:'AVISO_MERCADORIA',d:'Avisar chegada e entrega de mercadoria no WhatsApp',t:'bool',v:'Não',fase2:true},
  {mod:'Funções',k:'LIBERACAO_WHATSAPP',d:'Anfitrião libera a entrada respondendo 1/2 no WhatsApp',t:'bool',v:'Não',fase2:true},
+ {mod:'Turno',k:'TURNO_HORARIOS',d:'Horários de troca de turno (HH:MM, separados por vírgula)',t:'text',v:'06:00,18:00'},
+ {mod:'Turno',k:'TURNO_TOLERANCIA',d:'Tolerância para passar o turno depois do horário (minutos)',t:'num',v:60},
  {mod:'Prazos',k:'ALERTA_PERMANENCIA',d:'Pessoa com entrada aberta há mais de (horas) vira pendência',t:'num',v:14},
  {mod:'Prazos',k:'ALERTA_PATIO',d:'Veículo no pátio há mais de (horas) vira pendência',t:'num',v:4},
  {mod:'Prazos',k:'ALERTA_MERCADORIA',d:'Mercadoria aguardando há mais de (dias) vira pendência',t:'num',v:2},
@@ -74,10 +76,11 @@ const erroIncompleto=()=>Object.assign(new Error('Consulta de presença incomple
 /* listas que cada papel precisa enxergar (a permissão real é a da lista no SharePoint) */
 const LISTAS_POSTO=['movP','agend','prevV','movV','merc','ocor','turnos','dir','params','transp'];
 const LISTAS_LOG=['prevV','movV','params','transp'];
+const LISTAS_AG=['agend'];
 let COLS={};
-async function boot({posto=true,log=false}={}){
+async function boot({posto=true,log=false,agendar=false}={}){
  const all=await sp.lists();
- const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[])]);
+ const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[])]);
  const faltando=[];
  for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n];if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
  if(faltando.length)return {ok:false,faltando};
@@ -90,8 +93,9 @@ async function boot({posto=true,log=false}={}){
   Object.entries(PESQUISAS[k]||{}).forEach(([c,alvo])=>{const col=have.get(c);if(!col||!L[alvo])return;if(!col.lookup)out.push(nm+': a coluna '+c+' precisa ser do tipo Pesquisa');else if(guid(col.lookup.listId)!==guid(L[alvo]))out.push(nm+': a coluna '+c+' deve pesquisar na lista '+LISTAS[alvo]);});
   return out;}catch(e){return [LISTAS[k]+': '+e.message];}}));
  checks.flat().forEach(x=>faltando.push(x));
+ for(const k of ['transp','pessoas'])if(L[k]&&!COLS[k]){try{COLS[k]=await sp.columns(L[k]);}catch(e){console.warn('Colunas de '+LISTAS[k]+' indisponíveis',e.message);}}
  if(faltando.length)return {ok:false,faltando};
- await loadParams();
+ if(L.params){try{await loadParams();}catch(e){if(precisa.has('params'))throw e;}}
  return {ok:true};
 }
 /* ---------- parâmetros e porteiros (00_Parametros_Apps, APP = Portaria) ---------- */
@@ -122,13 +126,65 @@ const podeEntrar=c=>!!c&&SITUACAO_ENTRA.some(s=>norm(s)===norm(c.sit));
 const desligado=c=>!!c&&!podeEntrar(c);
 function buscaColab(lista,q){const n=norm(q);if(n.length<2)return[];return lista.filter(c=>norm(c.nome).includes(n)||c.mat.includes(n)||norm(c.dep).includes(n)).slice(0,8);}
 /* ---------- transportadoras (pesquisa → nome) ---------- */
-let TRANSP_L=[];
+let TRANSP_L=[],TRANSP_ALL=[];
 async function transp(){if(TRANSP)return TRANSP;TRANSP={};if(!L.transp)return TRANSP;
- try{TRANSP_L=(await sp.items(L.transp,'$expand=fields&$top=999')).map(t=>({id:t.id,nome:String(t.RAZAO_SOCIAL||'').trim(),cnpj:String(t.CNPJ||'').trim()})).filter(t=>t.nome).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-  TRANSP_L.forEach(t=>TRANSP[t.id]=t.nome);}catch(e){console.warn('Transportadoras indisponíveis',e.message);}return TRANSP;}
+ try{TRANSP_ALL=(await sp.items(L.transp,'$expand=fields&$top=999')).map(t=>({id:t.id,nome:String(t.RAZAO_SOCIAL||t.Title||'').trim(),cnpj:String(t.CNPJ||'').trim(),ativo:t.ATIVO!==false&&norm(val(t.ATIVO))!=='nao'})).filter(t=>t.nome).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  TRANSP_L=TRANSP_ALL.filter(t=>t.ativo);TRANSP_ALL.forEach(t=>TRANSP[t.id]=t.nome);}catch(e){console.warn('Transportadoras indisponíveis',e.message);}return TRANSP;}
+/* ---------- pessoas externas recorrentes (00_Cadastro_Pessoas) ---------- */
+let PEXT=null,PEXT_AT=0;
+const TIPOS_EXT=['Visitante','Prestador','Terceiro','Motorista','Outros'];
+async function pessoasExt(force){if(!L.pessoas)return [];if(!force&&PEXT&&Date.now()-PEXT_AT<10*60e3)return PEXT;
+ const rs=await sp.items(L.pessoas,'$expand=fields&$top=999');
+ PEXT=rs.map(r=>({id:r.id,nome:String(r.NOME||r.Title||'').trim(),tipo:val(r.TIPO),doc:String(r.RG_CPF||'').trim(),empresa:String(r.EMPRESA||'').trim(),
+  ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao'})).filter(p=>p.nome&&p.ativo&&(!p.tipo||TIPOS_EXT.includes(p.tipo)));PEXT_AT=Date.now();return PEXT;}
+function buscaPessoaExt(lista,q){const n=norm(q),dg=String(q).replace(/\D/g,'');if(n.length<2)return [];
+ return lista.filter(p=>norm(p.nome).includes(n)||norm(p.empresa).includes(n)||(dg.length>=4&&String(p.doc).replace(/\D/g,'').includes(dg))).slice(0,8);}
+const podeCadastrarPessoa=()=>!!L.pessoas;
+async function salvarPessoaExt({nome,tipo,empresa,doc}){if(!L.pessoas)return {semLista:true};
+ const lista=await pessoasExt(true);const ja=lista.find(p=>norm(p.nome)===norm(nome)&&norm(p.empresa)===norm(empresa||''));if(ja)return {ja};
+ const has=c=>!!(COLS.pessoas&&COLS.pessoas.has(c));const tipos=opcoes('pessoas','TIPO');
+ const f={Title:String(nome).trim(),NOME:String(nome).trim()};
+ if(tipo&&(!tipos||tipos.includes(tipo)))f.TIPO=tipo;
+ if(doc&&has('RG_CPF'))f.RG_CPF=maskDoc(doc);if(empresa&&has('EMPRESA'))f.EMPRESA=String(empresa).trim();if(has('ATIVO'))f.ATIVO=true;
+ const novo=await sp.add(L.pessoas,f);PEXT=null;return {novo};}
+/* ---------- cadastro de transportadora (Logística) ---------- */
+const soDig=v=>String(v||'').replace(/\D/g,'');
+function cnpjValido(v){const c=soDig(v);if(c.length!==14||/^(\d)\1+$/.test(c))return false;
+ const dv=n=>{let s=0,p=n-7;for(let i=0;i<n;i++){s+=Number(c[i])*p--;if(p<2)p=9;}const r=s%11;return r<2?0:11-r;};
+ return dv(12)===Number(c[12])&&dv(13)===Number(c[13]);}
+const fmtCnpj=v=>{const c=soDig(v);return c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):String(v||'');};
+/* consulta pública (BrasilAPI / Receita) só com o CNPJ da empresa; se falhar, segue manual */
+async function consultaCnpj(v){const c=soDig(v);if(!cnpjValido(c))return null;
+ const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),8000);
+ try{const r=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+c,{signal:ctl.signal});if(!r.ok)return r.status===404?{naoEncontrado:true}:null;const j=await r.json();
+  return {razao:String(j.razao_social||'').trim(),fantasia:String(j.nome_fantasia||'').trim(),situacao:String(j.descricao_situacao_cadastral||'').trim(),tel:String(j.ddd_telefone_1||'').trim(),email:String(j.email||'').trim().toLowerCase()};}
+ catch{return null;}finally{clearTimeout(tm);}}
+async function salvarTransportadora({razao,cnpj,tel,contato,email}){
+ if(String(razao||'').trim().length<3)throw Object.assign(new Error('Informe a razão social.'),{code:'validacao'});
+ if(!cnpjValido(cnpj))throw Object.assign(new Error('CNPJ inválido — confira os números.'),{code:'validacao'});
+ TRANSP=null;await transp();const ja=TRANSP_ALL.find(t=>soDig(t.cnpj)===soDig(cnpj));if(ja)return {ja};
+ const has=c=>!!(COLS.transp&&COLS.transp.has(c));
+ const f={Title:String(razao).trim(),RAZAO_SOCIAL:String(razao).trim(),CNPJ:fmtCnpj(cnpj)};
+ if(tel&&has('TELEFONE'))f.TELEFONE=String(tel).trim();if(contato&&has('CONTATO'))f.CONTATO=String(contato).trim();if(email&&has('EMAIL'))f.EMAIL=String(email).trim();if(has('ATIVO'))f.ATIVO=true;
+ const novo=await sp.add(L.transp,f);TRANSP=null;await transp();return {novo};}
 /* ---------- turno / porteiro de plantão (compartilhado PC + celular) ---------- */
 /* validade calculada NA HORA (não um booleano guardado): existe, tem porteiro e tem < 13 h */
-const turnoValido=t=>!!t&&!!String(t.PARA||'').trim()&&Date.now()-new Date(t.CIENCIA_EM||0).getTime()<TURNO_EXPIRA_H*3600e3;
+/* turno por horário (ex.: 06:00 e 18:00): o turno vale até o fim da sua janela + tolerância.
+   Aberto até 30 min antes de um horário, conta para a janela seguinte (quem chega antes).
+   Horários vazios ou "-" → regra antiga de 13 h corridas. */
+const ANTECIPA_MIN=30;
+function horarios(){const v=String(param('TURNO_HORARIOS')||'').trim();if(!v||v==='-'||norm(v)==='nao')return [];
+ const hs=v.split(/[,;\s]+/).map(x=>x.match(/^([01]?\d|2[0-3]):([0-5]\d)$/)).filter(Boolean).map(m=>Number(m[1])*60+Number(m[2]));
+ return [...new Set(hs)].sort((a,b)=>a-b);}
+function janelaDe(ms){const hs=horarios();if(!hs.length)return null;const d=new Date(ms);const bs=[];
+ for(let o=-1;o<=1;o++)hs.forEach(m=>bs.push(new Date(d.getFullYear(),d.getMonth(),d.getDate()+o,Math.floor(m/60),m%60,0,0).getTime()));
+ bs.sort((a,b)=>a-b);const ref=ms+ANTECIPA_MIN*6e4;let i=-1;bs.forEach((b,j)=>{if(b<=ref)i=j;});
+ if(i<0||i+1>=bs.length)return null;return {ini:bs[i],fim:bs[i+1]};}
+function fimDoTurno(t){if(!t)return null;const j=janelaDe(new Date(t.CIENCIA_EM||0).getTime());return j?new Date(j.fim):new Date(new Date(t.CIENCIA_EM||0).getTime()+TURNO_EXPIRA_H*3600e3);}
+const turnoValido=t=>{if(!t||!String(t.PARA||'').trim())return false;const ms=new Date(t.CIENCIA_EM||0).getTime();const j=janelaDe(ms);
+ if(!j)return Date.now()-ms<TURNO_EXPIRA_H*3600e3;return Date.now()<j.fim+param('TURNO_TOLERANCIA')*6e4;};
+/* passou do horário de troca, mas ainda dentro da tolerância → hora de passar o turno */
+function trocaPendente(t){if(!turnoValido(t))return null;const j=janelaDe(new Date(t.CIENCIA_EM||0).getTime());return j&&Date.now()>=j.fim?new Date(j.fim):null;}
 async function turnoAtual(){const rs=await sp.items(L.turnos,'$expand=fields&$orderby=fields/CIENCIA_EM desc&$top=1',1);const t=rs[0]||null;return {turno:t,ativo:turnoValido(t),lidoEm:Date.now()};}
 async function ultimosTurnos(n=12){return sp.items(L.turnos,'$expand=fields&$orderby=fields/CIENCIA_EM desc&$top='+n,n);}
 async function abrirTurno({de,para,recados,resumo}){return sp.add(L.turnos,{DE:de||'',PARA:para,RECADOS:recados||'',RESUMO:resumo||'',CIENCIA_EM:now()});}
@@ -144,7 +200,9 @@ async function agendaEntre(dIni,dFim){const k=todayKey();const a=keyShift(k,dIni
  const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;});}
 const agendaHoje=()=>agendaEntre(0,0);
 const agendaRecente=()=>agendaEntre(-3,0);
-async function agendaPorCodigo(cod){const c=String(cod).replace(/'/g,'').trim();return (await sp.items(L.agend,"$expand=fields&$filter=fields/CODIGO eq '"+encodeURIComponent(c)+"'&$top=3"))[0]||null;}
+async function agendaPorCodigo(cod){const c=String(cod).replace(/'/g,'').trim().toUpperCase();const rs=await sp.items(L.agend,"$expand=fields&$filter=fields/CODIGO eq '"+encodeURIComponent(c)+"'&$top=5");
+ /* código repetido (raríssimo): vale o convite de hoje */
+ return rs.find(x=>dateKey(x.DATA)===todayKey())||rs[0]||null;}
 async function prevEntre(dIni,dFim){const k=todayKey();const a=keyShift(k,dIni-1)+'T00:00:00Z',b=keyShift(k,dFim+1)+'T23:59:59Z';
  const rs=await sp.items(L.prevV,"$expand=fields&$filter=fields/DATA ge '"+a+"' and fields/DATA le '"+b+"'&$top=999");
  const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;});}
@@ -286,6 +344,43 @@ async function autorizarPelaExpedicao(id,quem,obs){const at=await getItem('movV'
  const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
  const r=await patchVersao('movV',id,{AUT_EXPEDICAO:'Autorizado',AUT_POR:('Expedição (no app): '+quem+' às '+hm+(obs?' — '+obs:'')).slice(0,250)},at._etag,x=>val(x.STATUS_MOV)==='Aberto'&&val(x.AUT_EXPEDICAO)!=='Autorizado');
  return r.conflito?(val(r.mov.STATUS_MOV)!=='Aberto'?{jaSaiu:true}:{jaAut:true,mov:r.mov}):{ok:true};}
+/* ---------- agendamento pelo colaborador (agendar.html) ---------- */
+const ALFA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function novoCodigo(n=8){const r=new Uint32Array(n);crypto.getRandomValues(r);return [...r].map(x=>ALFA[x%ALFA.length]).join('');}
+async function meuCadastro(email){const e=String(email||'').replace(/'/g,'').trim().toLowerCase();if(!e||!L.dir)return null;
+ try{const rs=await sp.items(L.dir,"$expand=fields($select=NOME,MATRICULA,DEPARTAMENTO,SITUACAO,EMAIL)&$filter=fields/EMAIL eq '"+encodeURIComponent(e)+"'&$top=3");
+  return rs.map(mapDir).find(c=>c.email.toLowerCase()===e)||rs.map(mapDir)[0]||null;}catch(err){console.warn('Diretório indisponível',err.message);return null;}}
+/* a lista mostra só o que é seu (a trava real é a permissão em nível de item da 09_Agendamentos) */
+async function minhasVisitas(me){const k=todayKey();const a=keyShift(k,-31)+'T00:00:00Z',b=keyShift(k,91)+'T23:59:59Z';
+ const rs=await sp.items(L.agend,"$expand=fields&$filter=fields/DATA ge '"+a+"' and fields/DATA le '"+b+"'&$top=999");
+ const em=String(me.email||'').toLowerCase();
+ return rs.filter(x=>(em&&x._byEmail===em)||(me.mat&&String(x.ANFITRIAO_MATRICULA||'').trim()===me.mat));}
+const tiposConvite=()=>opcoes('agend','TIPO')||['Visitante','Prestador','Terceiro'];
+const temColuna=(k,c)=>!!(COLS[k]&&COLS[k].has(c));
+function validarConvite(f){
+ if(String(f.NOME||'').trim().length<3)return 'Informe o nome do visitante.';
+ if(!tiposConvite().includes(f.TIPO))return 'Escolha o tipo de visita.';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(f.dia||''))return 'Informe a data da visita.';
+ if(f.dia<todayKey())return 'A data não pode ser anterior a hoje.';
+ if(f.dia>keyShift(todayKey(),90))return 'Agende com no máximo 90 dias de antecedência.';
+ if(f.HORA&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(f.HORA))return 'Hora no formato 00:00.';
+ if(String(f.MOTIVO||'').trim().length<3)return 'Informe o motivo da visita.';
+ if(f.WHATSAPP&&String(f.WHATSAPP).replace(/\D/g,'').length<10)return 'WhatsApp com DDD (10 ou 11 dígitos).';
+ return null;}
+async function criarConvite(f,me){const erro=validarConvite(f);if(erro)throw Object.assign(new Error(erro),{code:'validacao'});
+ const fields={CODIGO:novoCodigo(),TIPO:f.TIPO,NOME:String(f.NOME).trim(),EMPRESA:String(f.EMPRESA||'').trim(),DOC_MASC:f.DOC?maskDoc(f.DOC):'',
+  DATA:diaParaGravar(f.dia),HORA:f.HORA||'',MOTIVO:String(f.MOTIVO).trim(),STATUS:'Agendado',ANFITRIAO_NOME:me.nome,ANFITRIAO_MATRICULA:me.mat||''};
+ if(f.WHATSAPP&&temColuna('agend','WHATSAPP'))fields.WHATSAPP=String(f.WHATSAPP).replace(/\D/g,'');
+ return sp.add(L.agend,fields);}
+async function alterarConvite(id,etag,{dia,HORA,MOTIVO}){const cur=await getItem('agend',id);const st=val(cur.STATUS);
+ if(st!=='Agendado')return {bloq:'Esta visita está "'+st+'" — não pode mais ser alterada.'};
+ const erro=validarConvite({NOME:cur.NOME,TIPO:val(cur.TIPO)||tiposConvite()[0],dia,HORA,MOTIVO});if(erro&&!/tipo/.test(erro))throw Object.assign(new Error(erro),{code:'validacao'});
+ try{await sp.patch(L.agend,id,{DATA:diaParaGravar(dia),HORA:HORA||'',MOTIVO:String(MOTIVO).trim()},{etag:etag||cur._etag});}catch(e){if(e.status===412)return {conflito:true};throw e;}
+ return {ok:true};}
+async function cancelarConvite(id,etag){const cur=await getItem('agend',id);const st=val(cur.STATUS);
+ if(st==='Cancelado')return {ok:true};if(['Entrou','Saiu'].includes(st))return {bloq:'O visitante já passou pela portaria — a visita não pode ser cancelada.'};
+ try{await sp.patch(L.agend,id,{STATUS:'Cancelado'},{etag:etag||cur._etag});}catch(e){if(e.status===412)return {conflito:true};throw e;}
+ return {ok:true};}
 /* corrige o status de PRESENÇA dos convites cuja 2ª gravação falhou (últimos 3 dias):
    movimento aberto e convite ≠ "Entrou" → "Entrou";  convite "Entrou" sem aberto → "Saiu".
    Relê no servidor antes de gravar; nunca sobrescreve Cancelado / Não veio (situação administrativa). */
@@ -300,13 +395,15 @@ async function reconciliar(agenda,abertos){
  return n;
 }
 /* ---------- formatação / validação ---------- */
-function maskDoc(v){const d=String(v||'').replace(/\D/g,'');if(!d)return String(v||'').trim();if(d.length===11)return '***.'+d.slice(3,6)+'.'+d.slice(6,9)+'-**';if(d.length>=7)return '*'.repeat(d.length-4)+d.slice(-4);return d;}
+function maskDoc(v){if(String(v||'').includes('*'))return String(v).trim();const d=String(v||'').replace(/\D/g,'');if(!d)return String(v||'').trim();if(d.length===11)return '***.'+d.slice(3,6)+'.'+d.slice(6,9)+'-**';if(d.length>=7)return '*'.repeat(d.length-4)+d.slice(-4);return d;}
 function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
- dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,ultimosTurnos,abrirTurno,resumoTurno,
+ dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
+ pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,fmtCnpj,consultaCnpj,salvarTransportadora,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
- get transportadoras(){return TRANSP_L;},diaMais:keyShift,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
+ get transportadoras(){return TRANSP_L;},diaMais:keyShift,
+ meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
  entradaPessoa,saidaPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});

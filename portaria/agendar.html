@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Agendar visita | Polystell Apps</title>
+<link rel="stylesheet" href="/core/polystell.css?v=2.3">
+<style>
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:14px;margin:4px 0 12px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.anf{display:flex;gap:10px;align-items:center;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin-bottom:14px;font-size:13.5px}
+.anf b{display:block}
+.anf span{color:var(--muted);font-size:12.5px}
+.vbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.ldia{font-weight:700;font-size:12.5px;margin:16px 0 2px;text-transform:capitalize}
+.ldia:first-child{margin-top:2px}
+.convite{text-align:center}
+.convite .cod{font:700 30px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--ink);margin:4px 0 10px;overflow-wrap:anywhere}
+.convite .qr{display:flex;justify-content:center;margin:6px 0 4px}
+.convite .qr svg,.convite .qr img{width:184px;height:184px;image-rendering:pixelated}
+.msgbox{white-space:pre-wrap;text-align:left;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:10px 0 0;color:#44526a}
+</style>
+</head>
+<body>
+<noscript><div class="ps-screen"><p>Ative o JavaScript para agendar visitas.</p></div></noscript>
+<script src="/core/polystell.js?v=2.3"></script>
+<script src="comum.js?v=2.3"></script>
+<script>
+'use strict';
+/* Agendar visita — página do colaborador (Portaria v2.2).
+   O colaborador agenda a visita dele; a portaria recebe o convite (CODIGO / QR)
+   na agenda do dia. Só o documento mascarado é gravado. A lista mostra só as
+   visitas do próprio colaborador; a trava real é a permissão em nível de item
+   da 09_Agendamentos (cada um lê e edita só o que criou). */
+const {$,$$,esc,val,fmt,icon,toast,dialog,dateKey,todayKey}=PS;
+const P=PORTARIA;
+const QR_URL='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+const ST={me:null,lista:[],sync:{at:null,err:null},
+ f:{tipo:'',nome:'',empresa:'',doc:'',wa:'',dia:todayKey(),hora:'',motivo:''}};
+let SHELL=null,qrPronto=null;
+const qrLib=()=>{if(!qrPronto)qrPronto=PS.loadScript(QR_URL).then(()=>!!window.qrcode).catch(()=>false);return qrPronto;};
+const ROTULO_DIA=k=>{const h=todayKey();const dm=fmt.data(k);
+ if(k===h)return 'Hoje · '+dm;if(k===P.diaMais(h,1))return 'Amanhã · '+dm;
+ return new Date(k+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')+' · '+dm;};
+const chip=s=>s==='Entrou'?'ok':s==='Saiu'?'':['Cancelado','Não veio'].includes(s)?'err':s==='Na portaria'?'warn':'blue';
+const waOn=()=>P.on('ENVIA_QR_WA')&&P.temColuna('agend','WHATSAPP');
+function bind(){SHELL.page.oninput=e=>{const b=e.target.dataset.bind;if(b)ST.f[b]=e.target.value;};}
+/* ---------------- tela ---------------- */
+function tela(){
+ SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>Minhas visitas</h1><p>Agende quem vem visitar você. A portaria recebe o convite e confere o código na chegada.</p></div></div><div id="banners"></div>'+
+  '<div class="cols"><div class="panel" id="vform"></div><div class="panel"><div class="panel-h">'+icon('calendar')+'<h2>Agendadas</h2><span class="sp"><span class="count" id="vcount"></span></span></div><div class="rows" id="vlist"></div></div></div>';
+ desenhaForm();bind();
+ SHELL.page.onclick=e=>{const t=e.target.closest('[data-tp]');if(t){ST.f.tipo=t.dataset.tp;$$('#vtipo [data-tp]').forEach(x=>x.setAttribute('aria-pressed',String(x===t)));return;}
+  if(e.target.closest('#vgo')){salvar();return;}
+  const c=e.target.closest('[data-conv]');if(c){const a=ST.lista.find(x=>x.id===c.dataset.conv);if(a)convite(a);return;}
+  const ed=e.target.closest('[data-alt]');if(ed){alterar(ed.dataset.alt);return;}
+  const cn=e.target.closest('[data-can]');if(cn)cancelar(cn.dataset.can);
+  if(e.target.closest('[data-refresh]'))refresh();};
+}
+function desenhaForm(){const F=ST.f,me=ST.me;const tipos=P.tiposConvite();if(!tipos.includes(F.tipo))F.tipo=tipos[0];
+ $('#vform').innerHTML='<div class="panel-h">'+icon('plus')+'<h2>Nova visita</h2></div>'+
+  '<div class="anf">'+icon('user')+'<div><b>Recebe: '+esc(me.nome)+'</b><span>'+(me.mat?'Matr. '+esc(me.mat)+(me.dep?' · '+esc(me.dep):''):'Seu e-mail não foi encontrado no diretório — a portaria verá só o seu nome.')+'</span></div></div>'+
+  '<div class="seg" id="vtipo" style="margin-bottom:14px">'+tipos.map(t=>'<button type="button" data-tp="'+esc(t)+'" aria-pressed="'+(F.tipo===t)+'">'+esc(t)+'</button>').join('')+'</div>'+
+  '<div class="field"><label for="vnome">Nome do visitante *</label><input id="vnome" maxlength="80" data-bind="nome" autocomplete="off" value="'+esc(F.nome)+'"></div>'+
+  '<div class="grid2"><div class="field"><label for="vemp">Empresa</label><input id="vemp" maxlength="80" data-bind="empresa" value="'+esc(F.empresa)+'"></div>'+
+  '<div class="field"><label for="vdoc">Documento (opcional)</label><input id="vdoc" maxlength="20" data-bind="doc" inputmode="numeric" autocomplete="off" value="'+esc(F.doc)+'"><span class="hint">Grava só mascarado. A portaria confere o documento na chegada.</span></div></div>'+
+  (waOn()?'<div class="field"><label for="vwa">WhatsApp do visitante</label><input id="vwa" maxlength="16" data-bind="wa" inputmode="tel" placeholder="(11) 91234-5678" value="'+esc(F.wa)+'"><span class="hint">Para o convite com QR chegar no WhatsApp dele.</span></div>':'')+
+  '<div class="grid2"><div class="field"><label for="vdia">Data *</label><input id="vdia" type="date" min="'+todayKey()+'" max="'+P.diaMais(todayKey(),90)+'" data-bind="dia" value="'+esc(F.dia)+'"></div><div class="field"><label for="vhora">Hora prevista</label><input id="vhora" type="time" data-bind="hora" value="'+esc(F.hora)+'"></div></div>'+
+  '<div class="field"><label for="vmot">Motivo da visita *</label><input id="vmot" maxlength="120" data-bind="motivo" placeholder="Reunião, manutenção, entrevista…" value="'+esc(F.motivo)+'"></div>'+
+  '<div class="vbtns"><button class="btn primary" id="vgo" type="button">'+icon('check')+'Agendar visita</button></div>'+
+  '<div class="note">O convite vale <b>o dia todo</b> da data marcada. Se a visita não for mais acontecer, cancele aqui para a portaria saber.</div>';}
+function banners(){const el=$('#banners');if(!el)return;
+ el.innerHTML=ST.sync.err?'<div class="banner err">'+icon('cloudoff')+'<span><b>A lista pode estar desatualizada.</b> '+esc(ST.sync.err)+'</span><button class="btn sm" data-refresh>'+icon('refresh')+'Tentar agora</button></div>':'';}
+function lista(){banners();if(!$('#vlist'))return;const h0=todayKey();
+ const prox=ST.lista.filter(a=>dateKey(a.DATA)>=h0).sort((a,b)=>(dateKey(a.DATA)+(a.HORA||'99')).localeCompare(dateKey(b.DATA)+(b.HORA||'99')));
+ const ant=ST.lista.filter(a=>dateKey(a.DATA)<h0).sort((a,b)=>dateKey(b.DATA).localeCompare(dateKey(a.DATA))).slice(0,10);
+ $('#vcount').textContent=prox.filter(a=>val(a.STATUS)!=='Cancelado').length;
+ const row=a=>{const s=val(a.STATUS)||'Agendado',k=dateKey(a.DATA),ativo=s==='Agendado'&&k>=h0;
+  return '<div class="row"><div class="main"><div class="t">'+esc(a.NOME)+(a.EMPRESA?' · '+esc(a.EMPRESA):'')+'</div><div class="meta">'+esc([val(a.TIPO),a.HORA||'sem horário',a.MOTIVO].filter(Boolean).join(' · '))+'</div><div class="detail">Código '+esc(a.CODIGO||'—')+'</div><div class="tags"><span class="chip dot '+chip(s)+'">'+esc(s)+'</span></div></div>'+
+   '<div class="act">'+(['Agendado','Na portaria'].includes(s)&&k>=h0?'<button class="btn sm" data-conv="'+a.id+'">'+icon('qr')+'Convite</button>':'')+(ativo?'<button class="btn sm" data-alt="'+a.id+'">Alterar</button><button class="btn sm" data-can="'+a.id+'">Cancelar</button>':'')+'</div></div>';};
+ let h='',dia=null;prox.forEach(a=>{const k=dateKey(a.DATA);if(k!==dia){dia=k;h+='<div class="ldia">'+esc(ROTULO_DIA(k))+'</div>';}h+=row(a);});
+ if(ant.length)h+='<div class="ldia">Anteriores</div>'+ant.map(row).join('');
+ $('#vlist').innerHTML=h||'<div class="empty">Nenhuma visita agendada. Use o formulário ao lado.</div>';}
+/* ---------------- ações ---------------- */
+async function salvar(){const F=ST.f;
+ const f={TIPO:F.tipo,NOME:F.nome,EMPRESA:F.empresa,DOC:F.doc,WHATSAPP:waOn()?F.wa:'',dia:F.dia,HORA:F.hora,MOTIVO:F.motivo};
+ const erro=P.validarConvite(f);if(erro){toast(erro,'err');return;}
+ const b=$('#vgo');b.disabled=true;
+ try{const a=await P.criarConvite(f,ST.me);
+  ST.f={tipo:F.tipo,nome:'',empresa:'',doc:'',wa:'',dia:F.dia,hora:'',motivo:''};desenhaForm();
+  toast('Visita agendada: '+a.NOME);await refresh();const novo=ST.lista.find(x=>x.id===a.id)||a;convite(novo);}
+ catch(e){if(e.code==='validacao')toast(e.message,'err');else if(e.uncertain){toast('Sem confirmação do servidor. Confira a lista antes de agendar de novo.','warn');refresh();}else toast(e.message||'Erro ao agendar.','err');}
+ finally{const x=$('#vgo');if(x)x.disabled=false;}}
+function mensagem(a){const k=dateKey(a.DATA);
+ return 'Olá, '+String(a.NOME).split(' ')[0]+'! Sua visita à Polystell está agendada para '+fmt.data(k)+(a.HORA?' às '+a.HORA:'')+'.\nQuem recebe: '+(a.ANFITRIAO_NOME||ST.me.nome)+'.\nNa portaria, apresente o código '+a.CODIGO+' (ou o QR) e um documento com foto.';}
+async function convite(a){const k=dateKey(a.DATA);const txt=mensagem(a);
+ const ok=await qrLib();let qrHtml='',png='';
+ if(ok){try{const q=window.qrcode(0,'M');q.addData('PSTL|A|'+a.CODIGO);q.make();qrHtml=q.createSvgTag(6,2);png=q.createDataURL(8,4);}catch(e){qrHtml='';}}
+ const v=await dialog({title:'Convite da visita',html:'<div class="convite"><p style="margin:0 0 4px"><b>'+esc(a.NOME)+'</b>'+(a.EMPRESA?' · '+esc(a.EMPRESA):'')+'<br>'+esc(ROTULO_DIA(k)+(a.HORA?' · '+a.HORA:''))+'</p>'+
+   (qrHtml?'<div class="qr" aria-label="QR do convite">'+qrHtml+'</div>':'')+'<div class="cod">'+esc(a.CODIGO)+'</div></div>'+
+   '<span class="lbl">Mensagem para enviar ao visitante</span><div class="msgbox">'+esc(txt)+'</div>',
+  actions:[{label:'Fechar',value:null},...(png?[{label:'Baixar QR',value:'png'}]:[]),{label:'Copiar mensagem',kind:'primary',onClick:async()=>{try{await navigator.clipboard.writeText(txt);toast('Mensagem copiada. Cole no WhatsApp ou e-mail do visitante.');return true;}catch{toast('Não foi possível copiar. Selecione o texto e copie manualmente.','warn');return false;}}}]});
+ if(v==='png'&&png){const l=document.createElement('a');l.href=png;l.download='convite-'+a.CODIGO+'.gif';document.body.appendChild(l);l.click();l.remove();}}
+function alterar(id){const a=ST.lista.find(x=>x.id===id);if(!a)return;
+ dialog({title:'Alterar visita',html:'<p><b>'+esc(a.NOME)+'</b>'+(a.EMPRESA?' · '+esc(a.EMPRESA):'')+'</p><div class="grid2"><div class="field"><label for="ddia">Data *</label><input id="ddia" type="date" min="'+todayKey()+'" max="'+P.diaMais(todayKey(),90)+'" value="'+esc(dateKey(a.DATA))+'"></div><div class="field"><label for="dhora">Hora prevista</label><input id="dhora" type="time" value="'+esc(a.HORA||'')+'"></div></div><div class="field"><label for="dmot">Motivo *</label><input id="dmot" maxlength="120" value="'+esc(a.MOTIVO||'')+'"></div><div class="note">O código do convite continua o mesmo.</div>',
+  actions:[{label:'Voltar',value:null},{label:'Salvar',kind:'primary',onClick:async d=>{
+   try{const r=await P.alterarConvite(id,a._etag,{dia:d.querySelector('#ddia').value,HORA:d.querySelector('#dhora').value,MOTIVO:d.querySelector('#dmot').value});
+    if(r.bloq){toast(r.bloq,'warn');refresh();return true;}
+    if(r.conflito){toast('A visita foi atualizada enquanto você editava (por exemplo, pela portaria). Confira e tente de novo.','warn');refresh();return true;}
+    toast('Visita alterada.');refresh();return true;}catch(e){toast(e.message||'Erro ao alterar.','err');return false;}}}]});}
+function cancelar(id){const a=ST.lista.find(x=>x.id===id);if(!a)return;
+ dialog({title:'Cancelar visita',html:'<p><b>'+esc(a.NOME)+'</b> · '+esc(ROTULO_DIA(dateKey(a.DATA))+(a.HORA?' · '+a.HORA:''))+'</p><div class="note">A portaria verá a visita como <b>Cancelada</b> e não libera a entrada pelo convite.</div>',
+  actions:[{label:'Voltar',value:null},{label:'Cancelar visita',kind:'danger solid',onClick:async()=>{
+   try{const r=await P.cancelarConvite(id,a._etag);if(r.bloq){toast(r.bloq,'warn');refresh();return true;}
+    if(r.conflito){toast('A visita foi atualizada enquanto isso. Confira e tente de novo.','warn');refresh();return true;}
+    toast('Visita cancelada.');refresh();return true;}catch(e){toast(e.message||'Erro ao cancelar.','err');return false;}}}]});}
+/* ---------------- dados ---------------- */
+let running=null;
+async function refresh(){if(running)return running;
+ running=(async()=>{try{ST.lista=await P.minhasVisitas(ST.me);ST.sync={at:new Date(),err:null};SHELL.setSync('ok','Atualizado às '+fmt.hm(ST.sync.at));}
+  catch(e){ST.sync={at:ST.sync.at,err:e.message||'erro'};SHELL.setSync('bad','Falha ao atualizar');}
+  lista();})();
+ try{await running;}finally{running=null;}}
+/* ---------------- início ---------------- */
+(async function init(){
+ PS.screens.loading('Abrindo suas visitas…');
+ let acc;try{acc=await PS.auth.init();}catch(e){PS.screens.error(e.code==='https'?'Endereço não seguro':'Não foi possível iniciar',e.message);return;}
+ if(!acc){PS.screens.login({app:'Agendar visita',text:'Entre com a sua conta corporativa para agendar visitas.',onLogin:()=>PS.auth.login()});return;}
+ try{const b=await P.boot({posto:false,log:false,agendar:true});
+  if(!b.ok){PS.screens.error('Agendamento indisponível','A página precisa destes itens no SharePoint. Avise a TI:',{details:b.faltando});return;}
+  PS.auth.ready();window.addEventListener('ps:session',()=>refresh());
+  const c=await P.meuCadastro(acc.username);
+  ST.me={nome:c?.nome||acc.name||acc.username,mat:c?.mat||'',dep:c?.dep||'',email:String(acc.username||'').toLowerCase()};
+  SHELL=PS.mount({app:'Portaria',nav:[{id:'visitas',label:'Minhas visitas',icon:'calendar',section:'Visitas'}],current:'visitas',onNav:()=>{},account:acc});
+  SHELL.setCurrent('visitas','Minhas visitas');tela();await refresh();qrLib();
+  setInterval(()=>{if(!document.hidden)refresh();},120000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+ }catch(e){console.error(e);PS.screens.error('Não foi possível abrir',e.message);}
+})();
+</script>
+</body>
+</html>
