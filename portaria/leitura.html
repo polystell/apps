@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=1">
+<link rel="stylesheet" href="/core/polystell.css?v=2.2">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -38,12 +38,17 @@
 .lt-card .field{margin:12px 0 0}
 .lt-card .field input{min-height:48px;font-size:16px}
 .ps-toast{left:50%}
+.lt-acc{border:1px solid #ffffff26;background:#ffffff12;color:#fff;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;flex-shrink:0}
+.lt-accm{position:fixed;right:10px;top:54px;z-index:40;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 35px #16244030;padding:12px 14px;min-width:230px;max-width:calc(100vw - 20px)}
+.lt-accm strong{display:block;font-size:14px;overflow-wrap:anywhere}.lt-accm small{display:block;color:var(--muted);font-size:12px;margin:3px 0 8px;overflow-wrap:anywhere}
+.lt-accm a,.lt-accm button{display:flex;gap:9px;align-items:center;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:11px 0 6px;font-size:14px;color:var(--ink);text-decoration:none;text-align:left}
+.lt-turno{min-width:0}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=1"></script>
-<script src="comum.js?v=1"></script>
+<script src="/core/polystell.js?v=2.2"></script>
+<script src="comum.js?v=2.2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -55,34 +60,43 @@
    física do crachá — a conferência visual continua sendo do porteiro. */
 const {$,$$,esc,val,fmt,icon,toast,dialog}=PS;
 const P=PORTARIA;
-const S={mode:'scan',op:0,turno:null,turnoAtivo:false,last:{code:'',at:0}};
-const porteiro=()=>S.turnoAtivo?S.turno.PARA:'';
+const S={mode:'scan',op:0,turno:null,last:{code:'',at:0}};
+const tAtivo=()=>P.turnoValido(S.turno);
+const porteiro=()=>tAtivo()?S.turno.PARA:'';
 const MODAIS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'];
 function verif(mat){let h=7;for(const c of String(mat))h=(h*31+c.charCodeAt(0))%1296;return h.toString(36).padStart(2,'0').toUpperCase();}
 const quando=v=>v&&new Date(v).toDateString()===new Date().toDateString()?fmt.hm(v):fmt.dmhm(v);
 function shell(){
- document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button></header>'+
+ document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button><button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
+ '<div class="lt-accm" id="accm" hidden><strong>'+esc(PS.auth.account?.name||'Conta')+'</strong><small>'+esc(PS.auth.account?.username||'')+'</small><a href="'+PS.cfg.hubUrl+'">'+icon('grid')+'Todos os aplicativos</a><a href="./">'+icon('home')+'Portaria no computador</a><button type="button" id="sair">'+icon('logout')+'Sair da conta</button></div>'+
  '<main class="lt-wrap"><div id="ban"></div><section class="lt-cam" id="cam"><video id="video" playsinline muted></video><div class="mira"></div><div class="hint" id="hint">Aponte para o QR do crachá ou do convite</div></section>'+
  '<form class="lt-manual" id="mf"><input id="mc" autocomplete="off" inputmode="text" placeholder="Ou digite matrícula / código do convite" aria-label="Matrícula ou código do convite"><button class="btn primary" type="submit">OK</button></form><div id="res" aria-live="polite"></div></main>';
  $('#tb').onclick=dlgTurno;
+ const am=$('#accm'),ab=$('#acc');ab.onclick=()=>{am.hidden=!am.hidden;ab.setAttribute('aria-expanded',String(!am.hidden));};
+ document.addEventListener('click',e=>{if(!e.target.closest('#acc')&&!e.target.closest('#accm')){am.hidden=true;ab.setAttribute('aria-expanded','false');}});
+ $('#sair').onclick=()=>PS.auth.logout();
  $('#mf').onsubmit=e=>{e.preventDefault();const v=$('#mc').value.trim();if(!v)return;if(S.mode==='busy'){toast('Aguarde a consulta em andamento.','warn');return;}$('#mc').value='';$('#mc').blur();if(S.mode==='confirm'||S.mode==='done')nova();handle(v,'digitado');};
 }
-function paintTurno(){const b=$('#tb');if(!b)return;b.className='lt-turno'+(S.turnoAtivo?'':' off');b.textContent=S.turnoAtivo?'Plantão: '+S.turno.PARA:'Abrir turno';
- $('#ban').innerHTML=S.turnoAtivo?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno aberto. Abra o turno para registrar entradas e saídas.</span></div>';}
-async function loadTurno(){try{const t=await P.turnoAtual();S.turno=t.turno;S.turnoAtivo=t.ativo;}catch(e){console.warn(e);}paintTurno();}
+function paintTurno(){const b=$('#tb');if(!b)return;const ok=tAtivo();b.className='lt-turno'+(ok?'':' off');b.textContent=ok?'Plantão: '+S.turno.PARA:'Abrir turno';
+ $('#ban').innerHTML=(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
+async function loadTurno(){try{const [t]=await Promise.all([P.turnoAtual(),P.loadParams()]);S.turno=t.turno;S.lidoEm=t.lidoEm;S.syncErr=null;}catch(e){S.syncErr=e.message||'erro';}paintTurno();}
 async function dlgTurno(){const ativos=P.porteiros.filter(p=>p.ativo);
  if(!ativos.length){dialog({title:'Nenhum porteiro cadastrado',html:'<p>A TI cadastra os porteiros em Segurança (TI), no computador da portaria.</p>'});return;}
- const de=S.turnoAtivo?S.turno.PARA:'';
+ const de=tAtivo()?S.turno.PARA:'';
  await dialog({title:de?'Passagem de turno':'Abrir turno',html:(de?'<p>Sai do posto: <b>'+esc(de)+'</b>. O resumo completo da passagem fica no computador.</p>':'')+'<div class="field"><label for="tp">'+(de?'Assume o posto *':'Porteiro de plantão *')+'</label><select id="tp"><option value="">— selecione —</option>'+ativos.filter(p=>p.nome!==de).map(p=>'<option>'+esc(p.nome)+'</option>').join('')+'</select></div>',
   actions:[{label:'Cancelar',value:null},{label:'Confirmar',kind:'primary',onClick:async d=>{const para=d.querySelector('#tp').value;if(!para){toast('Selecione o porteiro.','err');return false;}
    try{await P.abrirTurno({de,para,resumo:'Turno aberto pelo celular da portaria.'});await loadTurno();toast('Plantão: '+para);return true;}catch(e){toast(e.message,'err');return false;}}}]});}
-function needTurno(){if(S.turnoAtivo)return false;dlgTurno();return true;}
+function needTurno(){if(tAtivo())return false;paintTurno();dlgTurno();return true;}
 /* ---------------- estados ---------------- */
-function setMode(m){S.mode=m;$$('#res button').forEach(b=>b.disabled=(m==='busy'));const c=$('#cam');if(!c)return;c.classList.toggle('mini',m!=='scan');$('#hint').textContent=m==='scan'?'Aponte para o QR do crachá ou do convite':m==='busy'?'Consultando…':'Leitura pausada — conclua ou toque em Nova leitura';}
+function setMode(m){S.mode=m;$$('#res button').forEach(b=>b.disabled=(m==='busy'));const c=$('#cam');if(!c)return;c.classList.toggle('mini',m!=='scan');$('#hint').textContent=m==='scan'?'Aponte para o QR do crachá ou do convite':m==='busy'?'Consultando…':'Leitura pausada';}
 function nova(){S.op++;$('#res').innerHTML='';setMode('scan');S.last.at=Date.now();}
 function card(html,acts=''){$('#res').innerHTML='<div class="lt-card">'+html+(acts?'<div class="lt-acts">'+acts+'</div>':'')+'</div>';const n=$('#res [data-nova]');if(n)n.onclick=nova;}
+/* presença incompleta nunca vira "está fora": interrompe a consulta */
+async function abertosOk(){const ab=await P.abertosP();if(ab.truncated)throw new Error('Consulta de presença incompleta (lista acima do limite de leitura). Nada foi gravado — registre no computador e avise a TI.');return ab;}
 const btnNova='<button class="btn" type="button" data-nova>'+icon('qr')+'Nova leitura</button>';
-function sucesso(msg){const op=S.op;setMode('done');card('<div class="banner ok" style="margin:0">'+icon('check')+'<span><b>'+esc(msg)+'</b></span></div>',btnNova);toast(msg);navigator.vibrate?.(80);
+function sucesso(msg,parcial){const op=S.op;setMode('done');
+ if(parcial){card('<div class="banner ok" style="margin:0">'+icon('check')+'<span><b>'+esc(msg)+'</b></span></div><div class="banner warn">'+icon('alert')+'<span>'+esc(parcial)+'</span></div>',btnNova);navigator.vibrate?.([80,60,80]);return;}
+ card('<div class="banner ok" style="margin:0">'+icon('check')+'<span><b>'+esc(msg)+'</b></span></div>',btnNova);toast(msg);navigator.vibrate?.(80);
  setTimeout(()=>{if(S.op===op&&S.mode==='done')nova();},3500);}
 function falha(e){if(e.code==='session'){toast(e.message,'warn');return;}if(e.uncertain){card('<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Sem confirmação do servidor. Confira no computador antes de repetir.</span></div>',btnNova);}else toast(e.message||'Erro','err');}
 async function handle(raw,origem){
@@ -99,44 +113,45 @@ async function colab(mat,ver,origem){
  if(ver&&verif(mat)!==ver){setMode('confirm');navigator.vibrate?.(200);card('<h2>QR não confere</h2><div class="banner err">'+icon('lock')+'<span>O código do crachá não confere. Confira o crachá ou registre manualmente no computador.</span></div>',btnNova);return;}
  const c=await P.colabPorMatricula(mat);
  if(!c){setMode('confirm');card('<h2>Matrícula não encontrada</h2><div class="banner err">'+icon('alert')+'<span>A matrícula <b>'+esc(mat)+'</b> não consta no diretório. Não libere; registre no computador.</span></div>',btnNova);return;}
- const aberto=P.abertoDaMatricula(await P.abertosP(),c.mat);
+ const aberto=P.abertoDaMatricula(await abertosOk(),c.mat);
  const deslig=P.desligado(c);
  /* saída vem antes do bloqueio: encerrar um movimento aberto é sempre permitido */
  if(aberto){setMode('confirm');
-  card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+' · <b style="color:var(--ok)">dentro desde '+quando(aberto.ENTRADA)+'</b></div>'+(deslig?'<div class="banner err">'+icon('lock')+'<span>Colaborador <b>desligado</b>. Registre a saída e comunique a Segurança.</span></div>':''),
+  card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+' · <b style="color:var(--ok)">dentro desde '+quando(aberto.ENTRADA)+'</b></div>'+(deslig?'<div class="banner err">'+icon('lock')+'<span>Situação no diretório: <b>'+esc(c.sit||'não informada')+'</b>. Registre a saída e comunique a Segurança.</span></div>':''),
    '<button class="btn danger solid" type="button" id="go">'+icon('out')+'Registrar SAÍDA</button>'+btnNova);
   $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;setMode('busy');
    try{const r=await P.saidaPessoa(aberto,porteiro());if(r.jaSaiu){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>A saída já tinha sido registrada'+(r.mov.SAIDA?' às '+fmt.hm(r.mov.SAIDA):'')+'.</span></div>',btnNova);return;}
-    sucesso(c.nome+' — saída registrada');}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
+    sucesso(c.nome+' — saída registrada',r.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
   return;}
- if(deslig){setMode('confirm');navigator.vibrate?.([120,60,120]);card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span><b>Colaborador desligado.</b> Não libere a entrada e comunique a Segurança.</span></div>',btnNova);return;}
+ if(deslig){setMode('confirm');navigator.vibrate?.([120,60,120]);card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span><b>Situação no diretório: '+esc(c.sit||'não informada')+'.</b> Não libere a entrada e comunique a Segurança.</span></div>',btnNova);return;}
  const precisa=P.on('MODAL_OBRIGATORIO');let modal=null;setMode('confirm');
- const origemTxt=origem==='digitado'?'<span class="chip warn dot">Colaborador localizado (matrícula digitada — sem crachá)</span>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR lido (sem código verificador)</span>';
+ const origemTxt=origem==='digitado'?'<span class="chip warn dot">Matrícula digitada</span><div class="detail">Colaborador localizado no diretório, sem leitura do crachá. Confira um documento com foto.</div>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR sem verificador</span><div class="detail">Crachá lido, mas sem o código de conferência. Confira o crachá.</div>';
  card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="false">'+esc(x)+'</button>').join('')+'</div>',
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
  $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));};
  $('#go').onclick=async()=>{if(needTurno())return;if(precisa&&!modal){toast('Selecione como o colaborador veio hoje.','err');return;}const b=$('#go');b.disabled=true;setMode('busy');
-  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro()},{mat:c.mat});
+  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)'},{mat:c.mat});
+   if(r.bloq){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span>'+esc(r.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(r.dup){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(r.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
-   sucesso(c.nome+' — entrada registrada');}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
+   sucesso(c.nome+' — entrada registrada'+(r.confirmado?' (confirmada)':''));}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
 }
 async function convite(cod){
  const a=await P.agendaPorCodigo(cod);
  if(!a){setMode('confirm');card('<h2>Convite não encontrado</h2><div class="banner err">'+icon('alert')+'<span>O código <b>'+esc(cod)+'</b> não consta nos agendamentos.</span></div>',btnNova);return;}
- const aberto=P.abertoDoAgend(await P.abertosP(),a.id);const r=P.regraConvite(a,aberto);setMode('confirm');
+ const aberto=P.abertoDoAgend(await abertosOk(),a.id);const r=P.regraConvite(a,aberto);setMode('confirm');
  const head='<h2>'+esc(a.NOME)+'</h2><div class="meta">'+esc([val(a.TIPO),a.EMPRESA].filter(Boolean).join(' · ')||'—')+'<br>Recebe: <b>'+esc(a.ANFITRIAO_NOME||'—')+'</b>'+(a.HORA?' · '+esc(a.HORA):'')+'</div>';
  if(r.acao==='bloq'){navigator.vibrate?.(200);card(head+'<div class="banner err">'+icon('lock')+'<span>'+esc(r.motivo)+'</span></div>',btnNova);return;}
  if(r.acao==='saida'){card(head+'<div class="meta" style="margin-top:8px"><b style="color:var(--ok)">Dentro desde '+quando(aberto.ENTRADA)+'</b>'+(aberto.CRACHA?' · recolha o crachá <b>'+esc(aberto.CRACHA)+'</b>':'')+'</div>','<button class="btn danger solid" type="button" id="go">'+icon('out')+'Registrar SAÍDA</button>'+btnNova);
   $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;setMode('busy');
    try{const x=await P.saidaPessoa(aberto,porteiro());if(x.jaSaiu){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>A saída já tinha sido registrada.</span></div>',btnNova);return;}
-    if(x.parcial)toast(x.parcial,'warn');sucesso(a.NOME+' — saída registrada');}catch(e){setMode('confirm');b.disabled=false;falha(e);}};return;}
+    sucesso(a.NOME+' — saída registrada',x.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};return;}
  card(head+'<div class="banner ok">'+icon('check')+'<span>'+(r.reentrada?'Reentrada no mesmo dia — convite válido hoje.':'Convite válido para hoje.')+'</span></div><div class="field"><label for="cr">Crachá entregue (nº)</label><input id="cr" maxlength="12" placeholder="Ex.: V-012"></div>',
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
  $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;const cr=$('#cr').value.trim();setMode('busy');
-  try{const x=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:cr,SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
+  try{const x=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:cr,SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'Celular (QR)',AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
    if(x.bloq){setMode('confirm');card(head+'<div class="banner err">'+icon('lock')+'<span>'+esc(x.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(x.dup){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(x.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
-   if(x.parcial)toast(x.parcial,'warn');sucesso(a.NOME+' — entrada registrada');}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
+   sucesso(a.NOME+' — entrada registrada'+(x.confirmado?' (confirmada)':''),x.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
 }
 /* ---------------- câmera ---------------- */
 async function camera(){const v=$('#video');
@@ -159,7 +174,7 @@ async function camera(){const v=$('#video');
  if(!acc){PS.screens.login({app:'Portaria · Leitura',text:'Entre com a conta da portaria.',onLogin:()=>PS.auth.login()});return;}
  try{const b=await P.boot();if(!b.ok){PS.screens.error('Estrutura incompleta no SharePoint','O leitor precisa destes itens:',{details:b.faltando});return;}
   PS.auth.ready();window.addEventListener('ps:session',()=>loadTurno());
-  shell();await loadTurno();if(!S.turnoAtivo)dlgTurno();camera();
+  shell();await loadTurno();if(!tAtivo())dlgTurno();camera();
   setInterval(()=>{if(!document.hidden)loadTurno();},120000);
  }catch(e){console.error(e);PS.screens.error('Não foi possível abrir o leitor',e.message);}
 })();

@@ -30,7 +30,7 @@ const pad=n=>String(n).padStart(2,'0');
 const todayKey=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
 /* Coluna "somente data" do SharePoint chega como meia-noite local em UTC
    (ex.: 2026-10-08T03:00:00Z). Hora UTC ≤ 05 → vale a parte de data. */
-function dateKey(v){if(!v)return'';const s=String(v);const m=s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})/);if(m&&+m[2]<=5)return m[1];const d=new Date(s);if(isNaN(d))return s.slice(0,10);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function dateKey(v){if(!v)return'';const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const m=s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})/);if(m&&+m[2]<=5)return m[1];const d=new Date(s);if(isNaN(d))return s.slice(0,10);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 const fmt={
  hm:v=>v?new Date(v).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—',
  dm:v=>v?new Date(v).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—',
@@ -72,21 +72,28 @@ const IC={
 const icon=(n,cls='')=>'<svg class="i '+cls+'" viewBox="0 0 24 24" aria-hidden="true">'+(IC[n]||IC.grid)+'</svg>';
 /* ---------------- toast / diálogo ---------------- */
 let toastT=null;
-function toast(msg,kind){let t=$('#ps-toast');if(!t){t=document.createElement('div');t.id='ps-toast';t.className='ps-toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.appendChild(t);}
+let dlgCapture=null;
+function toast(msg,kind){if(dlgCapture){dlgCapture.push([msg,kind]);return;}const dl=$('#ps-dlg');if(dl&&dl.open){const m=dl.querySelector('.dlg-msg');if(m){m.className='dlg-msg banner '+(kind==='err'?'err':kind==='warn'?'warn':'ok');m.textContent=msg;m.hidden=false;return;}}
+ let t=$('#ps-toast');if(!t){t=document.createElement('div');t.id='ps-toast';t.className='ps-toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.appendChild(t);}
  clearTimeout(toastT);t.textContent=msg;t.className='ps-toast show'+(kind?' '+kind:'');toastT=setTimeout(()=>t.classList.remove('show'),kind==='err'?6000:3800);}
 let dlgBusy=false;
 function dialog({title,html='',actions=[{label:'Fechar',value:null}]}){
  return new Promise(resolve=>{
   let d=$('#ps-dlg');if(!d){d=document.createElement('dialog');d.id='ps-dlg';d.className='ps-dlg';document.body.appendChild(d);}
   if(d.open)d.close();
-  d.innerHTML='<div class="body"><h3>'+esc(title)+'</h3>'+html+'</div><div class="acts">'+actions.map((a,i)=>'<button type="button" class="btn '+(a.kind||'')+'" data-a="'+i+'">'+esc(a.label)+'</button>').join('')+'</div>';
+  d.setAttribute('aria-labelledby','ps-dlg-t');
+  d.innerHTML='<div class="body"><h3 id="ps-dlg-t">'+esc(title)+'</h3>'+html+'<div class="dlg-msg" role="alert" hidden></div></div><div class="acts">'+actions.map((a,i)=>'<button type="button" class="btn '+(a.kind||'')+'" data-a="'+i+'">'+esc(a.label)+'</button>').join('')+'</div>';
   let settled=false;const finish=v=>{if(settled)return;settled=true;if(d.open)d.close();resolve(v);};
   d.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const a=actions[+b.dataset.a];
    if(!a.onClick){finish(a.value);return;}
    dlgBusy=true;d.querySelectorAll('.acts button').forEach(x=>x.disabled=true);
-   let r;try{r=await a.onClick(d);}catch(e){r=false;toast(e.message||'Erro',"err");}
+   /* mensagens geradas durante a ação: se o diálogo continua aberto, aparecem
+      dentro dele (camada superior); se ele fecha, viram aviso normal */
+   dlgCapture=[];let r;try{r=await a.onClick(d);}catch(e){r=false;dlgCapture.push([e.message||'Erro','err']);}
+   const msgs=dlgCapture;dlgCapture=null;
    dlgBusy=false;d.querySelectorAll('.acts button').forEach(x=>x.disabled=false);
-   if(r===false)return;finish(r===undefined?a.value:r);});
+   if(r===false){const m=msgs[msgs.length-1];if(m)toast(m[0],m[1]);return;}
+   finish(r===undefined?a.value:r);const m=msgs[msgs.length-1];if(m)toast(m[0],m[1]);});
   d.oncancel=e=>{if(dlgBusy){e.preventDefault();return;}finish(undefined);};
   d.showModal();
   setTimeout(()=>{const f=d.querySelector('.body input,.body select,.body textarea');if(f)f.focus();},40);
@@ -102,12 +109,13 @@ const isPopupBlocked=e=>/popup_window_error|empty_window_error|popup/i.test(Stri
    • depois de aberto, só com gesto do usuário (clique) → popup;
    • em segundo plano (timer) → NUNCA interativo: mostra a barra
      "Sessão expirada — Entrar novamente" e preserva a tela. */
-let mode='boot',lastGesture=0;
+let mode='boot',lastGesture=0,popupP=null;
+function popupOnce(req){if(!popupP)popupP=msalApp.acquireTokenPopup(req).finally(()=>{popupP=null;});return popupP;}
 ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastGesture=Date.now();},true));
 const hasGesture=()=>navigator.userActivation?navigator.userActivation.isActive:Date.now()-lastGesture<4000;
 function sessionBar(){if($('#ps-sess'))return;const b=document.createElement('div');b.id='ps-sess';b.className='ps-sess';b.setAttribute('role','alert');
  b.innerHTML=icon('lock')+'<span><b>Sua sessão expirou.</b> O que você digitou continua na tela.</span><button type="button" class="btn sm primary">Entrar novamente</button>';
- b.querySelector('button').onclick=async()=>{try{const r=await msalApp.acquireTokenPopup({scopes:CFG.baseScopes,account});account=r.account||account;b.remove();window.dispatchEvent(new Event('ps:session'));}
+ b.querySelector('button').onclick=async()=>{try{const r=await popupOnce({scopes:CFG.baseScopes,account});account=r.account||account;b.remove();window.dispatchEvent(new Event('ps:session'));}
   catch(p){if(isPopupBlocked(p))await msalApp.acquireTokenRedirect({scopes:CFG.baseScopes,account});else toast('Não foi possível entrar: '+(p.message||'erro'),'err');}};
  document.body.appendChild(b);}
 const auth={
@@ -125,14 +133,15 @@ const auth={
  login(scopes=CFG.baseScopes){return msalApp.loginRedirect({scopes});},
  logout(){try{sessionStorage.clear();}catch{}return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
  get account(){return account;},
- async token(scopes=CFG.baseScopes,{optional=false}={}){
-  const req={scopes,account};
+ sessionLost(){sessionBar();return Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});},
+ async token(scopes=CFG.baseScopes,{optional=false,force=false}={}){
+  const req={scopes,account,forceRefresh:force};
   try{return (await msalApp.acquireTokenSilent(req)).accessToken;}
   catch(e){
    if(!isInteraction(e))throw e;
    if(optional)throw Object.assign(new Error('Permissão opcional indisponível.'),{code:'optional'});
    if(mode==='boot'){await msalApp.acquireTokenRedirect(req);throw new Error('Redirecionando para entrar novamente…');}
-   if(hasGesture()){try{const r=await msalApp.acquireTokenPopup(req);account=r.account||account;const sb=$('#ps-sess');if(sb)sb.remove();return r.accessToken;}
+   if(hasGesture()){try{const r=await popupOnce(req);account=r.account||account;const sb=$('#ps-sess');if(sb)sb.remove();return r.accessToken;}
     catch(p){if(isPopupBlocked(p)){sessionBar();throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});}throw p;}}
    sessionBar();throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});
   }
@@ -144,8 +153,8 @@ async function graph(path,opt={}){
  const url=new URL(path.startsWith('https://')?path:'https://graph.microsoft.com/v1.0'+path);
  if(url.origin!=='https://graph.microsoft.com')throw new Error('Destino de API não autorizado.');
  const method=(opt.method||'GET').toUpperCase(),isRead=method==='GET';
- const tok=await auth.token(opt.scopes||CFG.baseScopes,{optional:!!opt.optional});
- let waited=0;
+ let tok=await auth.token(opt.scopes||CFG.baseScopes,{optional:!!opt.optional});
+ let waited=0,renewed=false;
  for(let a=0;a<4;a++){
   const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),opt.timeout||25000);let r;
   try{r=await fetch(url,{method,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json',...(opt.headers||{})},body:opt.body!=null?JSON.stringify(opt.body):undefined,signal:ctl.signal});}
@@ -154,6 +163,8 @@ async function graph(path,opt={}){
    if(isRead&&a<2){await sleep(1500*(a+1));continue;}
    throw Object.assign(new Error(isRead?'Sem conexão com o Microsoft 365.':'Sem confirmação do servidor — a gravação pode ou não ter sido aplicada.'),{status:0,uncertain:!isRead});}
   clearTimeout(tm);
+  if(r.status===401&&!renewed){renewed=true;tok=await auth.token(opt.scopes||CFG.baseScopes,{optional:!!opt.optional,force:true});a--;continue;}
+  if(r.status===401){if(opt.optional)throw Object.assign(new Error('Não autorizado (401).'),{status:401});throw auth.sessionLost();}
   /* 429 = não processado → pode repetir sempre. 503/504 → só leitura. */
   const retriable=r.status===429||(isRead&&[503,504].includes(r.status));
   if(retriable&&a<3){const ra=Number(r.headers.get('Retry-After'))||(a+1)*2;if(waited+ra>60)throw Object.assign(new Error('O Microsoft 365 pediu para aguardar '+ra+'s. Tente novamente em instantes.'),{status:r.status});waited+=ra;await sleep(ra*1000);continue;}
@@ -161,7 +172,7 @@ async function graph(path,opt={}){
   if(!r.ok){let d='',code='';try{const j=await r.json();d=j?.error?.message||'';code=j?.error?.code||'';}catch{}
    const msg=r.status===403?'Sem permissão para esta operação (403).':r.status===404?'Recurso não encontrado (404).':r.status===412?'O registro foi alterado em outro dispositivo (412).':'Microsoft Graph '+r.status+(d?' — '+d:'');
    throw Object.assign(new Error(msg),{status:r.status,code,detail:d,uncertain:!isRead&&r.status>=500});}
-  return r.json();
+  try{return await r.json();}catch(e){if(isRead)throw new Error('Resposta inválida do Microsoft 365.');throw Object.assign(new Error('O servidor respondeu sem confirmação legível — a gravação pode ter sido aplicada.'),{status:r.status,uncertain:true});}
  }
  throw new Error('Falha ao consultar o Microsoft Graph.');
 }
@@ -174,9 +185,10 @@ const sp={
  /* paginação completa; para em max e marca .truncated (nunca corta em silêncio) */
  async items(listId,query,max=5000){const s=await sp.site();let out=[],next='/sites/'+s+'/lists/'+listId+'/items?'+query,trunc=false;
   while(next){const p=await graph(next,{headers:{Prefer:'HonorNonIndexedQueriesWarningMayFailRandomly'}});out.push(...(p.value||[]));next=p['@odata.nextLink']||null;if(next&&out.length>=max){trunc=true;break;}}
-  const rows=out.map(it=>({id:String(it.id),_etag:it['@odata.etag']||it.eTag||'',...(it.fields||{})}));rows.truncated=trunc;return rows;},
+  const rows=out.map(it=>({id:String(it.id),_etag:it['@odata.etag']||it.eTag||'',_by:it.createdBy?.user?.displayName||'',...(it.fields||{})}));rows.truncated=trunc;return rows;},
  async add(listId,fields){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items',{method:'POST',body:{fields}});return {id:String(r.id),...(r.fields||{})};},
- async patch(listId,id,fields){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'/fields',{method:'PATCH',body:fields});}
+ async patch(listId,id,fields,{etag}={}){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'/fields',{method:'PATCH',body:fields,headers:etag?{'If-Match':etag}:{}});},
+ async get(listId,id){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'?$expand=fields');return {id:String(r.id),_etag:r['@odata.etag']||r.eTag||'',_by:r.createdBy?.user?.displayName||'',...(r.fields||{})};}
 };
 async function groups(){try{let next='/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName&$top=999';const out=new Set();
  while(next){const p=await graph(next,{scopes:CFG.groupScopes,optional:true,headers:{ConsistencyLevel:'eventual'}});(p.value||[]).forEach(g=>{if(g.id)out.add(String(g.id).toLowerCase());if(g.displayName)out.add(String(g.displayName).toLowerCase());});next=p['@odata.nextLink']||null;}
@@ -206,23 +218,27 @@ function mount({app,nav,current,onNav,account:acc}){
  '<aside class="ps-side" id="ps-side" aria-label="Navegação">'+brandHtml()+
  '<a class="ps-back" href="'+CFG.hubUrl+'">'+icon('back')+'Todos os aplicativos</a>'+
  '<nav class="ps-nav" id="ps-nav"></nav><div class="ps-sidefoot"><div id="ps-ctx"></div><span style="display:flex;gap:7px;align-items:center;padding:0 4px">'+icon('shield')+'Identidade Microsoft 365</span></div></aside>'+
- '<div class="ps-main"><header class="ps-top"><button class="ps-iconbtn ps-menubtn" id="ps-mb" aria-label="Abrir menu">'+icon('menu')+'</button>'+
+ '<div class="ps-main"><header class="ps-top"><button class="ps-iconbtn ps-menubtn" id="ps-mb" aria-label="Abrir menu" aria-controls="ps-side" aria-expanded="false">'+icon('menu')+'</button>'+
  '<div class="ps-crumb"><a href="'+CFG.hubUrl+'" class="hide-sm">Polystell Apps</a><span class="hide-sm">'+icon('chevR')+'</span><span>'+esc(app)+'</span>'+icon('chevR')+'<b id="ps-cur"></b></div>'+
  '<div class="ps-topact"><span class="ps-sync" id="ps-sync"></span><a class="ps-iconbtn" href="'+CFG.supportUrl+'" target="_blank" rel="noopener" aria-label="Central de ajuda" title="Central de ajuda">'+icon('help')+'</a>'+
- '<button class="ps-user" id="ps-ub" aria-expanded="false" aria-label="Conta"><span class="ps-av" id="ps-av"><span>'+esc(ini.toUpperCase())+'</span></span>'+icon('chevD')+'</button></div>'+
+ '<button class="ps-user" id="ps-ub" aria-expanded="false" aria-controls="ps-um" aria-label="Conta"><span class="ps-av" id="ps-av"><span>'+esc(ini.toUpperCase())+'</span></span>'+icon('chevD')+'</button></div>'+
  '<div class="ps-umenu" id="ps-um" hidden><strong>'+esc(name)+'</strong><small>'+esc(acc?.username||'')+'</small><a href="'+CFG.hubUrl+'">'+icon('grid')+'Todos os aplicativos</a><button id="ps-out">'+icon('logout')+'Sair da conta</button></div></header>'+
  '<main class="ps-page" id="ps-page" tabindex="-1"></main></div>';
  let cur=current,counts={};
  const drawNav=()=>{let html='',sec=null;nav.filter(n=>!n.hidden).forEach(n=>{if(n.section&&n.section!==sec){sec=n.section;html+='<div class="lbl">'+esc(sec)+'</div>';}
   const c=counts[n.id];const cn=c==null?'':typeof c==='object'?(c.n?'<span class="n'+(c.alert?' alert':'')+'">'+c.n+'</span>':''):(c?'<span class="n">'+c+'</span>':'');
   html+='<button data-nav="'+n.id+'"'+(n.id===cur?' aria-current="page"':'')+'>'+icon(n.icon)+'<span class="t">'+esc(n.label)+'</span>'+cn+'</button>';});$('#ps-nav').innerHTML=html;};
- const closeMenu=()=>{$('#ps-side').classList.remove('open');$('#ps-bd').hidden=true;};
+ const mq=window.matchMedia('(max-width:820px)');
+ const syncSide=()=>{const side=$('#ps-side'),open=side.classList.contains('open');side.inert=mq.matches&&!open;$('#ps-mb').setAttribute('aria-expanded',String(open));};
+ const closeMenu=()=>{$('#ps-side').classList.remove('open');$('#ps-bd').hidden=true;syncSide();};
+ const closeUser=()=>{$('#ps-um').hidden=true;$('#ps-ub').setAttribute('aria-expanded','false');};
  $('#ps-nav').onclick=e=>{const b=e.target.closest('[data-nav]');if(!b)return;closeMenu();onNav(b.dataset.nav);};
- $('#ps-mb').onclick=()=>{$('#ps-side').classList.add('open');$('#ps-bd').hidden=false;};
+ $('#ps-mb').onclick=()=>{$('#ps-side').classList.add('open');$('#ps-bd').hidden=false;syncSide();const f=$('#ps-side a,#ps-side button');if(f)f.focus();};
+ (mq.addEventListener?mq.addEventListener('change',syncSide):mq.addListener(syncSide));
  $('#ps-bd').onclick=closeMenu;
  $('#ps-ub').onclick=()=>{const m=$('#ps-um');m.hidden=!m.hidden;$('#ps-ub').setAttribute('aria-expanded',String(!m.hidden));};
- document.addEventListener('click',e=>{if(!e.target.closest('#ps-ub')&&!e.target.closest('#ps-um')){$('#ps-um').hidden=true;}});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#ps-um').hidden=true;closeMenu();}});
+ document.addEventListener('click',e=>{if(!e.target.closest('#ps-ub')&&!e.target.closest('#ps-um'))closeUser();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeUser();if($('#ps-side').classList.contains('open')){closeMenu();$('#ps-mb').focus();}}});
  $('#ps-out').onclick=()=>auth.logout();
  photo().then(u=>{if(u)$('#ps-av').innerHTML='<img src="'+u+'" alt="">';});
  const api={
@@ -233,7 +249,7 @@ function mount({app,nav,current,onNav,account:acc}){
   setCtx(html){$('#ps-ctx').innerHTML=html||'';},
   setNav(n){nav=n;drawNav();}
  };
- drawNav();return api;
+ drawNav();syncSide();return api;
 }
 window.PS=Object.freeze({cfg:CFG,$,$$,esc,norm,val,fmt,todayKey,dateKey,icon,toast,dialog,auth,graph,sp,groups,photo,screens,mount,loadScript,sleep});
 })();
