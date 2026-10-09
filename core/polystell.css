@@ -31,6 +31,8 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .btn:hover:not(:disabled){background:#f6f8fc;border-color:#cbd5e5}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
 .btn.primary:hover:not(:disabled){background:var(--blue-h);border-color:var(--blue-h)}
+.btn.ok:hover:not(:disabled){background:#17684f;border-color:#17684f}
+.btn.danger.solid:hover:not(:disabled){background:#9a1d14;border-color:#9a1d14}
 .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
 .btn.danger{color:var(--err);border-color:#e7c3bc}
 .btn.danger.solid{background:var(--err);border-color:var(--err);color:#fff}

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Emergência | Polystell Apps</title>
+<link rel="stylesheet" href="/core/polystell.css?v=2.8">
+<style>
+.em-acionar{border:2px solid #f3c4c4;background:#fffafa}
+.em-big{width:100%;min-height:64px;font-size:18px;font-weight:800;letter-spacing:.3px}
+.em-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.em-chips button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-weight:600;font-size:14px;min-height:44px}
+.em-chips button[aria-pressed="true"]{background:#b42318;border-color:#b42318;color:#fff}
+.em-locais{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.em-locais button{border:1px solid var(--line);background:#f6f8fb;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;color:#44526a}
+.em-ativa{background:#b42318;color:#fff;border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.em-ativa h2{margin:0 0 4px;font-size:22px;line-height:1.2}
+.em-ativa p{margin:0;opacity:.92;font-size:14px}
+.em-ativa .sim{display:inline-block;background:#fff;color:#b42318;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:2px}
+.em-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.em-kpis div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.em-kpis b{display:block;font-size:26px;line-height:1.1}
+.em-kpis span{font-size:12.5px;color:var(--muted)}
+.em-kpis .falta b{color:#b42318}
+.em-kpis .ok b{color:var(--ok,#067647)}
+.row.marcado{background:#f2fbf6}
+#elist .act .btn{min-height:44px;font-size:15px;padding:0 16px}
+.em-tel{display:flex;gap:6px;flex-wrap:wrap}
+.em-tel a{text-decoration:none}
+.em-resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0;color:#44526a}
+@media(max-width:560px){.em-kpis b{font-size:22px}.em-ativa h2{font-size:19px}}
+</style>
+</head>
+<body>
+<noscript><div class="ps-screen"><p>Ative o JavaScript para usar a emergência.</p></div></noscript>
+<script src="/core/polystell.js?v=2.8"></script>
+<script src="comum.js?v=2.8"></script>
+<script>
+'use strict';
+/* Emergência — portaria, TI e brigadistas (Portaria v2.8).
+   Acionar grava em 09_Emergencias (uma ativa por vez, ATIVA_CHAVE exclusiva); o fluxo do
+   Power Automate avisa brigadistas e o grupo da Brigada no WhatsApp (a chave da Evolution API
+   fica só no fluxo). A lista de evacuação é o instantâneo de quem estava dentro; a chamada no
+   ponto de encontro é compartilhada (09_Emergencia_Chamada, uma marca por pessoa). */
+const {$,$$,esc,val,norm,fmt,icon,toast,dialog}=PS;
+const P=PORTARIA;
+const GRUPO_TI='grp-plataforma-admin',GRUPO_GUARITA='grp-portaria-guarita',GRUPO_BRIG='grp-portaria-brigada';
+const CONTAS_POSTO=['portaria@polystell.com.br'];
+const TIPOS_E=['Incêndio','Vazamento químico','Pessoa ferida / mal súbito','Evacuação','Simulado','Outro'];
+const ST={perfil:'',quem:'',em:null,marcas:[],brig:[],hist:[],f:{tipo:'',local:'',msg:''},aba:'faltam',q:'',sync:null};
+let SHELL=null,timer=null,busy=false;
+const tel=d=>{const x=String(d||'').replace(/\D/g,'');return x?(x.length<=11?'55'+x:x):'';};
+const fmtTel=d=>{const x=String(d||'').replace(/\D/g,'');return x.length===11?'('+x.slice(0,2)+') '+x.slice(2,7)+'-'+x.slice(7):x.length===10?'('+x.slice(0,2)+') '+x.slice(2,6)+'-'+x.slice(6):x;};
+function brigHtml(){const at=ST.brig.filter(b=>b.ativo);
+ return '<div class="panel"><div class="panel-h">'+icon('users')+'<h2>Brigada</h2><span class="sp"><span class="count">'+at.length+'</span></span></div><div class="rows">'+(at.length?at.map(b=>'<div class="row"><div class="main"><div class="t">'+esc(b.nome)+'</div><div class="meta">'+esc([b.funcao,b.tel&&fmtTel(b.tel)].filter(Boolean).join(' · '))+'</div></div><div class="act em-tel">'+(b.tel?'<a class="btn sm" href="tel:+'+tel(b.tel)+'">Ligar</a>':'')+(b.wa?'<a class="btn sm" href="https://wa.me/'+tel(b.wa)+'" target="_blank" rel="noopener">WhatsApp</a>':'')+'</div></div>').join(''):'<div class="empty">Nenhum brigadista cadastrado. A TI cadastra em Segurança (TI) → Brigada.</div>')+'</div></div>';}
+/* ---------------- sem emergência ativa ---------------- */
+function telaAcionar(){const F=ST.f;const locais=String(P.param('EMERG_LOCAIS')||'').split(',').map(x=>x.trim()).filter(Boolean);
+ SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>Emergência</h1><p>Aciona a Brigada no WhatsApp e abre a lista de evacuação com a chamada no ponto de encontro.</p></div></div><div id="banners"></div>'+
+  '<div class="cols"><div><div class="panel em-acionar"><div class="panel-h">'+icon('alert')+'<h2>Acionar emergência</h2></div>'+
+  '<span class="lbl">Tipo *</span><div class="em-chips" id="etipo">'+TIPOS_E.map(t=>'<button type="button" data-et="'+esc(t)+'" aria-pressed="'+(F.tipo===t)+'">'+esc(t)+'</button>').join('')+'</div>'+
+  '<div class="field"><label for="eloc">Local *</label><input id="eloc" maxlength="80" value="'+esc(F.local)+'" placeholder="Ex.: Produção — linha 2"><div class="em-locais">'+locais.map(l=>'<button type="button" data-el="'+esc(l)+'">'+esc(l)+'</button>').join('')+'</div></div>'+
+  '<div class="field"><label for="emsg">Detalhes (opcional)</label><textarea id="emsg" maxlength="400" placeholder="O que está acontecendo, rota de saída, ponto de encontro…">'+esc(F.msg)+'</textarea></div>'+
+  '<button class="btn danger solid em-big" type="button" id="ego">'+icon('alert')+'ACIONAR EMERGÊNCIA</button>'+
+  '<div class="note">Avisa no WhatsApp os brigadistas ativos e o grupo da Brigada. Use "Simulado" para treinamentos.</div></div></div>'+
+  '<div>'+brigHtml()+'<div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Últimas emergências</h2></div><div class="rows">'+(ST.hist.length?ST.hist.map(h=>'<div class="row"><div class="main"><div class="t">'+esc(val(h.TIPO))+' · '+esc(h.LOCAL||'')+'</div><div class="meta">'+esc(fmt.dmhm(h.INICIO))+(h.ENCERRADO_POR?' · encerrada por '+esc(h.ENCERRADO_POR):'')+'</div></div><div class="act"><button class="btn sm" data-eh="'+h.id+'">Resumo</button></div></div>').join(''):'<div class="empty">Nenhuma emergência registrada.</div>')+'</div></div></div></div>';
+ SHELL.page.oninput=e=>{if(e.target.id==='eloc')F.local=e.target.value;if(e.target.id==='emsg')F.msg=e.target.value;};
+ SHELL.page.onclick=e=>{const t=e.target.closest('[data-et]');if(t){F.tipo=t.dataset.et;$$('#etipo [data-et]').forEach(x=>x.setAttribute('aria-pressed',String(x===t)));return;}
+  const l=e.target.closest('[data-el]');if(l){F.local=l.dataset.el;$('#eloc').value=F.local;return;}
+  const h=e.target.closest('[data-eh]');if(h){const x=ST.hist.find(y=>y.id===h.dataset.eh);if(x)dialog({title:'Resumo da emergência',html:'<pre class="em-resumo">'+esc(x.RESUMO||'—')+'</pre>'});return;}
+  if(e.target.closest('#ego'))acionar();};}
+async function acionar(){const F=ST.f;if(!F.tipo){toast('Escolha o tipo de emergência.','err');return;}if(String(F.local).trim().length<2){$('#eloc').setAttribute('aria-invalid','true');toast('Informe o local.','err');return;}
+ const n=ST.brig.filter(b=>b.ativo&&b.wa).length;const sim=F.tipo==='Simulado';
+ const ok=await dialog({title:sim?'Acionar SIMULADO?':'Acionar emergência?',html:'<p><b>'+esc(F.tipo)+'</b> · '+esc(F.local)+'</p><div class="banner '+(sim?'warn':'err')+'">'+icon('alert')+'<span>Envia WhatsApp para <b>'+n+' brigadista(s)</b> e para o grupo da Brigada'+(sim?', identificado como SIMULADO':'')+'.</span></div>',
+  actions:[{label:'Cancelar',value:false},{label:sim?'Acionar simulado':'Acionar agora',kind:'danger solid',value:true}]});if(!ok)return;
+ const b=$('#ego');if(b)b.disabled=true;
+ try{const r=await P.acionarEmergencia({tipo:F.tipo,local:F.local,msg:F.msg,quem:ST.quem});
+  toast(r.ja?'Já havia uma emergência ativa — abrindo a lista.':'Emergência acionada. A Brigada está sendo avisada.',r.ja?'warn':'ok');ST.f={tipo:'',local:'',msg:''};await atualizar(true);}
+ catch(e){if(e.code==='validacao')toast(e.message,'err');else toast(e.message||'Erro ao acionar.','err');if(b)b.disabled=false;}}
+/* ---------------- emergência ativa ---------------- */
+function telaAtiva(){SHELL.page.innerHTML='<div id="banners"></div><div id="eatv"></div><div class="cols"><div class="panel"><div class="toolbar"><input type="search" id="eq" placeholder="Buscar nome, empresa, crachá…" aria-label="Buscar na lista de evacuação" value="'+esc(ST.q)+'"></div>'+
+  '<div class="seg" id="eaba" style="margin-bottom:8px"></div><div class="rows" id="elist"></div></div><div><div id="ebrig"></div><div class="panel"><div class="panel-h">'+icon('truck')+'<h2>Veículos no pátio</h2><span class="sp"><span class="count" id="evc"></span></span></div><div class="rows" id="ev"></div></div>'+
+  '<div class="panel"><button class="btn danger solid em-big" type="button" id="eend">Encerrar emergência</button><div class="note">Encerre quando a Brigada liberar a área. O resumo (quem confirmou, quem faltou e tempos) fica registrado.</div></div></div></div>';
+ $('#eq').oninput=e=>{ST.q=e.target.value;desenhaAtiva();};
+ SHELL.page.onclick=e=>{const a=e.target.closest('[data-ea]');if(a){ST.aba=a.dataset.ea;desenhaAtiva();return;}
+  const m=e.target.closest('[data-em]');if(m){marcar(m.dataset.em);return;}
+  const d=e.target.closest('[data-ed]');if(d){desmarcarP(d.dataset.ed);return;}
+  if(e.target.closest('#eend'))encerrar();};
+ desenhaAtiva();}
+function desenhaAtiva(){const em=ST.em;if(!em||!$('#eatv'))return;const lista=P.listaDe(em);const marc=new Map(ST.marcas.map(m=>[m.PESSOA,m]));const sim=val(em.TIPO)==='Simulado';
+ const pes=lista?lista.p:[];const no=pes.filter(x=>marc.has('P:'+x.i)).length;
+ $('#eatv').innerHTML='<div class="em-ativa" role="alert"><h2>'+icon('alert')+' EMERGÊNCIA ATIVA'+(sim?'<span class="sim">SIMULADO</span>':'')+'</h2><p><b>'+esc(val(em.TIPO))+'</b> · '+esc(em.LOCAL||'')+' · desde '+esc(fmt.hm(em.INICIO))+' ('+fmt.dur(Date.now()-new Date(em.INICIO))+') · acionada por '+esc(em.ACIONADO_POR||'—')+'</p>'+(em.MENSAGEM?'<p style="margin-top:6px">'+esc(em.MENSAGEM)+'</p>':'')+'</div>'+
+  (lista?'<div class="em-kpis"><div><b>'+pes.length+'</b><span>na lista</span></div><div class="ok"><b>'+no+'</b><span>no ponto</span></div><div class="falta"><b>'+(pes.length-no)+'</b><span>faltam</span></div></div>'+(lista.inc?'<div class="banner warn">'+icon('alert')+'<span>A lista pode estar incompleta (leitura acima do limite). Confira com a portaria.</span></div>':'')
+   :'<div class="banner warn">'+icon('clock')+'<span><b>Montando a lista de evacuação…</b> O computador da portaria envia quem está dentro em instantes.</span></div>');
+ $('#eaba').innerHTML=[['faltam','Faltam',pes.length-no],['ponto','No ponto',no],['todos','Todos',pes.length]].map(([k,l,n])=>'<button type="button" data-ea="'+k+'" aria-pressed="'+(ST.aba===k)+'">'+l+' <span class="count">'+n+'</span></button>').join('');
+ let rows=pes.slice().sort((a,b)=>String(a.n).localeCompare(String(b.n),'pt-BR'));
+ if(ST.aba==='faltam')rows=rows.filter(x=>!marc.has('P:'+x.i));if(ST.aba==='ponto')rows=rows.filter(x=>marc.has('P:'+x.i));
+ const q=norm(ST.q);if(q)rows=rows.filter(x=>norm([x.n,x.e,x.m,x.a,x.c].join(' ')).includes(q));
+ $('#elist').innerHTML=rows.length?rows.map(x=>{const mk=marc.get('P:'+x.i);return '<div class="row'+(mk?' marcado':'')+'"><div class="main"><div class="t">'+esc(x.n)+'</div><div class="meta">'+esc([x.t,x.m&&'Matr. '+x.m,x.e,x.a&&'recebe: '+x.a,x.c&&'crachá '+x.c].filter(Boolean).join(' · '))+'</div>'+(mk?'<div class="detail">No ponto às '+esc(fmt.hm(mk.HORA))+' · '+esc(mk.MARCADO_POR||'')+'</div>':'')+'</div><div class="act">'+(mk?'<button class="btn sm" data-ed="'+esc(mk.id)+'">Desmarcar</button>':'<button class="btn sm ok" data-em="'+esc(x.i)+'">'+icon('check')+'No ponto</button>')+'</div></div>';}).join('')
+  :'<div class="empty">'+(lista?(ST.aba==='faltam'?'Todos confirmados no ponto de encontro.':'Ninguém nesta aba.'):'Aguardando a lista…')+'</div>';
+ const vs=lista?lista.v:[];$('#evc').textContent=vs.length;$('#ev').innerHTML=vs.length?vs.map(v=>'<div class="row"><div class="main"><div class="t">'+esc(v.pl)+'</div><div class="meta">'+esc([v.mo,v.e].filter(Boolean).join(' · ')||'—')+'</div></div></div>').join(''):'<div class="empty">Nenhum veículo no pátio.</div>';
+ $('#ebrig').innerHTML=brigHtml();}
+async function marcar(movId){const lista=P.listaDe(ST.em);const x=lista&&lista.p.find(y=>String(y.i)===String(movId));if(!x)return;
+ try{const r=await P.marcarNoPonto(ST.em.id,'P:'+x.i,x.n,ST.quem);if(r.item)ST.marcas.push({...r.item,PESSOA:'P:'+x.i,HORA:new Date().toISOString(),MARCADO_POR:ST.quem});desenhaAtiva();atualizar();}catch(e){toast(e.message||'Erro ao marcar.','err');}}
+async function desmarcarP(id){const m=ST.marcas.find(x=>String(x.id)===String(id));if(!m)return;
+ try{await P.desmarcar(m);ST.marcas=ST.marcas.filter(x=>x!==m);desenhaAtiva();atualizar();}catch(e){toast(e.message||'Erro ao desmarcar.','err');}}
+async function encerrar(){const em=ST.em;const lista=P.listaDe(em);const marc=new Set(ST.marcas.map(m=>m.PESSOA));const falt=lista?lista.p.filter(x=>!marc.has('P:'+x.i)):[];
+ const ok=await dialog({title:'Encerrar emergência?',html:(falt.length?'<div class="banner warn">'+icon('alert')+'<span><b>'+falt.length+' pessoa(s) não confirmada(s)</b> no ponto de encontro: '+esc(falt.slice(0,8).map(x=>x.n).join(', '))+(falt.length>8?'…':'')+'</span></div>':'<div class="banner ok">'+icon('check')+'<span>Todos confirmados no ponto de encontro.</span></div>')+'<p>O WhatsApp de encerramento vai para a Brigada.</p>',
+  actions:[{label:'Voltar',value:false},{label:'Encerrar',kind:'danger solid',value:true}]});if(!ok)return;
+ try{const r=await P.encerrarEmergencia(em,ST.quem);if(r.ja)toast('A emergência já tinha sido encerrada.','warn');else{toast('Emergência encerrada.');await dialog({title:'Resumo registrado',html:'<pre class="em-resumo">'+esc(r.resumo)+'</pre>'});}await atualizar(true);}
+ catch(e){toast(e.message||'Erro ao encerrar.','err');}}
+/* ---------------- dados ---------------- */
+async function atualizar(redesenha){if(busy)return;busy=true;
+ try{const em=await P.emergenciaAtiva();
+  if(em&&!P.listaDe(em)&&ST.perfil!=='brigada'){try{if(await P.preencherLista(em)){busy=false;return atualizar(true);}}catch(e){console.warn(e.message);}}
+  const mudou=!!em!==!!ST.em||(em&&ST.em&&em.id!==ST.em.id);ST.em=em;
+  if(em){ST.marcas=await P.chamadaDe(em.id);}
+  if(!em&&(mudou||redesenha)){try{[ST.brig,ST.hist]=await Promise.all([P.brigadistas(),P.ultimasEmergencias(8)]);}catch{}}
+  else if(em&&(mudou||redesenha||!ST.brig.length)){try{ST.brig=await P.brigadistas();}catch{}}
+  SHELL.setSync('ok','Atualizado às '+fmt.hm(new Date()));
+  if(mudou||redesenha){em?telaAtiva():telaAcionar();}else if(em)desenhaAtiva();
+  agenda();}
+ catch(e){SHELL.setSync('bad','Falha ao atualizar');const b=$('#banners');if(b)b.innerHTML='<div class="banner err">'+icon('cloudoff')+'<span><b>Sem conexão com o Microsoft 365.</b> '+esc(e.message||'')+' Tentando de novo…</span></div>';agenda();}
+ finally{busy=false;}}
+function agenda(){clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden)atualizar();else agenda();},ST.em?6000:20000);}
+(async function init(){
+ PS.screens.loading('Abrindo a emergência…');
+ let acc;try{acc=await PS.auth.init();}catch(e){PS.screens.error(e.code==='https'?'Endereço não seguro':'Não foi possível iniciar',e.message);return;}
+ if(!acc){PS.screens.login({app:'Emergência',text:'Entre com a conta da portaria ou com a sua conta corporativa.',onLogin:()=>PS.auth.login()});return;}
+ try{const g=await PS.groups();const user=String(acc.username||'').toLowerCase();
+  const ti=!!g&&g.has(GRUPO_TI),posto=(!!g&&g.has(GRUPO_GUARITA))||CONTAS_POSTO.includes(user),brig=!!g&&g.has(GRUPO_BRIG);
+  if(!ti&&!posto&&!brig){PS.screens.error('Sem perfil na emergência','Acionar e acompanhar a emergência é da portaria, da TI e da Brigada.',{retry:g===null,details:g===null?['Não foi possível ler seus grupos no Microsoft 365.']:['Em caso de emergência, ligue para a portaria ou acione o alarme.']});return;}
+  ST.perfil=ti?'ti':posto?'posto':'brigada';
+  const b=await P.boot({posto:false,emergencia:true});
+  if(!b.ok){PS.screens.error('Estrutura incompleta no SharePoint','A emergência precisa destes itens. Avise a TI:',{details:b.faltando});return;}
+  PS.auth.ready();window.addEventListener('ps:session',()=>atualizar(true));
+  let turno=null;if(posto){try{turno=(await P.turnoAtual()).turno;}catch{}}
+  ST.quem=posto&&turno&&P.turnoValido(turno)?'Portaria · '+turno.PARA:(acc.name||acc.username);
+  SHELL=PS.mount({app:'Portaria',nav:[...(ST.perfil!=='brigada'?[{id:'posto',label:'Portaria',icon:'home',section:'Portaria'}]:[]),{id:'emerg',label:'Emergência',icon:'alert',section:'Segurança'}],current:'emerg',onNav:v=>{if(v==='posto')location.assign('index.html');},account:acc});
+  SHELL.setCurrent('emerg','Emergência');SHELL.setCtx('<div class="ps-ctx"><small>'+(ST.perfil==='brigada'?'Brigada':ST.perfil==='ti'?'TI':'Portaria')+'</small><b>'+esc(ST.quem)+'</b></div>');
+  await atualizar(true);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)atualizar();});
+ }catch(e){console.error(e);PS.screens.error('Não foi possível abrir',e.message);}
+})();
+</script>
+</body>
+</html>

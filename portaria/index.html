@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.7">
+<link rel="stylesheet" href="/core/polystell.css?v=2.8">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -44,8 +44,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.7"></script>
-<script src="comum.js?v=2.7"></script>
+<script src="/core/polystell.js?v=2.8"></script>
+<script src="comum.js?v=2.8"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -70,7 +70,7 @@ const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_G
 /* a guarita é a conta da portaria (permissão direta) ou quem estiver no grupo da guarita */
 const CONTAS_POSTO=['portaria@polystell.com.br'];
 let SHELL=null,TRANSP={};
-const TITLES={painel:'Painel do posto',pessoas:'Pessoas',veiculos:'Veículos',mercadorias:'Mercadorias',ocorrencias:'Ocorrências',turno:'Turno',historico:'Histórico do dia',logistica:'Coletas e entregas',autorizar:'Autorizar coletas',presenca:'Na planta agora',consultas:'Consultas e ESG',seguranca:'Segurança (TI)'};
+const TITLES={painel:'Painel do posto',pessoas:'Pessoas',veiculos:'Veículos',mercadorias:'Mercadorias',ocorrencias:'Ocorrências',turno:'Turno',historico:'Histórico do dia',logistica:'Coletas e entregas',autorizar:'Autorizar coletas',presenca:'Na planta agora',consultas:'Consultas e ESG',seguranca:'Segurança (TI)',emergencia:'Emergência'};
 /* menu por papel: guarita (portaria@ e TI), Logística (Expedição e TI), Segurança (TI).
    Esconder o menu é usabilidade; quem barra de verdade é a permissão de cada lista. */
 const NAV=()=>[
@@ -81,6 +81,7 @@ const NAV=()=>[
  {id:'ocorrencias',label:'Ocorrências',icon:'alert',section:'Operação',hidden:!ST.posto},
  {id:'historico',label:'Histórico do dia',icon:'clock',section:'Posto',hidden:!ST.posto},
  {id:'turno',label:'Turno',icon:'swap',section:'Posto',hidden:!ST.posto},
+ {id:'emergencia',label:'Emergência',icon:'alert',section:'Posto',hidden:!(ST.posto&&P.temEmergencia())},
  {id:'logistica',label:'Coletas e entregas',icon:'calendar',section:'Logística',hidden:!ST.log},
  {id:'autorizar',label:'Autorizar coletas',icon:'check',section:'Logística',hidden:!ST.log},
  {id:'presenca',label:'Na planta agora',icon:'users',section:'RH',hidden:!ST.rh},
@@ -115,6 +116,7 @@ async function doRefresh(){
  const plan=ST.posto?[['openP',P.abertosP],['openV',P.abertosV],['movVHoje',P.veicHoje],['movPHoje',P.pessoasHoje],['agenda',P.agendaHoje],['agendaRec',P.agendaRecente],['prev',P.prevHoje],['merc',P.mercAguardando],['ocor',P.ocorAbertas],['turno',P.turnoAtual],['params',P.loadParams]]
   :[...(ST.log?[['openV',P.abertosV],['movVHoje',P.veicHoje]]:[]),...(ST.rh?[['openP',P.abertosP],['movPHoje',P.pessoasHoje]]:[]),['params',P.loadParams]];
  if(ST.log)plan.push(['prevR',prevR]);
+ if(ST.posto&&P.temEmergencia())plan.push(['emerg',P.emergenciaAtiva]);
  const pendAntes=ST.sync.at?new Set(ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').map(v=>v.id)):new Set();
  const rs=await Promise.allSettled(plan.map(([,f])=>f()));const fails=[];
  rs.forEach((r,i)=>{const k=plan[i][0];if(r.status!=='fulfilled'){fails.push(r.reason);return;}if(k==='turno'){ST.turno=r.value.turno;}else if(k!=='params')ST.d[k]=r.value;});
@@ -124,8 +126,17 @@ async function doRefresh(){
  ST.sync=fails.length?{at:ST.sync.at,err:(fails[0]?.message||'erro')+(fails.length>1?' (+'+(fails.length-1)+' consulta(s))':'')}:{at:new Date(),err:null};
  if(ST.posto&&!fails.length&&tAtivo()){try{const fixed=await P.reconciliar(ST.d.agendaRec||[],ST.d.openP);if(fixed)ST.d.agenda=await P.agendaHoje();}catch(e){console.warn(e);}}
  chrome();if(VIEWS[ST.view]?.update)VIEWS[ST.view].update();
- checaTroca();
+ checaTroca();aposEmerg();
 }
+/* emergência: a guarita enxerga quem está dentro, então completa a lista de evacuação se quem acionou não pôde (brigadista) */
+async function aposEmerg(){const em=ST.d.emerg;if(!ST.posto||!em)return;
+ if(!P.listaDe(em)&&!ST.enchendo){ST.enchendo=true;try{if(await P.preencherLista(em))ST.d.emerg=await P.emergenciaAtiva();}catch(e){console.warn('Lista de evacuação',e.message);}finally{ST.enchendo=false;}banners();}
+ if(ST.emergVista===em.id)return;ST.emergVista=em.id;const d=$('#ps-dlg');if(d&&d.open)return;
+ const sim=val(em.TIPO)==='Simulado';
+ const ok=await dialog({title:sim?'Emergência SIMULADA acionada':'EMERGÊNCIA ACIONADA',html:'<div class="banner err">'+icon('alert')+'<span><b>'+esc(val(em.TIPO))+'</b> · '+esc(em.LOCAL||'')+' · '+fmt.hm(em.INICIO)+' · acionada por '+esc(em.ACIONADO_POR||'—')+'</span></div>'+(em.MENSAGEM?'<p>'+esc(em.MENSAGEM)+'</p>':'')+'<p>Abra a lista de evacuação para a chamada no ponto de encontro.</p>',
+  actions:[{label:'Agora não',value:false},{label:'Abrir emergência',kind:'danger solid',value:true}]});if(ok)location.assign('emergencia.html');}
+async function checaEmergencia(){if(!ST.posto||!P.temEmergencia()||running)return;try{const em=await P.emergenciaAtiva();const antes=ST.d.emerg;ST.d.emerg=em;
+ if((antes&&antes.id)!==(em&&em.id)||(em&&!P.listaDe(antes)!==!P.listaDe(em))){banners();chrome();}aposEmerg();}catch(e){console.warn('Emergência',e.message);}}
 function chrome(){if(!SHELL)return;const pd=pend();
  const aguard=ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').length;
  SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length+pd.t.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length}});
@@ -135,6 +146,7 @@ function chrome(){if(!SHELL)return;const pd=pend();
  SHELL.setCtx(tAtivo()?'<div class="ps-ctx"><small>Plantão</small><b>'+esc(ST.turno.PARA)+'</b><span>desde '+quando(ST.turno.CIENCIA_EM)+' · até '+fmt.hm(P.fimDoTurno(ST.turno))+'</span><button data-turno>Trocar turno</button></div>'
   :'<div class="ps-ctx"><small>Plantão</small><b>Nenhum turno aberto</b><button data-turno>Abrir turno</button></div>');}
 function banners(){const el=$('#banners');if(!el)return;let h='';
+ const em=ST.posto&&ST.d.emerg;if(em){const sim=val(em.TIPO)==='Simulado';h+='<div class="banner err em-banner" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(sim?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · desde '+fmt.hm(em.INICIO)+'. '+(P.listaDe(em)?'Lista de evacuação pronta.':'Montando a lista de evacuação…')+'</span><a class="btn sm danger solid" href="emergencia.html">Abrir emergência</a></div>';}
  if(ST.sync.err)h+='<div class="banner err">'+icon('cloudoff')+'<span><b>Os dados podem estar desatualizados.</b> '+esc(ST.sync.err)+'</span><button class="btn sm" data-refresh>'+icon('refresh')+'Tentar agora</button></div>';
  const fimT=ST.posto&&P.trocaPendente(ST.turno);
  if(fimT)h+='<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(fimT)+').</b> Passe o turno para o porteiro que assume o posto.</span><button class="btn sm primary" data-turno>Passar o turno</button></div>';
@@ -147,7 +159,7 @@ function writeErr(e){if(e.code==='session'){toast(e.message,'warn');return;}
 /* ---------------- navegação ---------------- */
 const VIEWS={};
 function page(title,sub,body,acts=''){SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>'+esc(title)+'</h1>'+(sub?'<p>'+esc(sub)+'</p>':'')+'</div>'+acts+'</div><div id="banners"></div>'+body;banners();}
-function go(v){if(!VIEWS[v]||!podeVer(v))v=inicial();ST.view=v;SHELL.setCurrent(v,TITLES[v]);SHELL.page.oninput=null;SHELL.page.onclick=null;SHELL.page.onchange=null;VIEWS[v].mount();VIEWS[v].update();SHELL.page.focus({preventScroll:true});window.scrollTo(0,0);}
+function go(v){if(v==='emergencia'){location.assign('emergencia.html');return;}if(!VIEWS[v]||!podeVer(v))v=inicial();ST.view=v;SHELL.setCurrent(v,TITLES[v]);SHELL.page.oninput=null;SHELL.page.onclick=null;SHELL.page.onchange=null;VIEWS[v].mount();VIEWS[v].update();SHELL.page.focus({preventScroll:true});window.scrollTo(0,0);}
 function bindInputs(onLive){SHELL.page.oninput=e=>{const b=e.target.dataset.bind;if(!b)return;setPath(b,e.target.type==='checkbox'?e.target.checked:e.target.value);if(e.target.dataset.live&&onLive)onLive();};}
 /* na hora da troca, abre a passagem de turno sozinho (uma vez por horário, sem atropelar outra janela aberta) */
 function checaTroca(){if(!ST.posto||!SHELL)return;const fim=P.trocaPendente(ST.turno);if(!fim||ST.trocaAvisada===+fim)return;
@@ -173,7 +185,7 @@ VIEWS.painel={
  mount(){page('Painel do posto','Visão do turno: quem está dentro, o que está previsto e o que precisa de atenção.',
   '<div class="kpis" id="kpis"></div><div class="cols"><div class="panel"><div class="panel-h">'+icon('calendar')+'<h2>Agenda de hoje</h2><span class="sp"><span class="count" id="agc"></span></span></div><div class="rows" id="agl"></div></div>'+
   '<div><div class="panel"><div class="panel-h">'+icon('truck')+'<h2>Coletas e entregas previstas</h2><span class="sp"><span class="count" id="pvc"></span></span></div><div class="rows" id="pvl"></div></div>'+
-  '<div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Pendências</h2><span class="sp"><span class="count" id="pdc"></span></span></div><div class="rows" id="pdl"></div></div></div></div>');
+  '<div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Pendências</h2><span class="sp"><span class="count" id="pdc"></span></span></div><div class="rows" id="pdl"></div></div></div></div>',P.temEmergencia()?'<a class="btn danger" href="emergencia.html">'+icon('alert')+'Emergência</a>':'');
   SHELL.page.onclick=e=>{const c=e.target.closest('[data-chegada]');if(c)chegada(c.dataset.chegada);const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);}};},
  update(){banners();if(!$('#kpis'))return;const pd=pend(),D=ST.d;
   const prevAg=D.agenda.filter(a=>['Agendado','Na portaria'].includes(val(a.STATUS))&&!P.abertoDoAgend(D.openP,a.id)).length;
@@ -470,7 +482,8 @@ VIEWS.seguranca={
   page('Segurança (TI)','Como a Portaria funciona. Quem acessa o app é definido no hub (grupos).',
    '<div class="cols"><div><div class="panel"><div class="panel-h">'+icon('gear')+'<h2>Funções</h2></div><div id="sfun"></div></div><div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Prazos e alertas</h2></div><div id="spz"></div><button class="btn primary" id="spzsave" type="button" style="margin-top:12px">Salvar prazos</button></div>'+
    '<div class="panel"><div class="panel-h">'+icon('leaf')+'<h2>ESG — fatores de emissão</h2></div><div id="sesg"></div><button class="btn primary" id="sesgsave" type="button" style="margin-top:12px">Salvar fatores</button></div></div>'+
-   '<div class="panel"><div class="panel-h">'+icon('user')+'<h2>Porteiros</h2><span class="sp"><span class="count" id="spc"></span></span></div><div class="grid2"><div class="field"><label for="snm">Nome do porteiro *</label><input id="snm" maxlength="60"></div><div class="field"><label for="sob">Empresa / observação</label><input id="sob" maxlength="80"></div></div><button class="btn primary" id="sadd" type="button">'+icon('plus')+'Cadastrar porteiro</button><div class="rows" id="spl" style="margin-top:14px"></div></div></div>'+
+   '<div><div class="panel"><div class="panel-h">'+icon('user')+'<h2>Porteiros</h2><span class="sp"><span class="count" id="spc"></span></span></div><div class="grid2"><div class="field"><label for="snm">Nome do porteiro *</label><input id="snm" maxlength="60"></div><div class="field"><label for="sob">Empresa / observação</label><input id="sob" maxlength="80"></div></div><button class="btn primary" id="sadd" type="button">'+icon('plus')+'Cadastrar porteiro</button><div class="rows" id="spl" style="margin-top:14px"></div></div>'+
+   '<div class="panel"><div class="panel-h">'+icon('users')+'<h2>Brigada de emergência</h2><span class="sp"><span class="count" id="sbc"></span></span></div><div id="sbr"></div></div></div></div>'+
    '<div class="note">As alterações ficam em 00_Parametros_Apps (APP = Portaria) e valem para o computador e o celular na próxima atualização.</div>');
   SHELL.page.oninput=e=>{const i=e.target.closest('[data-pz],[data-pzt],[data-pzd]');if(i)i.dataset.dirty='1';};
   SHELL.page.onchange=async e=>{const sw=e.target.closest('[data-flag]');if(!sw)return;sw.disabled=true;
@@ -482,8 +495,12 @@ VIEWS.seguranca={
    if(e.target.closest('#sadd')){const n=$('#snm').value.trim();if(n.length<3){$('#snm').setAttribute('aria-invalid','true');toast('Informe o nome completo do porteiro.','err');return;}
     if(P.porteiros.some(p=>norm(p.nome)===norm(n))){toast('Este porteiro já está cadastrado.','warn');return;}
     const b=$('#sadd');b.disabled=true;try{await P.addPorteiro(n,$('#sob').value.trim());await P.loadParams();$('#snm').value='';$('#sob').value='';toast('Porteiro cadastrado.');this.update();}catch(er){writeErr(er);}finally{b.disabled=false;}}
-   const t=e.target.closest('[data-pt]');if(t){t.disabled=true;try{await P.setPorteiroAtivo(t.dataset.pt,t.dataset.on==='1');await P.loadParams();this.update();}catch(er){writeErr(er);t.disabled=false;}}};
-  this.drawConfig();},
+   const t=e.target.closest('[data-pt]');if(t){t.disabled=true;try{await P.setPorteiroAtivo(t.dataset.pt,t.dataset.on==='1');await P.loadParams();this.update();}catch(er){writeErr(er);t.disabled=false;}}
+   if(e.target.closest('#sbadd')){salvarBrig();return;}
+   if(e.target.closest('#sbcl')){ST.fb=BFORM0();drawBrig();return;}
+   const be=e.target.closest('[data-bed]');if(be){const b=ST.brig.find(x=>String(x.id)===be.dataset.bed);if(b){ST.fb={id:b.id,etag:b._etag,nome:b.nome,mat:b.mat,funcao:b.funcao,tel:b.tel,wa:b.wa};drawBrig();$('#sbnm').focus();}return;}
+   const ba=e.target.closest('[data-bat]');if(ba){ba.disabled=true;try{await P.setBrigadistaAtivo(ba.dataset.bat,ba.dataset.on==='1');await carregaBrig();}catch(er){writeErr(er);ba.disabled=false;}}};
+  this.drawConfig();ST.fb=BFORM0();carregaBrig();},
  drawConfig(){if(!$('#sfun'))return;
   const f2='<span class="chip warn" title="Depende de fluxo do Power Automate ainda não implantado">Fase 2 — fluxo ainda não implantado</span>';
   const sw=p=>'<label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label>';
@@ -501,6 +518,28 @@ VIEWS.seguranca={
   const ps=P.porteiros;$('#spc').textContent=ps.filter(p=>p.ativo).length;
   $('#spl').innerHTML=ps.length?ps.map(p=>'<div class="row"><div class="main"><div class="t">'+esc(p.nome)+'</div><div class="meta">'+esc(p.obs||'—')+'</div></div><div class="act"><span class="chip dot '+(p.ativo?'ok':'')+'">'+(p.ativo?'Ativo':'Inativo')+'</span><button class="btn sm" data-pt="'+p.id+'" data-on="'+(p.ativo?'0':'1')+'">'+(p.ativo?'Desativar':'Reativar')+'</button></div></div>').join(''):'<div class="empty">Nenhum porteiro cadastrado.</div>';}
 };
+/* ---- Brigada (09_Brigada): telefone e WhatsApp usados no aviso da emergência (o envio é do Power Automate) ---- */
+const FUNCOES_B=['Líder','Brigadista','Socorrista','Apoio'];
+const BFORM0=()=>({id:null,etag:null,nome:'',mat:'',funcao:'Brigadista',tel:'',wa:''});
+const fmtFone=d=>{const x=String(d||'').replace(/\D/g,'');return x.length===11?'('+x.slice(0,2)+') '+x.slice(2,7)+'-'+x.slice(7):x.length===10?'('+x.slice(0,2)+') '+x.slice(2,6)+'-'+x.slice(6):x;};
+async function carregaBrig(){if(!P.temEmergencia()){drawBrig();return;}try{ST.brig=await P.brigadistas();ST.brigErr=null;}catch(e){ST.brigErr=e.message;}drawBrig();}
+function drawBrig(){const el=$('#sbr');if(!el)return;
+ if(!P.temEmergencia()){el.innerHTML='<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Crie as listas <b>09_Emergencias</b>, <b>09_Emergencia_Chamada</b> e <b>09_Brigada</b> (ver ESTRUTURA-LISTAS.md) para ativar a emergência.</span></div>';$('#sbc').textContent='';return;}
+ const F=ST.fb||(ST.fb=BFORM0());const bs=ST.brig||[];$('#sbc').textContent=bs.filter(b=>b.ativo).length;
+ el.innerHTML='<div class="field"><label>Buscar no diretório (opcional)</label><div id="sbpk"></div></div>'+
+  '<div class="grid2"><div class="field"><label for="sbnm">Nome *</label><input id="sbnm" maxlength="80" value="'+esc(F.nome)+'"></div><div class="field"><label for="sbmt">Matrícula</label><input id="sbmt" maxlength="20" value="'+esc(F.mat)+'"></div></div>'+
+  '<div class="grid2"><div class="field"><label for="sbtl">Telefone (com DDD)</label><input id="sbtl" type="tel" inputmode="tel" maxlength="20" placeholder="(19) 99999-9999" value="'+esc(fmtFone(F.tel))+'"></div><div class="field"><label for="sbwa">WhatsApp (com DDD)</label><input id="sbwa" type="tel" inputmode="tel" maxlength="20" placeholder="igual ao telefone, se for o mesmo" value="'+esc(fmtFone(F.wa))+'"></div></div>'+
+  '<div class="field"><label for="sbfn">Função</label><select id="sbfn">'+FUNCOES_B.map(x=>'<option'+(F.funcao===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="sbadd" type="button">'+icon(F.id?'check':'plus')+(F.id?'Salvar alterações':'Cadastrar brigadista')+'</button>'+(F.id?'<button class="btn" id="sbcl" type="button">Cancelar edição</button>':'')+'</div>'+
+  '<div class="note">Na emergência, o WhatsApp vai para os brigadistas <b>ativos</b> e para o grupo da Brigada (configurado no fluxo do Power Automate). A portaria vê os telefones só na tela de emergência.</div>'+
+  (ST.brigErr?'<div class="banner err">'+icon('cloudoff')+'<span>'+esc(ST.brigErr)+'</span></div>':'')+
+  '<div class="rows" style="margin-top:12px">'+(bs.length?bs.map(b=>'<div class="row"><div class="main"><div class="t">'+esc(b.nome)+'</div><div class="meta">'+esc([b.funcao,b.mat&&'Matr. '+b.mat,b.tel&&'Tel. '+fmtFone(b.tel),b.wa&&'WhatsApp '+fmtFone(b.wa)].filter(Boolean).join(' · '))+'</div></div><div class="act"><span class="chip dot '+(b.ativo?'ok':'')+'">'+(b.ativo?'Ativo':'Inativo')+'</span><button class="btn sm" data-bed="'+esc(b.id)+'">Editar</button><button class="btn sm" data-bat="'+esc(b.id)+'" data-on="'+(b.ativo?'0':'1')+'">'+(b.ativo?'Desativar':'Reativar')+'</button></div></div>').join(''):'<div class="empty">Nenhum brigadista cadastrado.</div>')+'</div>';
+ picker($('#sbpk'),{value:null,placeholder:'Nome ou matrícula do colaborador',label:'Buscar brigadista no diretório',onPick:c=>{ST.fb={...lerBrig(),nome:c.nome,mat:c.mat||''};drawBrig();$('#sbtl').focus();},onClear:()=>{}});}
+const lerBrig=()=>({...ST.fb,nome:$('#sbnm').value.trim(),mat:$('#sbmt').value.trim(),funcao:$('#sbfn').value,tel:$('#sbtl').value,wa:$('#sbwa').value});
+async function salvarBrig(){const F=lerBrig();ST.fb=F;const b=$('#sbadd');
+ if(!F.id&&(ST.brig||[]).some(x=>norm(x.nome)===norm(F.nome)||(F.mat&&x.mat===F.mat))){toast('Este brigadista já está cadastrado — use Editar.','warn');return;}
+ b.disabled=true;try{await P.salvarBrigadista(F,F.id);toast(F.id?'Brigadista atualizado.':'Brigadista cadastrado.');ST.fb=BFORM0();await carregaBrig();}
+ catch(e){if(e.code==='validacao')toast(e.message,'err');else writeErr(e);b.disabled=false;}}
 /* ================= HISTÓRICO DO DIA ================= */
 VIEWS.historico={
  mount(){page('Histórico do dia','Movimentos de hoje, abertos e concluídos, com quem registrou e por onde.',
@@ -702,6 +741,7 @@ function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMoviment
   await refresh();
   if(ST.posto&&!tAtivo())dlgTurno();
   setInterval(()=>{if(!document.hidden)refresh();},60000);
+  setInterval(()=>{if(!document.hidden)checaEmergencia();},15000);
   setInterval(()=>{const t=ST.turnoMarca,ok=tAtivo(),f=!!P.trocaPendente(ST.turno);if(t!==ok+'|'+f){ST.turnoMarca=ok+'|'+f;chrome();banners();}checaTroca();},20000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
  }catch(e){console.error(e);PS.screens.error('Não foi possível abrir o posto',e.message);}
