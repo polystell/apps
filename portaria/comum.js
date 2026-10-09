@@ -32,7 +32,7 @@ const ESTRUTURA={
  dir:['NOME','MATRICULA','DEPARTAMENTO','SITUACAO','EMAIL'],
  params:['APP','MODULO','CHAVE','VALOR','ATIVO','DESCRICAO']
 };
-const INDICES={movP:['STATUS_MOV','ENTRADA','CHAVE_ABERTA'],movV:['STATUS_MOV','ENTRADA','CHAVE_ABERTA'],agend:['DATA','CODIGO'],prevV:['DATA'],merc:['STATUS'],ocor:['STATUS'],dir:['MATRICULA'],turnos:['CIENCIA_EM']};
+const INDICES={movP:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],movV:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],agend:['DATA','CODIGO'],prevV:['DATA'],merc:['STATUS'],ocor:['STATUS'],dir:['MATRICULA'],turnos:['CIENCIA_EM']};
 const UNICOS={movP:['CHAVE_ABERTA'],movV:['CHAVE_ABERTA']};
 const TIPOS={dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'}};
 const TIPO_NOME={text:'Texto (uma linha)',choice:'Escolha'};
@@ -148,21 +148,23 @@ async function salvarPessoaExt({nome,tipo,empresa,doc}){if(!L.pessoas)return {se
  if(doc&&has('RG_CPF'))f.RG_CPF=maskDoc(doc);if(empresa&&has('EMPRESA'))f.EMPRESA=String(empresa).trim();if(has('ATIVO'))f.ATIVO=true;
  const novo=await sp.add(L.pessoas,f);PEXT=null;return {novo};}
 /* ---------- cadastro de transportadora (Logística) ---------- */
-const soDig=v=>String(v||'').replace(/\D/g,'');
-function cnpjValido(v){const c=soDig(v);if(c.length!==14||/^(\d)\1+$/.test(c))return false;
- const dv=n=>{let s=0,p=n-7;for(let i=0;i<n;i++){s+=Number(c[i])*p--;if(p<2)p=9;}const r=s%11;return r<2?0:11-r;};
+const cnpjNorm=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function cnpjValido(v){const c=cnpjNorm(v);if(!/^[A-Z0-9]{12}\d{2}$/.test(c)||/^(.)\1+$/.test(c))return false;
+ const cv=ch=>ch.charCodeAt(0)-48;
+ const dv=n=>{let s=0,p=n-7;for(let i=0;i<n;i++){s+=cv(c[i])*p--;if(p<2)p=9;}const r=s%11;return r<2?0:11-r;};
  return dv(12)===Number(c[12])&&dv(13)===Number(c[13]);}
-const fmtCnpj=v=>{const c=soDig(v);return c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):String(v||'');};
+const cnpjAlfa=v=>/[A-Z]/.test(cnpjNorm(v));
+const fmtCnpj=v=>{const c=cnpjNorm(v);return c.length===14?c.replace(/^(.{2})(.{3})(.{3})(.{4})(\d{2})$/,'$1.$2.$3/$4-$5'):String(v||'');};
 /* consulta pública (BrasilAPI / Receita) só com o CNPJ da empresa; se falhar, segue manual */
-async function consultaCnpj(v){const c=soDig(v);if(!cnpjValido(c))return null;
+async function consultaCnpj(v){const c=cnpjNorm(v);if(!cnpjValido(c))return null;
  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),8000);
- try{const r=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+c,{signal:ctl.signal});if(!r.ok)return r.status===404?{naoEncontrado:true}:null;const j=await r.json();
+ try{const r=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+c,{signal:ctl.signal});if(!r.ok)return [400,404].includes(r.status)?{naoEncontrado:true,alfa:cnpjAlfa(c)}:null;const j=await r.json();
   return {razao:String(j.razao_social||'').trim(),fantasia:String(j.nome_fantasia||'').trim(),situacao:String(j.descricao_situacao_cadastral||'').trim(),tel:String(j.ddd_telefone_1||'').trim(),email:String(j.email||'').trim().toLowerCase()};}
  catch{return null;}finally{clearTimeout(tm);}}
 async function salvarTransportadora({razao,cnpj,tel,contato,email}){
  if(String(razao||'').trim().length<3)throw Object.assign(new Error('Informe a razão social.'),{code:'validacao'});
  if(!cnpjValido(cnpj))throw Object.assign(new Error('CNPJ inválido — confira os números.'),{code:'validacao'});
- TRANSP=null;await transp();const ja=TRANSP_ALL.find(t=>soDig(t.cnpj)===soDig(cnpj));if(ja)return {ja};
+ TRANSP=null;await transp();const ja=TRANSP_ALL.find(t=>t.cnpj&&cnpjNorm(t.cnpj)===cnpjNorm(cnpj));if(ja)return {ja};
  const has=c=>!!(COLS.transp&&COLS.transp.has(c));
  const f={Title:String(razao).trim(),RAZAO_SOCIAL:String(razao).trim(),CNPJ:fmtCnpj(cnpj)};
  if(tel&&has('TELEFONE'))f.TELEFONE=String(tel).trim();if(contato&&has('CONTATO'))f.CONTATO=String(contato).trim();if(email&&has('EMAIL'))f.EMAIL=String(email).trim();if(has('ATIVO'))f.ATIVO=true;
@@ -193,11 +195,17 @@ const keyShift=(k,d)=>{const x=new Date(k+'T12:00:00Z');x.setUTCDate(x.getUTCDat
 async function abertosP(){return sp.items(L.movP,"$expand=fields&$filter=fields/STATUS_MOV eq 'Aberto'&$top=500");}
 async function abertosV(){return sp.items(L.movV,"$expand=fields&$filter=fields/STATUS_MOV eq 'Aberto'&$top=500");}
 const desdeHoje=()=>keyShift(todayKey(),-1)+'T03:00:00Z';
-async function pessoasHoje(){const k=todayKey();const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/ENTRADA ge '"+desdeHoje()+"'&$top=999");return rs.filter(x=>new Date(x.ENTRADA).toDateString()===new Date().toDateString()||(x.SAIDA&&new Date(x.SAIDA).toDateString()===new Date().toDateString()));}
-async function veicHoje(){const rs=await sp.items(L.movV,"$expand=fields&$filter=fields/ENTRADA ge '"+desdeHoje()+"'&$top=999");return rs.filter(x=>new Date(x.ENTRADA).toDateString()===new Date().toDateString()||(x.SAIDA&&new Date(x.SAIDA).toDateString()===new Date().toDateString()));}
+/* filtro na tela nunca apaga o aviso de leitura incompleta */
+function manter(origem,arr){arr.truncated=!!(origem&&origem.truncated);return arr;}
+const ehHoje=v=>!!v&&new Date(v).toDateString()===new Date().toDateString();
+async function movHoje(k){const d=desdeHoje();
+ const [a,b]=await Promise.all([sp.items(L[k],"$expand=fields&$filter=fields/ENTRADA ge '"+d+"'&$top=999"),sp.items(L[k],"$expand=fields&$filter=fields/SAIDA ge '"+d+"'&$top=999")]);
+ const m=new Map();[...a,...b].forEach(x=>m.set(x.id,x));const out=[...m.values()].filter(x=>ehHoje(x.ENTRADA)||ehHoje(x.SAIDA));out.truncated=!!(a.truncated||b.truncated);return out;}
+const pessoasHoje=()=>movHoje('movP');
+const veicHoje=()=>movHoje('movV');
 async function agendaEntre(dIni,dFim){const k=todayKey();const a=keyShift(k,dIni-1)+'T00:00:00Z',b=keyShift(k,dFim+1)+'T23:59:59Z';
  const rs=await sp.items(L.agend,"$expand=fields&$filter=fields/DATA ge '"+a+"' and fields/DATA le '"+b+"'&$top=999");
- const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;});}
+ const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return manter(rs,rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;}));}
 const agendaHoje=()=>agendaEntre(0,0);
 const agendaRecente=()=>agendaEntre(-3,0);
 async function agendaPorCodigo(cod){const c=String(cod).replace(/'/g,'').trim().toUpperCase();const rs=await sp.items(L.agend,"$expand=fields&$filter=fields/CODIGO eq '"+encodeURIComponent(c)+"'&$top=5");
@@ -205,7 +213,7 @@ async function agendaPorCodigo(cod){const c=String(cod).replace(/'/g,'').trim().
  return rs.find(x=>dateKey(x.DATA)===todayKey())||rs[0]||null;}
 async function prevEntre(dIni,dFim){const k=todayKey();const a=keyShift(k,dIni-1)+'T00:00:00Z',b=keyShift(k,dFim+1)+'T23:59:59Z';
  const rs=await sp.items(L.prevV,"$expand=fields&$filter=fields/DATA ge '"+a+"' and fields/DATA le '"+b+"'&$top=999");
- const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;});}
+ const lo=keyShift(k,dIni),hi=keyShift(k,dFim);return manter(rs,rs.filter(x=>{const d=dateKey(x.DATA);return d>=lo&&d<=hi;}));}
 const prevHoje=()=>prevEntre(0,0);
 async function mercAguardando(){return sp.items(L.merc,"$expand=fields&$filter=fields/STATUS eq 'Aguardando retirada'&$top=500");}
 async function ocorAbertas(){return sp.items(L.ocor,"$expand=fields&$filter=fields/STATUS eq 'Aberta' or fields/STATUS eq 'Em análise'&$top=300");}
@@ -243,15 +251,23 @@ const isDupErr=e=>e&&(e.status===409||/duplica|unique|exclusiv|already exists|va
 async function criarMovimento(k,fields,chave,relerAbertos){
  try{return {novo:await sp.add(L[k],fields)};}
  catch(e){let fresh;try{fresh=await relerAbertos();}catch{throw e;}
-  const m=abertoDaChave(fresh,chave);if(!m)throw e;
-  return isDupErr(e)?{dup:m}:{novo:m,confirmado:true};}
+  const m=abertoDaChave(fresh,chave);if(!m)throw e;if(isDupErr(e))return {dup:m};
+  const minha=Math.abs(new Date(m.ENTRADA).getTime()-new Date(fields.ENTRADA).getTime())<2000&&String(val(m.ORIGEM)||'')===String(fields.ORIGEM||'')&&String(m.PORTEIRO_ENT||'')===String(fields.PORTEIRO_ENT||'');
+  return minha?{novo:m,confirmado:true}:{dup:m};}
 }
-async function statusConvite(agId,to){
- for(let t=0;t<2;t++){try{const cur=await getItem('agend',agId);const st=val(cur.STATUS);
+async function statusConvite(agId,to){let erros=0;
+ for(let t=0;t<5&&erros<2;t++){try{const cur=await getItem('agend',agId);const st=val(cur.STATUS);
    if(st===to||ADMIN_FINAL.includes(st))return true;
-   await sp.patch(L.agend,agId,{STATUS:to});return true;}catch(e){if(t===0)await sleep(1200);}}
+   await sp.patch(L.agend,agId,{STATUS:to},{etag:cur._etag});return true;}
+  catch(e){if(e.status===412)continue;erros++;if(erros<2)await sleep(1200);}}
  return false;
 }
+/* plantão conferido no servidor imediatamente antes de cada gravação da guarita */
+async function conferirTurno(porteiro){let t;
+ try{t=(await turnoAtual()).turno;}catch(e){throw Object.assign(new Error('Não foi possível confirmar o plantão no Microsoft 365 — nada foi gravado. Confira a conexão e tente de novo.'),{code:'turno'});}
+ if(!turnoValido(t))throw Object.assign(new Error('O turno venceu — abra o turno antes de registrar. Nada foi gravado.'),{code:'turno',turno:t});
+ if(porteiro&&norm(t.PARA)!==norm(porteiro))throw Object.assign(new Error('O plantão foi passado para '+t.PARA+' em outro dispositivo. A tela foi atualizada — confira e repita. Nada foi gravado.'),{code:'turno',turno:t});
+ return t;}
 /* PATCH com versão; 412 → relê: se já encerrado, foi o outro aparelho */
 async function patchVersao(k,id,fields,etag,aindaValido){
  try{await sp.patch(L[k],id,fields,{etag});return {ok:true};}
@@ -259,11 +275,14 @@ async function patchVersao(k,id,fields,etag,aindaValido){
   await sp.patch(L[k],id,fields,{etag:at._etag});return {ok:true};}
 }
 async function entradaPessoa(fields,{agId=null,mat=null,nome=null,permitirHomonimo=false}={}){
+ await conferirTurno(fields.PORTEIRO_ENT);
  const abertos=await abertosP();if(abertos.truncated)throw erroIncompleto();
  if(mat){const c=await colabPorMatricula(mat);
   if(!c)return {bloq:'Matrícula '+mat+' não encontrada no diretório. Não libere; confira com o RH.'};
   if(!podeEntrar(c))return {bloq:'Situação no diretório: '+(c.sit||'não informada')+'. Entrada não permitida — comunique a Segurança.'};}
- if(agId){const cur=await getItem('agend',agId);const r=regraConvite(cur,abertoDoAgend(abertos,agId));if(r.acao==='bloq')return {bloq:r.motivo};}
+ if(agId){const cur=await getItem('agend',agId);const r=regraConvite(cur,abertoDoAgend(abertos,agId));if(r.acao==='bloq')return {bloq:r.motivo};
+  /* a mesma pessoa pode ter entrado pelo registro manual: nome igual sem este convite = provável duplicidade */
+  const outro=!permitirHomonimo&&abertos.find(m=>norm(m.NOME)===norm(cur.NOME)&&lid(m.AGENDAMENTOLookupId)!==String(agId));if(outro)return {dup:outro,outroCanal:true};}
  const dup=agId?abertoDoAgend(abertos,agId):mat?abertoDaMatricula(abertos,mat):(!permitirHomonimo&&nome?abertoDoNome(abertos,nome):null);
  if(dup)return {dup};
  const chave=agId?'A:'+agId:mat?'M:'+mat:'N:'+norm(nome||fields.NOME)+'|'+norm(fields.EMPRESA)+(permitirHomonimo?'#'+Date.now().toString(36):'');
@@ -274,6 +293,7 @@ async function entradaPessoa(fields,{agId=null,mat=null,nome=null,permitirHomoni
  return {ok:true,novo:res.novo,confirmado:!!res.confirmado,parcial};
 }
 async function saidaPessoa(mov,porteiro){
+ await conferirTurno(porteiro);
  const atual=await getItem('movP',mov.id);
  if(val(atual.STATUS_MOV)!=='Aberto')return {jaSaiu:true,mov:atual};
  const r=await patchVersao('movP',mov.id,{SAIDA:now(),STATUS_MOV:'Encerrado',PORTEIRO_SAI:porteiro,CHAVE_ABERTA:(atual.CHAVE_ABERTA||'')+'#'+mov.id},atual._etag,at=>val(at.STATUS_MOV)==='Aberto');
@@ -283,15 +303,25 @@ async function saidaPessoa(mov,porteiro){
  return {ok:true,parcial};
 }
 async function entradaVeiculo(fields,{porteiro}){
+ await conferirTurno(porteiro);
  const abertos=await abertosV();if(abertos.truncated)throw erroIncompleto();
  const placa=normPlaca(fields.PLACA);const dup=abertoDaPlaca(abertos,placa);if(dup)return {dup};
+ fields={...fields};
+ /* vínculo revalidado no servidor: previsão cancelada pela Expedição não é aceita */
+ if(fields.PREVISAOLookupId){let pv=null;try{pv=await getItem('prevV',String(fields.PREVISAOLookupId));}catch(e){if(e.status!==404)throw e;}
+  if(!pv)return {bloq:'A previsão vinculada não foi encontrada. Registre sem vínculo ou confira com a Expedição.',prevInvalida:true};
+  const st=val(pv.STATUS);if(['Cancelado','Não veio'].includes(st))return {bloq:'A previsão vinculada está "'+st+'" na Expedição. Registre sem vínculo e confirme com a Expedição.',prevInvalida:true};}
+ /* NF respeita o tipo real da coluna */
+ const nfNum=COLS.movV&&COLS.movV.get('NF')&&COLS.movV.get('NF').number;const nf=String(fields.NF??'').trim();
+ if(nfNum){if(nf==='')delete fields.NF;else if(/^\d+$/.test(nf))fields.NF=Number(nf);else return {bloq:'Nota fiscal: use só números.'};}else fields.NF=nf;
  const chave='P:'+placa;
  const res=await criarMovimento('movV',{...fields,PLACA:placa,PORTEIRO_ENT:porteiro,STATUS_MOV:'Aberto',ENTRADA:now(),AUT_EXPEDICAO:'Pendente',CHAVE_ABERTA:chave},chave,abertosV);
  if(res.dup)return {dup:res.dup};return {ok:true,novo:res.novo,confirmado:!!res.confirmado};}
-async function autorizarVeiculo(id,quem,porteiro){const at=await getItem('movV',id);if(val(at.STATUS_MOV)!=='Aberto')return {jaSaiu:true};
+async function autorizarVeiculo(id,quem,porteiro){await conferirTurno(porteiro);const at=await getItem('movV',id);if(val(at.STATUS_MOV)!=='Aberto')return {jaSaiu:true};
  const r=await patchVersao('movV',id,{AUT_EXPEDICAO:'Autorizado',AUT_POR:(quem+' (informado à portaria · '+porteiro+')').slice(0,250)},at._etag,x=>val(x.STATUS_MOV)==='Aberto');
  return r.conflito?{jaSaiu:true}:{ok:true};}
 async function saidaVeiculo(v,{porteiro,excecao=null}){
+ await conferirTurno(porteiro);
  const atual=await getItem('movV',v.id);
  if(val(atual.STATUS_MOV)!=='Aberto')return {jaSaiu:true,mov:atual};
  const coleta=val(atual.FINALIDADE)==='Coleta',aut=val(atual.AUT_EXPEDICAO)==='Autorizado';
@@ -314,10 +344,12 @@ async function saidaVeiculo(v,{porteiro,excecao=null}){
 /* data só-dia gravada ao meio-dia local: não muda de dia por fuso */
 const diaParaGravar=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d,12,0,0).toISOString();};
 const opcoes=(k,c)=>{const col=COLS[k]&&COLS[k].get(c);return col&&col.choice?(col.choice.choices||[]):null;};
+const JANELA_PREV=60;
 function validarPrev(f){const t=f.TIPO;
  if(t!=='Coleta'&&t!=='Entrega')return 'Escolha Coleta ou Entrega.';
  if(!/^\d{4}-\d{2}-\d{2}$/.test(f.dia||''))return 'Informe a data.';
  if(f.dia<todayKey())return 'A data não pode ser anterior a hoje.';
+ if(f.dia>keyShift(todayKey(),JANELA_PREV))return 'Lance previsões com até '+JANELA_PREV+' dias de antecedência.';
  if(f.HORA&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(f.HORA))return 'Hora no formato 00:00.';
  if(t==='Coleta'&&!f.transp)return 'Na coleta, escolha a transportadora do cadastro.';
  if(t==='Entrega'&&!String(f.REMETENTE||'').trim())return 'Na entrega, informe o remetente (quem envia).';
@@ -326,10 +358,12 @@ function validarPrev(f){const t=f.TIPO;
 async function salvarPrev(f,{id=null,etag=null}={}){const erro=validarPrev(f);if(erro)throw Object.assign(new Error(erro),{code:'validacao'});
  const fields={TIPO:f.TIPO,DATA:diaParaGravar(f.dia),HORA:f.HORA||'',
   PLACA:normPlaca(f.PLACA),MOTORISTA:String(f.MOTORISTA||'').trim(),REMETENTE:f.TIPO==='Entrega'?String(f.REMETENTE||'').trim():''};
- if(String(f.AREA||'').trim())fields.AREA=String(f.AREA).trim();
+ /* campo vazio na edição é limpo de forma explícita, conforme o tipo da coluna */
+ const colP=c=>COLS.prevV&&COLS.prevV.get(c);const limpo=c=>{const x=colP(c);return x&&(x.number||x.choice)?null:'';};
+ if(String(f.AREA??'').trim())fields.AREA=String(f.AREA).trim();else if(id)fields.AREA=limpo('AREA');
  /* NF e ORDEM respeitam o tipo real da coluna (texto ou número) */
- for(const c of ['NF','ORDEM']){const v=String(f[c]||'').trim();const num=COLS.prevV&&COLS.prevV.get(c)&&COLS.prevV.get(c).number;
-  if(num){if(v!==''){if(!/^\d+([.,]\d+)?$/.test(v))throw Object.assign(new Error((c==='NF'?'Nota fiscal':'Ordem')+': use só números.'),{code:'validacao'});fields[c]=Number(v.replace(',','.'));}}else fields[c]=v;}
+ for(const c of ['NF','ORDEM']){const v=String(f[c]??'').trim();const num=colP(c)&&colP(c).number;
+  if(num){if(v!==''){if(!/^\d+([.,]\d+)?$/.test(v))throw Object.assign(new Error((c==='NF'?'Nota fiscal':'Ordem')+': use só números.'),{code:'validacao'});fields[c]=Number(v.replace(',','.'));}else if(id)fields[c]=null;}else fields[c]=v;}
  if(f.TIPO==='Coleta')fields.TRANSPORTADORALookupId=Number(f.transp);
  if(!id){fields.STATUS='Previsto';return {novo:await sp.add(L.prevV,fields)};}
  const cur=await getItem('prevV',id);if(val(cur.STATUS)==='Cancelado')return {cancelada:true};
@@ -353,8 +387,8 @@ async function meuCadastro(email){const e=String(email||'').replace(/'/g,'').tri
 /* a lista mostra só o que é seu (a trava real é a permissão em nível de item da 09_Agendamentos) */
 async function minhasVisitas(me){const k=todayKey();const a=keyShift(k,-31)+'T00:00:00Z',b=keyShift(k,91)+'T23:59:59Z';
  const rs=await sp.items(L.agend,"$expand=fields&$filter=fields/DATA ge '"+a+"' and fields/DATA le '"+b+"'&$top=999");
- const em=String(me.email||'').toLowerCase();
- return rs.filter(x=>(em&&x._byEmail===em)||(me.mat&&String(x.ANFITRIAO_MATRICULA||'').trim()===me.mat));}
+ const em=String(me.email||'').toLowerCase(),uid=String(me.id||'').toLowerCase();
+ return manter(rs,rs.filter(x=>(uid&&String(x._byId||'').toLowerCase()===uid)||(em&&x._byEmail===em)||(me.mat&&String(x.ANFITRIAO_MATRICULA||'').trim()===me.mat)||(me.criados&&me.criados.has(x.id))));}
 const tiposConvite=()=>opcoes('agend','TIPO')||['Visitante','Prestador','Terceiro'];
 const temColuna=(k,c)=>!!(COLS[k]&&COLS[k].has(c));
 function validarConvite(f){
@@ -400,7 +434,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
- pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,fmtCnpj,consultaCnpj,salvarTransportadora,
+ pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,

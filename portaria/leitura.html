@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.3">
+<link rel="stylesheet" href="/core/polystell.css?v=2.4">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -47,8 +47,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.3"></script>
-<script src="comum.js?v=2.3"></script>
+<script src="/core/polystell.js?v=2.4"></script>
+<script src="comum.js?v=2.4"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -100,7 +100,8 @@ function sucesso(msg,parcial){const op=S.op;setMode('done');
  if(parcial){card('<div class="banner ok" style="margin:0">'+icon('check')+'<span><b>'+esc(msg)+'</b></span></div><div class="banner warn">'+icon('alert')+'<span>'+esc(parcial)+'</span></div>',btnNova);navigator.vibrate?.([80,60,80]);return;}
  card('<div class="banner ok" style="margin:0">'+icon('check')+'<span><b>'+esc(msg)+'</b></span></div>',btnNova);toast(msg);navigator.vibrate?.(80);
  setTimeout(()=>{if(S.op===op&&S.mode==='done')nova();},3500);}
-function falha(e){if(e.code==='session'){toast(e.message,'warn');return;}if(e.uncertain){card('<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Sem confirmação do servidor. Confira no computador antes de repetir.</span></div>',btnNova);}else toast(e.message||'Erro','err');}
+function falha(e){if(e.code==='session'){toast(e.message,'warn');return;}
+ if(e.code==='turno'){card('<div class="banner warn" style="margin:0">'+icon('swap')+'<span>'+esc(e.message)+'</span></div>',btnNova);loadTurno().then(()=>{if(!tAtivo())dlgTurno();});return;}if(e.uncertain){card('<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Sem confirmação do servidor. Confira no computador antes de repetir.</span></div>',btnNova);}else toast(e.message||'Erro','err');}
 async function handle(raw,origem){
  if(S.mode!=='scan'){return;}
  S.op++;setMode('busy');card('<div class="meta">Consultando…</div>');
@@ -152,7 +153,7 @@ async function convite(cod){
  $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;const cr=$('#cr').value.trim();setMode('busy');
   try{const x=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:cr,SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'Celular (QR)',AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
    if(x.bloq){setMode('confirm');card(head+'<div class="banner err">'+icon('lock')+'<span>'+esc(x.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
-   if(x.dup){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(x.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
+   if(x.dup){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>'+(x.outroCanal?'Já existe entrada aberta com este nome (registro sem o convite) desde '+quando(x.dup.ENTRADA)+'. Se for outra pessoa com o mesmo nome, registre pelo computador.':'Já estava registrado(a) como dentro desde '+quando(x.dup.ENTRADA)+'.')+' Nada foi gravado.</span></div>',btnNova);return;}
    sucesso(a.NOME+' — entrada registrada'+(x.confirmado?' (confirmada)':''),x.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
 }
 /* ---------------- câmera ---------------- */
