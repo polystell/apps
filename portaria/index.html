@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.4">
+<link rel="stylesheet" href="/core/polystell.css?v=2.5">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -31,13 +31,19 @@
 .lrot2 .btn{flex:none}
 @media(max-width:560px){.lrot2{flex-direction:column}}
 @media(max-width:600px){.setrow{flex-wrap:wrap}.setrow .main{flex-basis:100%}.setrow .chip{white-space:normal;max-width:100%}.setrow input[type=text],.setrow input[type=number]{width:100%!important}}
+.rtab{width:100%;border-collapse:collapse;font-size:13.5px}
+.rtab th,.rtab td{text-align:left;padding:7px 8px;border-top:1px solid var(--line-2,#eef1f6)}
+.rtab th{color:var(--muted);font-weight:600;border-top:0}
+.rtab td:nth-child(n+2),.rtab th:nth-child(n+2){text-align:right}
+.rprintonly{display:none}
+@media print{.ps-side,.ps-top,.ps-backdrop,.toolbar,.seg,#banners,.ps-pagehead p,.ps-sess,#ps-toast{display:none!important}.ps-main{margin:0!important}.ps-page{padding:0!important}.panel{border:0;padding:0}.rprintonly{display:block;margin-bottom:8px}}
 pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0 0 12px;color:#44526a}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.4"></script>
-<script src="comum.js?v=2.4"></script>
+<script src="/core/polystell.js?v=2.5"></script>
+<script src="comum.js?v=2.5"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -47,7 +53,7 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
    exceção de coleta com ocorrência, turno formal, Segurança (TI). */
 const {$,$$,esc,norm,val,fmt,icon,toast,dialog,dateKey,todayKey}=PS;
 const P=PORTARIA;
-const ST={view:'painel',isTI:false,isExp:false,posto:true,log:false,turno:null,busy:false,
+const ST={view:'painel',isTI:false,isExp:false,isRH:false,posto:true,log:false,rh:false,r:null,turno:null,busy:false,
  d:{openP:[],openV:[],movVHoje:[],movPHoje:[],agenda:[],agendaRec:[],prev:[],prevR:[],merc:[],ocor:[],trunc:false},
  sync:{at:null,err:null},
  f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
@@ -56,12 +62,13 @@ const ST={view:'painel',isTI:false,isExp:false,posto:true,log:false,turno:null,b
     o:{tipo:'Segurança',grav:'Baixa',desc:''},
     h:{k:'p',q:''},
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
-    lv:{canc:false}}};
-const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_GUARITA='grp-portaria-guarita';
+    lv:{canc:false},
+    r:{q:'',ft:'Todos',de:todayKey(),ate:todayKey(),tipo:'Todos',bq:''}}};
+const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_GUARITA='grp-portaria-guarita',GRUPO_RH='grp-portaria-rh';
 /* a guarita é a conta da portaria (permissão direta) ou quem estiver no grupo da guarita */
 const CONTAS_POSTO=['portaria@polystell.com.br'];
 let SHELL=null,TRANSP={};
-const TITLES={painel:'Painel do posto',pessoas:'Pessoas',veiculos:'Veículos',mercadorias:'Mercadorias',ocorrencias:'Ocorrências',turno:'Turno',historico:'Histórico do dia',logistica:'Coletas e entregas',autorizar:'Autorizar coletas',seguranca:'Segurança (TI)'};
+const TITLES={painel:'Painel do posto',pessoas:'Pessoas',veiculos:'Veículos',mercadorias:'Mercadorias',ocorrencias:'Ocorrências',turno:'Turno',historico:'Histórico do dia',logistica:'Coletas e entregas',autorizar:'Autorizar coletas',presenca:'Na planta agora',consultas:'Consultas e ESG',seguranca:'Segurança (TI)'};
 /* menu por papel: guarita (portaria@ e TI), Logística (Expedição e TI), Segurança (TI).
    Esconder o menu é usabilidade; quem barra de verdade é a permissão de cada lista. */
 const NAV=()=>[
@@ -74,10 +81,13 @@ const NAV=()=>[
  {id:'turno',label:'Turno',icon:'swap',section:'Posto',hidden:!ST.posto},
  {id:'logistica',label:'Coletas e entregas',icon:'calendar',section:'Logística',hidden:!ST.log},
  {id:'autorizar',label:'Autorizar coletas',icon:'check',section:'Logística',hidden:!ST.log},
+ {id:'presenca',label:'Na planta agora',icon:'users',section:'RH',hidden:!ST.rh},
+ {id:'consultas',label:'Consultas e ESG',icon:'search',section:'RH',hidden:!ST.rh},
  {id:'seguranca',label:'Segurança (TI)',icon:'gear',section:'Administração',hidden:!ST.isTI}];
 const VIEW_LOG=['logistica','autorizar'];
-const podeVer=v=>v==='seguranca'?ST.isTI:VIEW_LOG.includes(v)?ST.log:ST.posto;
-const inicial=()=>ST.posto?'painel':'logistica';
+const VIEW_RH=['presenca','consultas'];
+const podeVer=v=>v==='seguranca'?ST.isTI:VIEW_LOG.includes(v)?ST.log:VIEW_RH.includes(v)?ST.rh:ST.posto;
+const inicial=()=>ST.posto?'painel':ST.log?'logistica':'presenca';
 const TIPOS_P=['Colaborador','Diretoria','Visitante','Prestador','Terceiro'];
 const MODAIS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'];
 const FILTROS={'Todos':null,'Colaboradores':['Colaborador','Diretoria'],'Visitantes':['Visitante'],'Prestadores':['Prestador'],'Terceiros':['Terceiro']};
@@ -100,7 +110,7 @@ async function refresh(){if(running){again=true;return running;}
 async function doRefresh(){
  const prevR=()=>P.prevEntre(-1,P.JANELA_PREV);
  const plan=ST.posto?[['openP',P.abertosP],['openV',P.abertosV],['movVHoje',P.veicHoje],['movPHoje',P.pessoasHoje],['agenda',P.agendaHoje],['agendaRec',P.agendaRecente],['prev',P.prevHoje],['merc',P.mercAguardando],['ocor',P.ocorAbertas],['turno',P.turnoAtual],['params',P.loadParams]]
-  :[['openV',P.abertosV],['movVHoje',P.veicHoje],['params',P.loadParams]];
+  :[...(ST.log?[['openV',P.abertosV],['movVHoje',P.veicHoje]]:[]),...(ST.rh?[['openP',P.abertosP]]:[]),['params',P.loadParams]];
  if(ST.log)plan.push(['prevR',prevR]);
  const pendAntes=ST.sync.at?new Set(ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').map(v=>v.id)):new Set();
  const rs=await Promise.allSettled(plan.map(([,f])=>f()));const fails=[];
@@ -115,10 +125,10 @@ async function doRefresh(){
 }
 function chrome(){if(!SHELL)return;const pd=pend();
  const aguard=ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').length;
- SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0}});
+ SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length}});
  if(ST.sync.err)SHELL.setSync('bad','Falha ao atualizar'+(ST.sync.at?' · dados de '+fmt.hm(ST.sync.at):''));
  else if(ST.sync.at)SHELL.setSync('ok','Atualizado às '+fmt.hm(ST.sync.at));
- if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>Logística</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>Expedição</span></div>');return;}
+ if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>'+(ST.log?'Logística':'RH')+'</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>'+(ST.log&&ST.rh?'Expedição · RH':ST.log?'Expedição':'Consulta')+'</span></div>');return;}
  SHELL.setCtx(tAtivo()?'<div class="ps-ctx"><small>Plantão</small><b>'+esc(ST.turno.PARA)+'</b><span>desde '+quando(ST.turno.CIENCIA_EM)+' · até '+fmt.hm(P.fimDoTurno(ST.turno))+'</span><button data-turno>Trocar turno</button></div>'
   :'<div class="ps-ctx"><small>Plantão</small><b>Nenhum turno aberto</b><button data-turno>Abrir turno</button></div>');}
 function banners(){const el=$('#banners');if(!el)return;let h='';
@@ -579,6 +589,58 @@ function autorizarExpedicao(id){const v=ST.d.openV.find(x=>x.id===id);if(!v)retu
     else if(r.jaAut)toast('Esta coleta já estava autorizada'+(r.mov&&r.mov.AUT_POR?': '+String(r.mov.AUT_POR).slice(0,80):'.'),'warn');
     else toast('Saída autorizada: '+v.PLACA+'. A portaria vê em até 1 minuto.');
     refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
+/* ================= RH · CONSULTA (somente leitura) ================= */
+const TIPO_GRUPO={'Todos':null,'Colaboradores':['Colaborador','Diretoria'],'Visitantes':['Visitante'],'Prestadores':['Prestador'],'Terceiros':['Terceiro']};
+VIEWS.presenca={
+ mount(){page('Na planta agora','Quem está dentro neste momento, conforme os registros da portaria. Somente consulta.',
+  '<div class="panel"><div class="toolbar"><input type="search" data-bind="r.q" data-live="1" value="'+esc(ST.f.r.q)+'" placeholder="Buscar nome, matrícula, empresa, anfitrião…" aria-label="Buscar na planta"><button class="btn" type="button" id="rprint">Imprimir lista</button></div>'+
+  '<div class="seg" id="rft" style="margin-bottom:8px"></div><div class="rows" id="rlist"></div></div>');
+  bindInputs(()=>this.update());
+  SHELL.page.onclick=e=>{const f=e.target.closest('[data-rft]');if(f){ST.f.r.ft=f.dataset.rft;this.update();return;}if(e.target.closest('#rprint'))window.print();};},
+ update(){banners();if(!$('#rlist'))return;const F=ST.f.r;const all=ST.d.openP;
+  const cnt=k=>TIPO_GRUPO[k]?all.filter(m=>TIPO_GRUPO[k].includes(val(m.TIPO))).length:all.length;
+  $('#rft').innerHTML=Object.keys(TIPO_GRUPO).map(k=>'<button type="button" data-rft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
+  let rows=all.slice().sort((a,b)=>String(a.NOME).localeCompare(String(b.NOME),'pt-BR'));
+  if(TIPO_GRUPO[F.ft])rows=rows.filter(m=>TIPO_GRUPO[F.ft].includes(val(m.TIPO)));
+  const q=norm(F.q);if(q)rows=rows.filter(m=>norm([m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,m.CRACHA].join(' ')).includes(q));
+  $('#rlist').innerHTML='<div class="detail rprintonly">Portaria Polystell · na planta em '+esc(fmt.dmhm(new Date()))+' · '+rows.length+' pessoa(s)</div>'+(rows.length?rows.map(m=>'<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.CRACHA&&'crachá '+m.CRACHA].filter(Boolean).join(' · '))+'</div><div class="detail">Entrou '+quando(m.ENTRADA)+' ('+fmt.dur(idade(m.ENTRADA))+')'+(m.PORTEIRO_ENT?' · '+esc(m.PORTEIRO_ENT):'')+'</div></div></div>').join(''):'<div class="empty">'+(all.length?'Ninguém para o filtro.':'Ninguém registrado dentro agora.')+'</div>');}
+};
+VIEWS.consultas={
+ mount(){const F=ST.f.r;
+  page('Consultas e ESG','Movimentos de pessoas por período (pela data de entrada), com exportação para Excel e resumo do meio de transporte dos colaboradores.',
+  '<div class="panel"><div class="grid3"><div class="field"><label for="rde">De *</label><input id="rde" type="date" data-bind="r.de" max="'+todayKey()+'" value="'+esc(F.de)+'"></div><div class="field"><label for="rate">Até *</label><input id="rate" type="date" data-bind="r.ate" max="'+todayKey()+'" value="'+esc(F.ate)+'"></div>'+
+  '<div class="field"><label for="rtp">Tipo</label><select id="rtp" data-bind="r.tipo">'+Object.keys(TIPO_GRUPO).map(k=>'<option'+(F.tipo===k?' selected':'')+'>'+k+'</option>').join('')+'</select></div></div>'+
+  '<div class="field"><label for="rbq">Buscar</label><input id="rbq" type="search" data-bind="r.bq" value="'+esc(F.bq)+'" placeholder="Nome, matrícula, empresa, anfitrião…"></div>'+
+  '<div class="lbtns"><button class="btn primary" type="button" id="rgo">'+icon('search')+'Consultar</button><button class="btn" type="button" id="rcsv" disabled>Exportar para Excel (CSV)</button></div><div class="detail" style="margin-top:8px">Período de até '+P.CONSULTA_MAX_DIAS+' dias por consulta. Os dados ficam só na sua tela e no arquivo exportado.</div></div>'+
+  '<div id="rres"></div>');
+  bindInputs();
+  SHELL.page.onclick=e=>{if(e.target.closest('#rgo'))consultarRH();if(e.target.closest('#rcsv'))exportarRH();};
+  if(ST.r)desenhaRH();},
+ update(){banners();}
+};
+function filtraRH(rows){const F=ST.f.r;let r=rows;if(TIPO_GRUPO[F.tipo])r=r.filter(m=>TIPO_GRUPO[F.tipo].includes(val(m.TIPO)));
+ const q=norm(F.bq);if(q)r=r.filter(m=>norm([m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME].join(' ')).includes(q));return r.sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));}
+async function consultarRH(){const F=ST.f.r;const b=$('#rgo');
+ const erro=P.validarPeriodo(F.de,F.ate);if(erro){toast(erro,'err');return;}
+ b.disabled=true;$('#rres').innerHTML='<div class="panel"><div class="empty">Consultando…</div></div>';
+ try{const rows=await P.movimentosPeriodo(F.de,F.ate);ST.r={de:F.de,ate:F.ate,rows:filtraRH(rows),truncated:!!rows.truncated};desenhaRH();}
+ catch(e){$('#rres').innerHTML='';toast(e.message||'Erro na consulta.','err');}finally{const x=$('#rgo');if(x)x.disabled=false;}}
+function desenhaRH(){const el=$('#rres');if(!el||!ST.r)return;const R=ST.r,rows=R.rows;const MAXL=300;
+ const pessoas=new Set(rows.map(m=>m.MATRICULA?'M:'+m.MATRICULA:'N:'+norm(m.NOME))).size;
+ const esg=P.resumoESG(rows);
+ const cb=$('#rcsv');if(cb)cb.disabled=!rows.length;
+ el.innerHTML=(R.truncated?'<div class="banner warn">'+icon('alert')+'<span>O período tem mais registros do que o limite de leitura. Reduza o período — o resultado abaixo está incompleto.</span></div>':'')+
+  '<div class="cols"><div class="panel"><div class="panel-h">'+icon('users')+'<h2>Movimentos</h2><span class="sp"><span class="count">'+rows.length+'</span></span></div><div class="detail" style="margin-bottom:6px">'+esc(fmt.data(R.de)+' a '+fmt.data(R.ate))+' · '+rows.length+' movimento(s) · '+pessoas+' pessoa(s)</div>'+
+  '<div class="rows">'+(rows.length?rows.slice(0,MAXL).map(m=>{const perm=m.SAIDA?fmt.dur(new Date(m.SAIDA)-new Date(m.ENTRADA)):'';
+   return '<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,val(m.MODAL)&&'veio de '+val(m.MODAL)].filter(Boolean).join(' · '))+'</div>'+
+    '<div class="detail">Entrada '+esc(fmt.dmhm(m.ENTRADA))+(m.PORTEIRO_ENT?' ('+esc(m.PORTEIRO_ENT)+')':'')+(m.SAIDA?' · Saída '+esc(fmt.dmhm(m.SAIDA))+(m.PORTEIRO_SAI?' ('+esc(m.PORTEIRO_SAI)+')':'')+' · '+esc(perm):' · ainda dentro')+(m.SEM_CRACHA===true?' · sem crachá':'')+'</div></div></div>';}).join('')+(rows.length>MAXL?'<div class="empty">Mostrando '+MAXL+' de '+rows.length+'. Exporte para ver todos.</div>':''):'<div class="empty">Nenhum movimento no período para o filtro.</div>')+'</div></div>'+
+  '<div class="panel"><div class="panel-h">'+icon('leaf')+'<h2>ESG — como os colaboradores vieram</h2></div>'+
+  (esg.total?'<div class="detail" style="margin-bottom:8px">'+esg.total+' colaborador-dia(s) no período (cada pessoa conta uma vez por dia).</div><table class="rtab"><thead><tr><th>Meio de transporte</th><th>Colaborador-dia</th><th>%</th></tr></thead><tbody>'+
+    esg.linhas.map(l=>'<tr><td>'+esc(l.modal)+'</td><td>'+l.n+'</td><td>'+l.pct.toFixed(1).replace('.',',')+'%</td></tr>').join('')+'</tbody></table>'
+   :'<div class="empty">Sem entradas de colaboradores no período.</div>')+'</div></div>';}
+function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMovimentos(ST.r.rows);
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='portaria-movimentos_'+ST.r.de+'_a_'+ST.r.ate+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ toast('Arquivo gerado: '+ST.r.rows.length+' movimento(s).');}
 /* ================= início ================= */
 (async function init(){
  PS.screens.loading('Abrindo o posto da portaria…');
@@ -590,11 +652,12 @@ function autorizarExpedicao(id){const v=ST.d.openV.find(x=>x.id===id);if(!v)retu
   const g=await PS.groups();
   ST.isTI=!!g&&g.has(GRUPO_TI);ST.isExp=!!g&&g.has(GRUPO_EXP);
   ST.isGuarita=(!!g&&g.has(GRUPO_GUARITA))||CONTAS_POSTO.includes(String(acc.username||'').toLowerCase());
-  ST.posto=ST.isTI||ST.isGuarita;ST.log=ST.isTI||ST.isExp;
-  if(!ST.posto&&!ST.log){PS.screens.error('Sem perfil na Portaria','Sua conta não tem perfil de guarita, Expedição ou TI neste aplicativo.',{retry:g===null,
+  ST.isRH=!!g&&g.has(GRUPO_RH);
+  ST.posto=ST.isTI||ST.isGuarita;ST.log=ST.isTI||ST.isExp;ST.rh=ST.isTI||ST.isRH;
+  if(!ST.posto&&!ST.log&&!ST.rh){PS.screens.error('Sem perfil na Portaria','Sua conta não tem perfil de guarita, Expedição, RH ou TI neste aplicativo.',{retry:g===null,
     details:[...(g===null?['Não foi possível ler seus grupos no Microsoft 365 — tente novamente ou fale com a TI.']:[]),'Para agendar uma visita, use "Minhas visitas".','Se você precisa de acesso, peça à TI.'],
     action:{label:'Agendar uma visita',onClick:()=>{location.href='agendar.html';}}});return;}
-  const b=await P.boot({posto:ST.posto,log:ST.log});
+  const b=await P.boot({posto:ST.posto,log:ST.log,rh:ST.rh});
   if(!b.ok){const det=b.faltando.slice();if(g===null)det.push('Não foi possível ler seus grupos no Microsoft 365 (a Expedição e a TI dependem disso). Peça à TI para conferir a permissão GroupMember.Read.All do app.');
    PS.screens.error('Estrutura incompleta no SharePoint','A Portaria precisa destes itens antes de operar. Ajuste e tente novamente:',{details:det});return;}
   PS.auth.ready();window.addEventListener('ps:session',()=>refresh());
