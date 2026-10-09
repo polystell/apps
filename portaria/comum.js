@@ -18,8 +18,8 @@
 (function(){
 'use strict';
 const {sp,norm,val,dateKey,todayKey}=PS;
-const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador'};
-const OPCIONAIS=new Set(['transp','pessoas','cadColab']);
+const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador',emerg:'09_Emergencias',chamada:'09_Emergencia_Chamada',brigada:'09_Brigada'};
+const OPCIONAIS=new Set(['transp','pessoas','cadColab','emerg','chamada','brigada']);
 /* ---------- contrato com o SharePoint (conferido na abertura) ---------- */
 const ESTRUTURA={
  movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA','SAIDA_TIPO'],
@@ -30,12 +30,16 @@ const ESTRUTURA={
  ocor:['TIPO','GRAVIDADE','DESCRICAO','STATUS','REGISTRADO_POR'],
  turnos:['DE','PARA','RESUMO','RECADOS','CIENCIA_EM'],
  dir:['NOME','MATRICULA','DEPARTAMENTO','SITUACAO','EMAIL'],
- params:['APP','MODULO','CHAVE','VALOR','ATIVO','DESCRICAO']
+ params:['APP','MODULO','CHAVE','VALOR','ATIVO','DESCRICAO'],
+ emerg:['TIPO','LOCAL','MENSAGEM','STATUS','INICIO','FIM','ACIONADO_POR','ENCERRADO_POR','PRESENTES','LISTA','RESUMO','ATIVA_CHAVE'],
+ chamada:['EMERG_ID','PESSOA','NOME','STATUS','MARCADO_POR','HORA','MARCA_CHAVE'],
+ brigada:['NOME','MATRICULA','FUNCAO','TELEFONE','WHATSAPP','ATIVO']
 };
-const INDICES={movP:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],movV:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],agend:['DATA','CODIGO'],prevV:['DATA'],merc:['STATUS'],ocor:['STATUS'],dir:['MATRICULA'],turnos:['CIENCIA_EM']};
-const UNICOS={movP:['CHAVE_ABERTA'],movV:['CHAVE_ABERTA']};
-const TIPOS={dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'}};
-const TIPO_NOME={text:'Texto (uma linha)',choice:'Escolha'};
+const INDICES={movP:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],movV:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],agend:['DATA','CODIGO'],prevV:['DATA'],merc:['STATUS'],ocor:['STATUS'],dir:['MATRICULA'],turnos:['CIENCIA_EM'],emerg:['STATUS','ATIVA_CHAVE'],chamada:['EMERG_ID','MARCA_CHAVE']};
+const UNICOS={movP:['CHAVE_ABERTA'],movV:['CHAVE_ABERTA'],emerg:['ATIVA_CHAVE'],chamada:['MARCA_CHAVE']};
+const TIPOS={dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'},emerg:{STATUS:'choice',ATIVA_CHAVE:'text',LISTA:'multi',RESUMO:'multi',PRESENTES:'number'},chamada:{EMERG_ID:'text',MARCA_CHAVE:'text'}};
+const TIPO_NOME={text:'Texto (uma linha)',choice:'Escolha',multi:'Várias linhas de texto (texto sem formatação)',number:'Número'};
+const tipoOk=(col,t)=>t==='multi'?!!(col.text&&col.text.allowMultipleLines&&col.text.textType!=='richText'):!!col[t];
 const OPCOES={
  movP:{STATUS_MOV:['Aberto','Encerrado'],TIPO:['Colaborador','Diretoria','Visitante','Prestador','Terceiro'],MODAL:['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'],ORIGEM:['PC','Celular (QR)','Celular (digitado)'],SAIDA_TIPO:['Final','Temporária']},
  movV:{STATUS_MOV:['Aberto','Encerrado'],FINALIDADE:['Coleta','Entrega','Serviço','Visita','Outro'],AUT_EXPEDICAO:['Pendente','Autorizado','Exceção']},
@@ -44,7 +48,10 @@ const OPCOES={
  merc:{STATUS:['Aguardando retirada','Entregue']},
  ocor:{TIPO:['Segurança','Acesso indevido','Veículo','Mercadoria','Estrutura','Outro'],GRAVIDADE:['Baixa','Média','Alta'],STATUS:['Aberta','Em análise','Encerrada']},
  dir:{SITUACAO:['Ativo','Desligado']},
- params:{APP:['Portaria']}
+ params:{APP:['Portaria']},
+ emerg:{TIPO:['Incêndio','Vazamento químico','Pessoa ferida / mal súbito','Evacuação','Simulado','Outro'],STATUS:['Ativa','Encerrada']},
+ chamada:{STATUS:['No ponto']},
+ brigada:{FUNCAO:['Líder','Brigadista','Socorrista','Apoio']}
 };
 const PESQUISAS={movP:{AGENDAMENTO:'agend'},movV:{PREVISAO:'prevV'},prevV:{TRANSPORTADORA:'transp'}};
 /* situações do diretório que permitem ENTRAR (lista explícita) */
@@ -65,6 +72,7 @@ const PARAM_DEF=[
  {mod:'ESG',k:'CO2_KM_BICICLETA',d:'Bicicleta',t:'dec',v:0,esg:true},
  {mod:'ESG',k:'CO2_KM_A_PE',d:'A pé',t:'dec',v:0,esg:true},
  {mod:'ESG',k:'CO2_KM_OUTRO',d:'Outro',t:'dec',v:null,esg:true},
+ {mod:'Emergência',k:'EMERG_LOCAIS',d:'Locais sugeridos no acionamento de emergência (separados por vírgula)',t:'text',v:'Portaria, Produção, Expedição, Almoxarifado, Laboratório, Escritório, Estacionamento'},
  {mod:'Turno',k:'TURNO_HORARIOS',d:'Horários de troca de turno (HH:MM, separados por vírgula)',t:'text',v:'06:00,18:00'},
  {mod:'Turno',k:'TURNO_TOLERANCIA',d:'Tolerância para passar o turno depois do horário (minutos)',t:'num',v:60},
  {mod:'Prazos',k:'ALERTA_PERMANENCIA',d:'Pessoa com entrada aberta há mais de (horas) vira pendência',t:'num',v:14},
@@ -87,10 +95,11 @@ const LISTAS_POSTO=['movP','agend','prevV','movV','merc','ocor','turnos','dir','
 const LISTAS_LOG=['prevV','movV','params','transp'];
 const LISTAS_AG=['agend'];
 const LISTAS_RH=['movP','movV','params'];
+const LISTAS_EMERG=['emerg','chamada','brigada','params'];
 let COLS={};
-async function boot({posto=true,log=false,agendar=false,rh=false}={}){
+async function boot({posto=true,log=false,agendar=false,rh=false,emergencia=false}={}){
  const all=await sp.lists();
- const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[])]);
+ const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[]),...(emergencia?LISTAS_EMERG:[])]);
  const faltando=[];
  for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n]||(k==='cadColab'?all['00_Cadastro_Colaboradores']:undefined);if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
  if(faltando.length)return {ok:false,faltando};
@@ -98,7 +107,7 @@ async function boot({posto=true,log=false,agendar=false,rh=false}={}){
   cols.filter(c=>!have.has(c)).forEach(c=>out.push(nm+': falta a coluna '+c));
   (INDICES[k]||[]).filter(c=>have.has(c)&&!have.get(c).indexed).forEach(c=>out.push(nm+': crie o índice na coluna '+c));
   (UNICOS[k]||[]).filter(c=>have.has(c)&&!have.get(c).enforceUniqueValues).forEach(c=>out.push(nm+': ative "Exigir valores exclusivos" na coluna '+c));
-  Object.entries(TIPOS[k]||{}).forEach(([c,t])=>{if(have.has(c)&&!have.get(c)[t])out.push(nm+': a coluna '+c+' precisa ser do tipo '+TIPO_NOME[t]);});
+  Object.entries(TIPOS[k]||{}).forEach(([c,t])=>{if(have.has(c)&&!tipoOk(have.get(c),t))out.push(nm+': a coluna '+c+' precisa ser do tipo '+TIPO_NOME[t]);});
   Object.entries(OPCOES[k]||{}).forEach(([c,ops])=>{const col=have.get(c);if(!col||!col.choice)return;const tem=(col.choice.choices||[]);ops.filter(o=>!tem.includes(o)).forEach(o=>out.push(nm+': a coluna '+c+' precisa da opção "'+o+'"'));});
   Object.entries(PESQUISAS[k]||{}).forEach(([c,alvo])=>{const col=have.get(c);if(!col||!L[alvo])return;if(!col.lookup)out.push(nm+': a coluna '+c+' precisa ser do tipo Pesquisa');else if(guid(col.lookup.listId)!==guid(L[alvo]))out.push(nm+': a coluna '+c+' deve pesquisar na lista '+LISTAS[alvo]);});
   return out;}catch(e){return [LISTAS[k]+': '+e.message];}}));
@@ -410,6 +419,60 @@ async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return nu
  const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/SAIDA ge '"+desdeHoje()+"'&$top=999");
  const meus=rs.filter(x=>String(x.MATRICULA||'').trim()===m&&ehHoje(x.SAIDA)).sort((a,b)=>new Date(b.SAIDA)-new Date(a.SAIDA));
  return meus[0]&&val(meus[0].SAIDA_TIPO)==='Temporária'?meus[0]:null;}
+/* ---------- emergência: acionamento, lista de evacuação, chamada no ponto de encontro ---------- */
+const temEmergencia=()=>!!(L.emerg&&L.chamada&&L.brigada);
+async function emergenciaAtiva(){if(!L.emerg)return null;const rs=await sp.items(L.emerg,"$expand=fields&$filter=fields/STATUS eq 'Ativa'&$top=5");
+ return rs.sort((a,b)=>new Date(b.INICIO)-new Date(a.INICIO))[0]||null;}
+async function ultimasEmergencias(n=10){if(!L.emerg)return [];const rs=await sp.items(L.emerg,"$expand=fields&$filter=fields/STATUS eq 'Encerrada'&$top=200");
+ return rs.sort((a,b)=>new Date(b.INICIO)-new Date(a.INICIO)).slice(0,n);}
+async function brigadistas(){if(!L.brigada)return [];const rs=await sp.items(L.brigada,'$expand=fields&$top=500');
+ return rs.map(r=>({id:r.id,nome:String(r.NOME||r.Title||'').trim(),mat:String(r.MATRICULA??'').trim(),funcao:val(r.FUNCAO)||'Brigadista',tel:String(r.TELEFONE||'').trim(),wa:String(r.WHATSAPP||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}))
+  .filter(b=>b.nome).sort((a,b)=>(a.funcao==='Líder'?0:1)-(b.funcao==='Líder'?0:1)||a.nome.localeCompare(b.nome,'pt-BR'));}
+const soDigitos=v=>String(v||'').replace(/\D/g,'');
+function salvarBrigadista(f,id){const nome=String(f.nome||'').trim();if(nome.length<3)throw Object.assign(new Error('Informe o nome do brigadista.'),{code:'validacao'});
+ const tel=soDigitos(f.tel),wa=soDigitos(f.wa);if(!tel&&!wa)throw Object.assign(new Error('Informe telefone ou WhatsApp.'),{code:'validacao'});
+ if((tel&&tel.length<10)||(wa&&wa.length<10))throw Object.assign(new Error('Telefone/WhatsApp com DDD (10 ou 11 dígitos).'),{code:'validacao'});
+ const fields={Title:nome,NOME:nome,MATRICULA:String(f.mat||'').trim(),FUNCAO:f.funcao||'Brigadista',TELEFONE:tel,WHATSAPP:wa,ATIVO:true};
+ return id?sp.patch(L.brigada,id,fields):sp.add(L.brigada,fields);}
+const setBrigadistaAtivo=(id,ativo)=>sp.patch(L.brigada,id,{ATIVO:!!ativo});
+/* lista de evacuação = quem está dentro no momento do acionamento (sem documentos) */
+async function instantaneoPresenca(){const [p,v]=await Promise.all([abertosP(),L.movV?abertosV():Promise.resolve([])]);
+ return {p:p.map(m=>({i:m.id,n:m.NOME,t:val(m.TIPO),e:m.EMPRESA||'',m:m.MATRICULA||'',a:m.ANFITRIAO_NOME||'',c:m.CRACHA||''})),v:v.map(x=>({i:x.id,pl:x.PLACA,mo:x.MOTORISTA||'',e:x.EMPRESA||''})),em:new Date().toISOString(),inc:!!(p.truncated||v.truncated)};}
+/* a lista cabe numa coluna de várias linhas: se crescer demais, tira detalhes antes de cortar (e avisa) */
+const LISTA_MAX=60000;
+function compacta(snap){const tam=()=>JSON.stringify(snap).length;
+ for(const k of ['a','c','e','m']){if(tam()<=LISTA_MAX)return snap;snap.p.forEach(x=>{delete x[k];});}
+ while(tam()>LISTA_MAX&&(snap.v.length||snap.p.length)){snap.inc=true;if(snap.v.length)snap.v.pop();else snap.p.pop();}return snap;}
+function listaDe(em){try{const j=JSON.parse(em&&em.LISTA||'');return j&&Array.isArray(j.p)?j:null;}catch{return null;}}
+/* uma emergência ativa por vez: ATIVA_CHAVE com valores exclusivos */
+async function acionarEmergencia({tipo,local,msg,quem}){
+ if(!tipo)throw Object.assign(new Error('Escolha o tipo de emergência.'),{code:'validacao'});
+ if(String(local||'').trim().length<2)throw Object.assign(new Error('Informe o local.'),{code:'validacao'});
+ const f={TIPO:tipo,LOCAL:String(local).trim(),MENSAGEM:String(msg||'').trim(),STATUS:'Ativa',INICIO:now(),ACIONADO_POR:quem,ATIVA_CHAVE:'ATIVA'};
+ let em;try{em=await sp.add(L.emerg,f);}
+ catch(e){let at=null;try{at=await emergenciaAtiva();}catch{}if(at)return {ja:at};throw e;}
+ /* quem enxerga a portaria já grava a lista; senão o computador da portaria completa em segundos */
+ if(L.movP){try{await preencherLista(em);}catch(e){console.warn('Lista de evacuação pendente',e.message);}}
+ return {novo:em};}
+async function preencherLista(em){if(!em||!L.movP)return false;const cur=await getItem('emerg',em.id);if(val(cur.STATUS)!=='Ativa'||listaDe(cur))return false;
+ const snap=compacta(await instantaneoPresenca());
+ try{await sp.patch(L.emerg,em.id,{LISTA:JSON.stringify(snap),PRESENTES:snap.p.length},{etag:cur._etag});return true;}catch(e){if(e.status===412)return false;throw e;}}
+async function chamadaDe(emId){if(!L.chamada)return [];return sp.items(L.chamada,"$expand=fields&$filter=fields/EMERG_ID eq '"+encodeURIComponent(String(emId))+"'&$top=999");}
+async function marcarNoPonto(emId,pessoa,nome,quem){
+ try{return {ok:true,item:await sp.add(L.chamada,{Title:nome,EMERG_ID:String(emId),PESSOA:pessoa,NOME:nome,STATUS:'No ponto',MARCADO_POR:quem,HORA:now(),MARCA_CHAVE:emId+'|'+pessoa})};}
+ catch(e){if(isDupErr(e))return {ja:true};throw e;}}
+async function desmarcar(item){try{await sp.del(L.chamada,item.id);}catch(e){if(e.status!==404)throw e;}return {ok:true};}
+async function encerrarEmergencia(em,quem){const cur=await getItem('emerg',em.id);if(val(cur.STATUS)!=='Ativa')return {ja:true};
+ const lista=listaDe(cur),marcas=await chamadaDe(em.id);const ok=new Set(marcas.map(m=>m.PESSOA));
+ const tot=lista?lista.p.length:0,noPonto=lista?lista.p.filter(x=>ok.has('P:'+x.i)).length:0;
+ const faltaram=lista?lista.p.filter(x=>!ok.has('P:'+x.i)).map(x=>x.n):[];
+ const ult=marcas.map(m=>new Date(m.HORA).getTime()).filter(Boolean).sort((a,b)=>b-a)[0];
+ const dur=ms=>{const m=Math.round(ms/6e4);return m<60?m+' min':Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');};
+ const resumo=['Tipo: '+val(cur.TIPO)+' · Local: '+cur.LOCAL,'Acionada por '+cur.ACIONADO_POR+' em '+new Date(cur.INICIO).toLocaleString('pt-BR'),'Encerrada por '+quem+' em '+new Date().toLocaleString('pt-BR')+' (duração '+dur(Date.now()-new Date(cur.INICIO).getTime())+')',
+  'No ponto de encontro: '+noPonto+' de '+tot+(ult?' · última confirmação '+dur(ult-new Date(cur.INICIO).getTime())+' após o acionamento':''),faltaram.length?'Não confirmados: '+faltaram.join(', '):'Todos confirmados.'].join('\n');
+ try{await sp.patch(L.emerg,em.id,{STATUS:'Encerrada',FIM:now(),ENCERRADO_POR:quem,ATIVA_CHAVE:'E#'+em.id,RESUMO:resumo.slice(0,60000)},{etag:cur._etag});}
+ catch(e){if(e.status===412){const at=await getItem('emerg',em.id);if(val(at.STATUS)!=='Ativa')return {ja:true};}throw e;}
+ return {ok:true,resumo};}
 /* ---------- RH: consulta por período, ESG e exportação (somente leitura) ---------- */
 const CONSULTA_MAX_DIAS=31;
 function validarPeriodo(de,ate){const ok=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'');if(!ok(de)||!ok(ate))return 'Informe as datas De e Até.';
@@ -503,6 +566,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
+ temEmergencia,emergenciaAtiva,ultimasEmergencias,brigadistas,salvarBrigadista,setBrigadistaAtivo,instantaneoPresenca,compacta,listaDe,acionarEmergencia,preencherLista,chamadaDe,marcarNoPonto,desmarcar,encerrarEmergencia,
  CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,marcarSaidaFinal,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,

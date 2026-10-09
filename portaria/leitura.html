@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.7">
+<link rel="stylesheet" href="/core/polystell.css?v=2.8">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -43,12 +43,16 @@
 .lt-accm strong{display:block;font-size:14px;overflow-wrap:anywhere}.lt-accm small{display:block;color:var(--muted);font-size:12px;margin:3px 0 8px;overflow-wrap:anywhere}
 .lt-accm a,.lt-accm button{display:flex;gap:9px;align-items:center;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:11px 0 6px;font-size:14px;color:var(--ink);text-decoration:none;text-align:left}
 .lt-turno{min-width:0}
+.lt-sos{flex-shrink:0;background:#b42318;color:#fff;border-radius:99px;padding:7px 11px;font-size:12px;font-weight:800;letter-spacing:.4px;text-decoration:none;border:1px solid #ffffff40}
+.lt-sos.on{animation:ltpulse 1.2s infinite}
+@keyframes ltpulse{50%{box-shadow:0 0 0 6px #b4231855}}
+@media(prefers-reduced-motion:reduce){.lt-sos.on{animation:none}}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.7"></script>
-<script src="comum.js?v=2.7"></script>
+<script src="/core/polystell.js?v=2.8"></script>
+<script src="comum.js?v=2.8"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -67,7 +71,7 @@ const MODAIS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Out
 function verif(mat){let h=7;for(const c of String(mat))h=(h*31+c.charCodeAt(0))%1296;return h.toString(36).padStart(2,'0').toUpperCase();}
 const quando=v=>v&&new Date(v).toDateString()===new Date().toDateString()?fmt.hm(v):fmt.dmhm(v);
 function shell(){
- document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button><button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
+ document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button>'+(P.temEmergencia()?'<a class="lt-sos" id="sos" href="emergencia.html" aria-label="Emergência">SOS</a>':'')+'<button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
  '<div class="lt-accm" id="accm" hidden><strong>'+esc(PS.auth.account?.name||'Conta')+'</strong><small>'+esc(PS.auth.account?.username||'')+'</small><a href="'+PS.cfg.hubUrl+'">'+icon('grid')+'Todos os aplicativos</a><a href="./">'+icon('home')+'Portaria no computador</a><button type="button" id="sair">'+icon('logout')+'Sair da conta</button></div>'+
  '<main class="lt-wrap"><div id="ban"></div><section class="lt-cam" id="cam"><video id="video" playsinline muted></video><div class="mira"></div><div class="hint" id="hint">Aponte para o QR do crachá ou do convite</div></section>'+
  '<form class="lt-manual" id="mf"><input id="mc" autocomplete="off" inputmode="text" placeholder="Ou digite matrícula / código do convite" aria-label="Matrícula ou código do convite"><button class="btn primary" type="submit">OK</button></form><div id="res" aria-live="polite"></div></main>';
@@ -78,9 +82,14 @@ function shell(){
  $('#mf').onsubmit=e=>{e.preventDefault();const v=$('#mc').value.trim();if(!v)return;if(S.mode==='busy'){toast('Aguarde a consulta em andamento.','warn');return;}$('#mc').value='';$('#mc').blur();if(S.mode==='confirm'||S.mode==='done')nova();handle(v,'digitado');};
 }
 function paintTurno(){const b=$('#tb');if(!b)return;const ok=tAtivo();b.className='lt-turno'+(ok?'':' off');b.textContent=ok?'Plantão: '+S.turno.PARA:'Abrir turno';
- $('#ban').innerHTML=(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(P.trocaPendente(S.turno)?'<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(P.trocaPendente(S.turno))+').</b> Toque em Plantão para passar o turno.</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
+ const em=S.em,sos=$('#sos');if(sos)sos.classList.toggle('on',!!em);
+ $('#ban').innerHTML=(em?'<div class="banner err" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(val(em.TIPO)==='Simulado'?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · '+fmt.hm(em.INICIO)+'</span><a class="btn sm danger solid" href="emergencia.html">Abrir</a></div>':'')+(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(P.trocaPendente(S.turno)?'<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(P.trocaPendente(S.turno))+').</b> Toque em Plantão para passar o turno.</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
 /* na hora da troca, abre a passagem sozinho uma vez (só com o leitor livre) */
 function checaTroca(){const fim=P.trocaPendente(S.turno);if(!fim||S.trocaAvisada===+fim||S.mode!=='scan')return;const d=$('#ps-dlg');if(d&&d.open)return;S.trocaAvisada=+fim;dlgTurno();}
+/* emergência: avisa no celular e completa a lista de evacuação (a guarita enxerga quem está dentro) */
+async function checaEmerg(){if(!P.temEmergencia())return;try{const em=await P.emergenciaAtiva();S.em=em;
+ if(em&&!P.listaDe(em)){try{await P.preencherLista(em);}catch(e){console.warn('Lista de evacuação',e.message);}}
+ if(em&&S.emVista!==em.id){S.emVista=em.id;if(navigator.userActivation?.hasBeenActive!==false)navigator.vibrate?.([300,150,300,150,300]);}paintTurno();}catch(e){console.warn('Emergência',e.message);}}
 async function loadTurno(){try{const [t]=await Promise.all([P.turnoAtual(),P.loadParams()]);S.turno=t.turno;S.lidoEm=t.lidoEm;S.syncErr=null;}catch(e){S.syncErr=e.message||'erro';}paintTurno();checaTroca();}
 async function dlgTurno(){const ativos=P.porteiros.filter(p=>p.ativo);
  if(!ativos.length){dialog({title:'Nenhum porteiro cadastrado',html:'<p>A TI cadastra os porteiros em Segurança (TI), no computador da portaria.</p>'});return;}
@@ -182,6 +191,7 @@ async function camera(){const v=$('#video');
   shell();await loadTurno();if(!tAtivo())dlgTurno();camera();
   setInterval(()=>{if(!document.hidden)loadTurno();},120000);
   setInterval(()=>{paintTurno();checaTroca();},30000);
+  checaEmerg();setInterval(()=>{if(!document.hidden)checaEmerg();},15000);
  }catch(e){console.error(e);PS.screens.error('Não foi possível abrir o leitor',e.message);}
 })();
 </script>

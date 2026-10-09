@@ -188,6 +188,7 @@ const sp={
   const rows=out.map(it=>({id:String(it.id),_etag:it['@odata.etag']||it.eTag||'',_by:it.createdBy?.user?.displayName||'',_byEmail:String(it.createdBy?.user?.email||'').toLowerCase(),_byId:String(it.createdBy?.user?.id||''),...(it.fields||{})}));rows.truncated=trunc;return rows;},
  async add(listId,fields){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items',{method:'POST',body:{fields}});return {id:String(r.id),...(r.fields||{})};},
  async patch(listId,id,fields,{etag}={}){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'/fields',{method:'PATCH',body:fields,headers:etag?{'If-Match':etag}:{}});},
+ async del(listId,id){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id,{method:'DELETE'});},
  async get(listId,id){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'?$expand=fields');return {id:String(r.id),_etag:r['@odata.etag']||r.eTag||'',_by:r.createdBy?.user?.displayName||'',_byEmail:String(r.createdBy?.user?.email||'').toLowerCase(),_byId:String(r.createdBy?.user?.id||''),...(r.fields||{})};}
 };
 async function groups(){try{let next='/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName&$top=999';const out=new Set();
