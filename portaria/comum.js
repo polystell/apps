@@ -70,6 +70,7 @@ const PARAM_DEF=[
  {mod:'Prazos',k:'ALERTA_PERMANENCIA',d:'Pessoa com entrada aberta há mais de (horas) vira pendência',t:'num',v:14},
  {mod:'Prazos',k:'ALERTA_PATIO',d:'Veículo no pátio há mais de (horas) vira pendência',t:'num',v:4},
  {mod:'Prazos',k:'ALERTA_MERCADORIA',d:'Mercadoria aguardando há mais de (dias) vira pendência',t:'num',v:2},
+ {mod:'Prazos',k:'ALERTA_RETORNO',d:'Saída temporária sem retorno há mais de (horas) vira pendência',t:'num',v:2},
  {mod:'Prazos',k:'ESPERA_ANFITRIAO',d:'Espera do anfitrião antes de ligar (minutos)',t:'num',v:5,fase2:true},
  {mod:'Prazos',k:'RETENCAO_VISITANTES',d:'Retenção de registros de visitantes (meses)',t:'num',v:12,fase2:true}
 ];
@@ -395,6 +396,15 @@ const chavePessoa=m=>m.MATRICULA?'M:'+String(m.MATRICULA).trim():'N:'+norm(m.NOM
 function foraTemporario(movsHoje,abertos){const dentro=new Set((abertos||[]).map(chavePessoa));const ult=new Map();
  (movsHoje||[]).filter(m=>m.SAIDA&&ehHoje(m.SAIDA)).forEach(m=>{const k=chavePessoa(m);const u=ult.get(k);if(!u||new Date(m.SAIDA)>new Date(u.SAIDA))ult.set(k,m);});
  return [...ult.entries()].filter(([k,m])=>!dentro.has(k)&&val(m.SAIDA_TIPO)==='Temporária').map(([,m])=>m).sort((a,b)=>new Date(a.SAIDA)-new Date(b.SAIDA));}
+/* a pessoa avisou que não volta: a saída temporária vira saída final (o horário real da saída é mantido) */
+async function marcarSaidaFinal(mov,porteiro){
+ await conferirTurno(porteiro);
+ const atual=await getItem('movP',mov.id);
+ if(val(atual.SAIDA_TIPO)!=='Temporária')return {ja:true};
+ const abertos=await abertosP();if(abertos.truncated)throw erroIncompleto();
+ if(abertos.some(m=>chavePessoa(m)===chavePessoa(atual)))return {voltou:true};
+ try{await sp.patch(L.movP,mov.id,{SAIDA_TIPO:'Final'},{etag:atual._etag});}catch(e){if(e.status===412)return {conflito:true};throw e;}
+ return {ok:true};}
 /* retorno no mesmo dia: devolve a saída temporária de hoje (para não pedir o transporte de novo) */
 async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return null;
  const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/SAIDA ge '"+desdeHoje()+"'&$top=999");
@@ -493,7 +503,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
- CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,
+ CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,marcarSaidaFinal,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,

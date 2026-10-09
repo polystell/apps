@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.6">
+<link rel="stylesheet" href="/core/polystell.css?v=2.7">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -44,8 +44,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.6"></script>
-<script src="comum.js?v=2.6"></script>
+<script src="/core/polystell.js?v=2.7"></script>
+<script src="comum.js?v=2.7"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -100,8 +100,9 @@ const quando=v=>isToday(v)?fmt.hm(v):fmt.dmhm(v);
 const idade=v=>Date.now()-new Date(v).getTime();
 function setPath(path,v){const [a,b]=path.split('.');ST.f[a][b]=v;}
 /* ---------------- pendências ---------------- */
-function pend(){const hP=P.param('ALERTA_PERMANENCIA'),hV=P.param('ALERTA_PATIO'),dM=P.param('ALERTA_MERCADORIA');
- return {p:ST.d.openP.filter(m=>idade(m.ENTRADA)>hP*36e5),v:ST.d.openV.filter(m=>idade(m.ENTRADA)>hV*36e5),m:ST.d.merc.filter(m=>idade(m.CHEGADA)>dM*864e5)};}
+function pend(){const hP=P.param('ALERTA_PERMANENCIA'),hV=P.param('ALERTA_PATIO'),dM=P.param('ALERTA_MERCADORIA'),hR=P.param('ALERTA_RETORNO');
+ return {p:ST.d.openP.filter(m=>idade(m.ENTRADA)>hP*36e5),v:ST.d.openV.filter(m=>idade(m.ENTRADA)>hV*36e5),m:ST.d.merc.filter(m=>idade(m.CHEGADA)>dM*864e5),
+  t:P.foraTemporario(ST.d.movPHoje,ST.d.openP).filter(m=>idade(m.SAIDA)>hR*36e5)};}
 /* ---------------- dados ---------------- */
 /* atualização coalescida: um pedido feito durante outra atualização roda
    de novo ao final (quem acabou de gravar sempre recebe dados novos) */
@@ -127,7 +128,7 @@ async function doRefresh(){
 }
 function chrome(){if(!SHELL)return;const pd=pend();
  const aguard=ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').length;
- SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length}});
+ SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length+pd.t.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length}});
  if(ST.sync.err)SHELL.setSync('bad','Falha ao atualizar'+(ST.sync.at?' · dados de '+fmt.hm(ST.sync.at):''));
  else if(ST.sync.at)SHELL.setSync('ok','Atualizado às '+fmt.hm(ST.sync.at));
  if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>'+(ST.log?'Logística':'RH')+'</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>'+(ST.log&&ST.rh?'Expedição · RH':ST.log?'Expedição':'Consulta')+'</span></div>');return;}
@@ -176,7 +177,7 @@ VIEWS.painel={
   SHELL.page.onclick=e=>{const c=e.target.closest('[data-chegada]');if(c)chegada(c.dataset.chegada);const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);}};},
  update(){banners();if(!$('#kpis'))return;const pd=pend(),D=ST.d;
   const prevAg=D.agenda.filter(a=>['Agendado','Na portaria'].includes(val(a.STATUS))&&!P.abertoDoAgend(D.openP,a.id)).length;
-  const npend=pd.p.length+pd.v.length+pd.m.length;
+  const npend=pd.p.length+pd.v.length+pd.m.length+pd.t.length;
   $('#kpis').innerHTML=[['pessoas',D.openP.length,'pessoas na planta'+(P.foraTemporario(D.movPHoje,D.openP).length?' · '+P.foraTemporario(D.movPHoje,D.openP).length+' fora (temporário)':''),pd.p.length],['veiculos',D.openV.length,'veículos no pátio',pd.v.length],['mercadorias',D.merc.length,'mercadorias aguardando',pd.m.length]].map(([g,n,l,a])=>'<button class="kpi'+(a?' alert':'')+'" data-go="'+g+'"><b>'+n+'</b><span>'+l+(a?' · '+a+' pendente(s)':'')+'</span></button>').join('')+
    '<div class="kpi"><b>'+prevAg+'</b><span>visitas ainda previstas hoje</span></div>';
   $('#pdc').textContent=npend+D.ocor.length;
@@ -189,7 +190,7 @@ VIEWS.painel={
   $('#pvc').textContent=D.prev.length;
   $('#pvl').innerHTML=D.prev.length?D.prev.map(p=>{const s=P.situacaoPrev(p,D.movVHoje);const quem=TRANSP[P.lid(p.TRANSPORTADORALookupId)]||p.REMETENTE||'—';
    return '<div class="row"><div class="main"><div class="t">'+esc(val(p.TIPO))+' · '+esc(quem)+'</div><div class="meta">'+esc([p.HORA||'sem horário',p.NF&&'NF '+p.NF,p.AREA].filter(Boolean).join(' · '))+'</div></div><div class="act"><span class="chip dot '+chipPrev(s)+'">'+esc(s)+'</span></div></div>';}).join(''):'<div class="empty">Nada previsto para hoje.</div>';
-  const pl=[...pd.p.map(m=>['pessoas','Entrada aberta há '+fmt.dur(idade(m.ENTRADA)),m.NOME]),...pd.v.map(m=>['veiculos','No pátio há '+fmt.dur(idade(m.ENTRADA)),m.PLACA]),...pd.m.map(m=>['mercadorias','Aguardando há '+fmt.dur(idade(m.CHEGADA)),m.DESTINATARIO_NOME||m.DESCRICAO])];
+  const pl=[...pd.p.map(m=>['pessoas','Entrada aberta há '+fmt.dur(idade(m.ENTRADA)),m.NOME]),...pd.t.map(m=>['pessoas','Saiu temporariamente às '+fmt.hm(m.SAIDA)+' e não retornou ('+fmt.dur(idade(m.SAIDA))+')',m.NOME]),...pd.v.map(m=>['veiculos','No pátio há '+fmt.dur(idade(m.ENTRADA)),m.PLACA]),...pd.m.map(m=>['mercadorias','Aguardando há '+fmt.dur(idade(m.CHEGADA)),m.DESTINATARIO_NOME||m.DESCRICAO])];
   if(D.ocor.length)pl.push(['ocorrencias',D.ocor.length+' ocorrência(s) em aberto','Ocorrências']);
   $('#pdl').innerHTML=pl.length?pl.map(([g,t,n])=>'<div class="row flag"><div class="main"><div class="t">'+esc(n||'—')+'</div><div class="meta">'+esc(t)+'</div></div><div class="act"><button class="btn sm" data-go="'+g+'">Ver</button></div></div>').join(''):'<div class="empty">Nenhuma pendência no momento.</div>';}
 };
@@ -240,9 +241,10 @@ VIEWS.pessoas={
    const t=e.target.closest('[data-t]');if(t){ST.f.p.tipo=t.dataset.t;ST.f.p.colab=null;ST.f.p.modal=null;$$('#ptipo [data-t]').forEach(b=>b.setAttribute('aria-pressed',String(b===t)));drawPForm();return;}
    const f=e.target.closest('[data-ft]');if(f){ST.f.p.ft=f.dataset.ft;this.update();return;}
    const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);return;}
+   const ff=e.target.closest('[data-ftfinal]');if(ff){marcarFinal(ff.dataset.ftfinal);return;}
    const md=e.target.closest('[data-m]');if(md){ST.f.p.modal=md.dataset.m;$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b===md)));return;}
    if(e.target.closest('#pgo-c'))regColab();if(e.target.closest('#pgo-v'))regVisit();};},
- update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount');
+ update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount',{acoes:true});
   let rows=ST.d.openP.slice().sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));
   const cnt=k=>FILTROS[k]?ST.d.openP.filter(m=>FILTROS[k].includes(val(m.TIPO))).length:ST.d.openP.length;
   $('#pft').innerHTML=Object.keys(FILTROS).map(k=>'<button type="button" data-ft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
@@ -312,8 +314,18 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
    catch(e){msg+='. Não foi possível salvar no cadastro de pessoas'+(e.status===403?' (sem permissão — avise a TI)':'')+'.';kind='warn';}}
   toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true});drawPForm();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
-function desenhaFora(lista,cont){const el=$(lista);if(!el)return;const ft=P.foraTemporario(ST.d.movPHoje,ST.d.openP);const c=$(cont);if(c)c.textContent=ft.length;
- el.innerHTML=ft.length?ft.map(m=>'<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA].filter(Boolean).join(' · '))+'</div><div class="detail">Saiu às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+')'+(m.PORTEIRO_SAI?' · '+esc(m.PORTEIRO_SAI):'')+'</div></div></div>').join(''):'<div class="empty">Ninguém fora temporariamente.</div>';}
+function desenhaFora(lista,cont,{acoes=false}={}){const el=$(lista);if(!el)return;const ft=P.foraTemporario(ST.d.movPHoje,ST.d.openP);const c=$(cont);if(c)c.textContent=ft.length;const hR=P.param('ALERTA_RETORNO');
+ el.innerHTML=ft.length?ft.map(m=>{const atraso=idade(m.SAIDA)>hR*36e5;return '<div class="row'+(atraso?' flag':'')+'"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA].filter(Boolean).join(' · '))+'</div><div class="detail">Saiu às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+')'+(m.PORTEIRO_SAI?' · '+esc(m.PORTEIRO_SAI):'')+'</div>'+(atraso?'<div class="tags"><span class="chip warn dot">Não retornou</span></div>':'')+'</div>'+
+  (acoes?'<div class="act"><button class="btn sm" data-ftfinal="'+m.id+'">Marcar como saída final</button></div>':'')+'</div>';}).join(''):'<div class="empty">Ninguém fora temporariamente.</div>';}
+function marcarFinal(id){if(needTurno())return;const m=P.foraTemporario(ST.d.movPHoje,ST.d.openP).find(x=>x.id===id);if(!m)return;
+ dialog({title:'Marcar como saída final',html:'<p><b>'+esc(m.NOME)+'</b> saiu temporariamente às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+').</p><div class="note">Use quando a pessoa avisou que não volta hoje. O horário da saída continua o mesmo ('+esc(fmt.hm(m.SAIDA))+'); só o tipo passa para <b>Final</b>.</div>',
+  actions:[{label:'Cancelar',value:null},{label:'Marcar como saída final',kind:'primary',onClick:async()=>{
+   try{const r=await P.marcarSaidaFinal(m,porteiro());
+    if(r.voltou)toast(m.NOME+' já voltou para a planta (entrada registrada) — nada foi alterado.','warn');
+    else if(r.ja)toast('Esta saída já não era temporária.','warn');
+    else if(r.conflito)toast('O registro foi alterado em outro aparelho. Confira e tente de novo.','warn');
+    else toast('Saída final registrada para '+m.NOME+'.');
+    refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
 /* ================= VEÍCULOS ================= */
 const prevsAbertas=()=>ST.d.prev.filter(p=>!['Concluído','Cancelado','Não veio'].includes(P.situacaoPrev(p,ST.d.movVHoje)));
 /* só as opções do seletor são refeitas na atualização; o formulário fica como está */
