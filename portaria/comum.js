@@ -77,10 +77,11 @@ const erroIncompleto=()=>Object.assign(new Error('Consulta de presença incomple
 const LISTAS_POSTO=['movP','agend','prevV','movV','merc','ocor','turnos','dir','params','transp'];
 const LISTAS_LOG=['prevV','movV','params','transp'];
 const LISTAS_AG=['agend'];
+const LISTAS_RH=['movP','movV','params'];
 let COLS={};
-async function boot({posto=true,log=false,agendar=false}={}){
+async function boot({posto=true,log=false,agendar=false,rh=false}={}){
  const all=await sp.lists();
- const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[])]);
+ const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[])]);
  const faltando=[];
  for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n];if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
  if(faltando.length)return {ok:false,faltando};
@@ -378,6 +379,25 @@ async function autorizarPelaExpedicao(id,quem,obs){const at=await getItem('movV'
  const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
  const r=await patchVersao('movV',id,{AUT_EXPEDICAO:'Autorizado',AUT_POR:('Expedição (no app): '+quem+' às '+hm+(obs?' — '+obs:'')).slice(0,250)},at._etag,x=>val(x.STATUS_MOV)==='Aberto'&&val(x.AUT_EXPEDICAO)!=='Autorizado');
  return r.conflito?(val(r.mov.STATUS_MOV)!=='Aberto'?{jaSaiu:true}:{jaAut:true,mov:r.mov}):{ok:true};}
+/* ---------- RH: consulta por período, ESG e exportação (somente leitura) ---------- */
+const CONSULTA_MAX_DIAS=31;
+function validarPeriodo(de,ate){const ok=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'');if(!ok(de)||!ok(ate))return 'Informe as datas De e Até.';
+ if(de>ate)return 'A data inicial é depois da final.';if(ate>todayKey())return 'A data final não pode ser futura.';
+ const dias=(new Date(ate+'T12:00:00')-new Date(de+'T12:00:00'))/864e5+1;if(dias>CONSULTA_MAX_DIAS)return 'Consulte no máximo '+CONSULTA_MAX_DIAS+' dias por vez.';return null;}
+/* entradas no período (dia civil local), pelo índice de ENTRADA */
+async function movimentosPeriodo(de,ate){const a=new Date(de+'T00:00:00').toISOString(),b=new Date(ate+'T23:59:59').toISOString();
+ const rs=await sp.items(L.movP,"$expand=fields&$filter=fields/ENTRADA ge '"+a+"' and fields/ENTRADA le '"+b+"'&$top=999");return rs;}
+/* cada colaborador conta uma vez por dia; quem não informou entra como "Não informado" */
+function resumoESG(rows){const vistos=new Map();
+ rows.filter(m=>['Colaborador','Diretoria'].includes(val(m.TIPO))).forEach(m=>{const k=(m.MATRICULA?'M:'+String(m.MATRICULA).trim():'N:'+norm(m.NOME))+'|'+new Date(m.ENTRADA).toDateString();
+  const md=val(m.MODAL)||'';if(!vistos.has(k)||(!vistos.get(k)&&md))vistos.set(k,md);});
+ const cont={};vistos.forEach(md=>{const x=md||'Não informado';cont[x]=(cont[x]||0)+1;});const total=vistos.size;
+ const linhas=Object.entries(cont).map(([modal,n])=>({modal,n,pct:total?n*100/total:0})).sort((a,b)=>(a.modal==='Não informado')-(b.modal==='Não informado')||b.n-a.n);return {total,linhas};}
+function csvMovimentos(rows){const q=v=>{const s=String(v??'');return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+ const dt=v=>v?new Date(v).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(',',''):'';
+ const cab=['Entrada','Saída','Permanência (min)','Tipo','Nome','Matrícula','Empresa','Anfitrião','Meio de transporte','Sem crachá','Origem','Porteiro entrada','Porteiro saída'];
+ const lin=rows.map(m=>[dt(m.ENTRADA),dt(m.SAIDA),m.SAIDA?Math.round((new Date(m.SAIDA)-new Date(m.ENTRADA))/6e4):'',val(m.TIPO),m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,val(m.MODAL),m.SEM_CRACHA===true?'Sim':'',val(m.ORIGEM),m.PORTEIRO_ENT,m.PORTEIRO_SAI].map(q).join(';'));
+ return '﻿'+[cab.join(';'),...lin].join('\r\n');}
 /* ---------- agendamento pelo colaborador (agendar.html) ---------- */
 const ALFA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function novoCodigo(n=8){const r=new Uint32Array(n);crypto.getRandomValues(r);return [...r].map(x=>ALFA[x%ALFA.length]).join('');}
@@ -434,6 +454,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
+ CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
