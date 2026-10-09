@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.2">
+<link rel="stylesheet" href="/core/polystell.css?v=2.3">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -23,13 +23,20 @@
 .ldia{font-weight:700;font-size:12.5px;color:var(--ink,#16233b);margin:16px 0 2px;text-transform:capitalize}
 .ldia:first-child{margin-top:2px}
 .lbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.lrot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.lrot label{margin:0}
+.lrot .btn.sm{min-height:32px;padding:5px 10px}
+.lrot2{display:flex;gap:8px}
+.lrot2 input{flex:1;min-width:0}
+.lrot2 .btn{flex:none}
+@media(max-width:560px){.lrot2{flex-direction:column}}
 pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0 0 12px;color:#44526a}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.2"></script>
-<script src="comum.js?v=2.2"></script>
+<script src="/core/polystell.js?v=2.3"></script>
+<script src="comum.js?v=2.3"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.2).
@@ -42,9 +49,9 @@ const P=PORTARIA;
 const ST={view:'painel',isTI:false,isExp:false,posto:true,log:false,turno:null,busy:false,
  d:{openP:[],openV:[],movVHoje:[],movPHoje:[],agenda:[],agendaRec:[],prev:[],prevR:[],merc:[],ocor:[],trunc:false},
  sync:{at:null,err:null},
- f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos'},
+ f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
     v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:''},
-    m:{dest:null,setor:'',vol:'1',rem:'',desc:''},
+    m:{dest:null,setor:'',vol:'1',rem:'',desc:'',modo:'pessoa',setorDest:''},
     o:{tipo:'Segurança',grav:'Baixa',desc:''},
     h:{k:'p',q:''},
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
@@ -101,6 +108,7 @@ async function doRefresh(){
  ST.sync=fails.length?{at:ST.sync.at,err:(fails[0]?.message||'erro')+(fails.length>1?' (+'+(fails.length-1)+' consulta(s))':'')}:{at:new Date(),err:null};
  if(ST.posto&&!fails.length&&tAtivo()){try{const fixed=await P.reconciliar(ST.d.agendaRec||[],ST.d.openP);if(fixed)ST.d.agenda=await P.agendaHoje();}catch(e){console.warn(e);}}
  chrome();if(VIEWS[ST.view]?.update)VIEWS[ST.view].update();
+ checaTroca();
 }
 function chrome(){if(!SHELL)return;const pd=pend();
  const aguard=ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').length;
@@ -108,10 +116,12 @@ function chrome(){if(!SHELL)return;const pd=pend();
  if(ST.sync.err)SHELL.setSync('bad','Falha ao atualizar'+(ST.sync.at?' · dados de '+fmt.hm(ST.sync.at):''));
  else if(ST.sync.at)SHELL.setSync('ok','Atualizado às '+fmt.hm(ST.sync.at));
  if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>Logística</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>Expedição</span></div>');return;}
- SHELL.setCtx(tAtivo()?'<div class="ps-ctx"><small>Plantão</small><b>'+esc(ST.turno.PARA)+'</b><span>desde '+quando(ST.turno.CIENCIA_EM)+'</span><button data-turno>Trocar turno</button></div>'
+ SHELL.setCtx(tAtivo()?'<div class="ps-ctx"><small>Plantão</small><b>'+esc(ST.turno.PARA)+'</b><span>desde '+quando(ST.turno.CIENCIA_EM)+' · até '+fmt.hm(P.fimDoTurno(ST.turno))+'</span><button data-turno>Trocar turno</button></div>'
   :'<div class="ps-ctx"><small>Plantão</small><b>Nenhum turno aberto</b><button data-turno>Abrir turno</button></div>');}
 function banners(){const el=$('#banners');if(!el)return;let h='';
  if(ST.sync.err)h+='<div class="banner err">'+icon('cloudoff')+'<span><b>Os dados podem estar desatualizados.</b> '+esc(ST.sync.err)+'</span><button class="btn sm" data-refresh>'+icon('refresh')+'Tentar agora</button></div>';
+ const fimT=ST.posto&&P.trocaPendente(ST.turno);
+ if(fimT)h+='<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(fimT)+').</b> Passe o turno para o porteiro que assume o posto.</span><button class="btn sm primary" data-turno>Passar o turno</button></div>';
  if(ST.posto&&!tAtivo())h+='<div class="banner warn">'+icon('swap')+'<span><b>Nenhum turno aberto.</b> Abra o turno para registrar movimentos com o nome do porteiro.</span><button class="btn sm primary" data-turno>Abrir turno</button></div>';
  if(ST.d.trunc)h+='<div class="banner warn">'+icon('alert')+'<span>Algumas listas passaram do limite de leitura e não foram carregadas por completo. Avise a TI.</span></div>';
  el.innerHTML=h;}
@@ -122,6 +132,9 @@ const VIEWS={};
 function page(title,sub,body,acts=''){SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>'+esc(title)+'</h1>'+(sub?'<p>'+esc(sub)+'</p>':'')+'</div>'+acts+'</div><div id="banners"></div>'+body;banners();}
 function go(v){if(!VIEWS[v]||!podeVer(v))v=inicial();ST.view=v;SHELL.setCurrent(v,TITLES[v]);SHELL.page.oninput=null;SHELL.page.onclick=null;SHELL.page.onchange=null;VIEWS[v].mount();VIEWS[v].update();SHELL.page.focus({preventScroll:true});window.scrollTo(0,0);}
 function bindInputs(onLive){SHELL.page.oninput=e=>{const b=e.target.dataset.bind;if(!b)return;setPath(b,e.target.type==='checkbox'?e.target.checked:e.target.value);if(e.target.dataset.live&&onLive)onLive();};}
+/* na hora da troca, abre a passagem de turno sozinho (uma vez por horário, sem atropelar outra janela aberta) */
+function checaTroca(){if(!ST.posto||!SHELL)return;const fim=P.trocaPendente(ST.turno);if(!fim||ST.trocaAvisada===+fim)return;
+ const d=$('#ps-dlg');if(d&&d.open)return;ST.trocaAvisada=+fim;banners();dlgTurno({auto:fim});}
 document.addEventListener('click',e=>{if(e.target.closest('[data-turno]'))dlgTurno();if(e.target.closest('[data-refresh]'))refresh();
  const k=e.target.closest('[data-go]');if(k)go(k.dataset.go);});
 /* ---------------- seletor do diretório (só o próprio bloco é redesenhado) ---------------- */
@@ -213,13 +226,29 @@ VIEWS.pessoas={
 };
 function drawPForm(){const F=ST.f.p,box=$('#pform');if(!box)return;
  if(['Colaborador','Diretoria'].includes(F.tipo)){box.innerHTML='<div id="colabbox"></div>';drawColab();return;}
- box.innerHTML='<div class="grid2"><div class="field"><label for="vnome">Nome completo *</label><input id="vnome" data-bind="p.nome" maxlength="80" value="'+esc(F.nome)+'"></div><div class="field"><label for="vemp">Empresa</label><input id="vemp" data-bind="p.empresa" maxlength="60" value="'+esc(F.empresa)+'"></div></div>'+
+ const cad=P.podeCadastrarPessoa();
+ box.innerHTML='<div class="grid2"><div class="field"><label for="vnome">Nome completo *</label><div class="pick" id="vnpick"><input id="vnome" data-bind="p.nome" maxlength="80" autocomplete="off" value="'+esc(F.nome)+'"'+(cad?' placeholder="Digite para buscar no cadastro de pessoas…"':'')+'><div class="menu" hidden></div></div>'+(F.pext?'<span class="hint"><span class="chip ok dot">Do cadastro de pessoas</span>'+(F.pext.tipo?' '+esc(F.pext.tipo):'')+'</span>':'')+'</div><div class="field"><label for="vemp">Empresa</label><input id="vemp" data-bind="p.empresa" maxlength="60" value="'+esc(F.empresa)+'"></div></div>'+
   '<div class="grid2"><div class="field"><label for="vdoc">Documento (RG/CPF)</label><input id="vdoc" data-bind="p.doc" maxlength="20" inputmode="numeric" value="'+esc(F.doc)+'"><span class="hint">Gravado mascarado: <b id="vdocprev">'+esc(F.doc?P.maskDoc(F.doc):'—')+'</b></span></div><div class="field"><label for="vcr">Crachá entregue (nº)</label><input id="vcr" data-bind="p.cracha" maxlength="12" placeholder="Ex.: V-012" value="'+esc(F.cracha)+'"></div></div>'+
   '<div class="field"><span class="lbl">Quem recebe (anfitrião)</span><div id="anfbox"></div></div>'+
   '<div class="field"><label for="vmot">Motivo</label><input id="vmot" data-bind="p.motivo" maxlength="120" placeholder="Reunião, manutenção, entrega…" value="'+esc(F.motivo)+'"></div>'+
+  (cad&&!F.pext?'<label class="lchk" style="margin:0 0 12px"><input type="checkbox" data-bind="p.salvarCad"'+(F.salvarCad?' checked':'')+'>Salvar no cadastro de pessoas para as próximas visitas</label>':'')+
   '<button class="btn primary block" id="pgo-v" type="button">'+icon('in')+'Registrar entrada</button>';
  $('#vdoc').addEventListener('input',e=>{$('#vdocprev').textContent=e.target.value?P.maskDoc(e.target.value):'—';});
+ if(cad)sugestoesPessoa();
  drawAnf();}
+/* sugestões do cadastro de pessoas externas (quem já veio não precisa ser digitado de novo) */
+function sugestoesPessoa(){const F=ST.f.p,inp=$('#vnome'),menu=$('#vnpick .menu');if(!inp||!menu)return;let res=[];
+ const show=async()=>{if(F.pext&&inp.value!==F.pext.nome){F.pext=null;}const q=inp.value.trim();if(q.length<2){menu.hidden=true;return;}
+  let lista=[];try{lista=await P.pessoasExt();}catch(e){menu.hidden=true;return;}
+  res=P.buscaPessoaExt(lista,q);if(!res.length){menu.hidden=true;return;}
+  menu.hidden=false;menu.innerHTML=res.map((x,i)=>'<button type="button" data-pe="'+i+'"><b>'+esc(x.nome)+'</b><div class="meta">'+esc([x.tipo,x.empresa,x.doc&&P.maskDoc(x.doc)].filter(Boolean).join(' · ')||'cadastro de pessoas')+'</div></button>').join('');};
+ inp.addEventListener('input',show);
+ inp.addEventListener('keydown',e=>{if(e.key==='Escape')menu.hidden=true;});
+ inp.addEventListener('blur',()=>setTimeout(()=>{menu.hidden=true;},200));
+ menu.onclick=e=>{const b=e.target.closest('[data-pe]');if(!b)return;const x=res[+b.dataset.pe];
+  Object.assign(F,{pext:x,nome:x.nome,empresa:x.empresa||F.empresa,doc:x.doc?P.maskDoc(x.doc):F.doc});
+  if(['Visitante','Prestador','Terceiro'].includes(x.tipo)&&x.tipo!==F.tipo){F.tipo=x.tipo;$$('#ptipo [data-t]').forEach(t=>t.setAttribute('aria-pressed',String(t.dataset.t===x.tipo)));}
+  drawPForm();setTimeout(()=>$('#vcr')?.focus(),0);};}
 function drawAnf(){const F=ST.f.p;const box=$('#anfbox');if(!box)return;
  picker(box,{value:F.anf,label:'Anfitrião',placeholder:'Buscar no diretório (nome, matrícula ou depto)…',onPick:c=>{F.anf=c;drawAnf();},onClear:()=>{F.anf=null;drawAnf();setTimeout(()=>$('#anfbox input')?.focus(),0);}});}
 function drawColab(){const F=ST.f.p,box=$('#colabbox');if(!box)return;const c=F.colab;
@@ -248,7 +277,10 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
   if(r.dup){b.disabled=false;const ch=await dialog({title:'Já existe entrada aberta com este nome',html:'<p><b>'+esc(r.dup.NOME)+'</b>'+(r.dup.EMPRESA?' · '+esc(r.dup.EMPRESA):'')+' entrou '+quando(r.dup.ENTRADA)+' e não tem saída registrada.</p><p>Se for a mesma pessoa, registre a saída da entrada anterior. Se for outra pessoa com o mesmo nome, confirme a nova entrada.</p>',
     actions:[{label:'Cancelar',value:null},{label:'Saída da anterior',value:'s'},{label:'É outra pessoa',kind:'primary',value:'n'}]});
    if(ch==='s'){doSaidaPessoa(r.dup);return;}if(ch!=='n')return;b.disabled=true;r=await P.entradaPessoa(fields,{permitirHomonimo:true});}
-  toast('Entrada registrada: '+nome);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null});drawPForm();refresh();}
+  let msg='Entrada registrada: '+nome,kind='ok';
+  if(!F.pext&&F.salvarCad&&P.podeCadastrarPessoa()){try{const c=await P.salvarPessoaExt({nome,tipo:F.tipo,empresa:F.empresa,doc:F.doc});if(c.novo)msg+=' · salvo no cadastro de pessoas';}
+   catch(e){msg+='. Não foi possível salvar no cadastro de pessoas'+(e.status===403?' (sem permissão — avise a TI)':'')+'.';kind='warn';}}
+  toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true});drawPForm();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
 /* ================= VEÍCULOS ================= */
 VIEWS.veiculos={
@@ -304,28 +336,37 @@ VIEWS.mercadorias={
  mount(){const F=ST.f.m;
   page('Mercadorias','Encomendas recebidas na portaria e retirada.',
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('box')+'<h2>Registrar chegada</h2></div>'+
-   '<div class="field"><span class="lbl">Destinatário *</span><div id="destbox"></div></div>'+
+   '<div class="field"><span class="lbl">Destinatário *</span><div class="seg" id="mdm" style="margin-bottom:8px"><button type="button" data-dm="pessoa" aria-pressed="'+(F.modo==='pessoa')+'">Pessoa</button><button type="button" data-dm="setor" aria-pressed="'+(F.modo==='setor')+'">Setor / Polystell</button></div><div id="destbox"></div></div>'+
    '<div class="grid2"><div class="field"><label for="mse">Setor</label><input id="mse" data-bind="m.setor" maxlength="50" value="'+esc(F.setor)+'"></div><div class="field"><label for="mvo">Volumes *</label><input id="mvo" data-bind="m.vol" type="number" min="1" max="999" step="1" inputmode="numeric" value="'+esc(F.vol)+'"></div></div>'+
    '<div class="grid2"><div class="field"><label for="mre">Remetente</label><input id="mre" data-bind="m.rem" maxlength="60" placeholder="Loja / fornecedor" value="'+esc(F.rem)+'"></div><div class="field"><label for="mde">Descrição</label><input id="mde" data-bind="m.desc" maxlength="80" placeholder="Caixa, envelope…" value="'+esc(F.desc)+'"></div></div>'+
    '<button class="btn primary block" id="mgo" type="button">'+icon('check')+'Registrar chegada</button>'+(P.on('AVISO_MERCADORIA')?'<div class="note">O aviso ao destinatário no WhatsApp é enviado pela automação, quando estiver ativa.</div>':'')+'</div>'+
    '<div class="panel"><div class="panel-h">'+icon('box')+'<h2>Aguardando retirada</h2><span class="sp"><span class="count" id="mcount"></span></span></div><div class="rows" id="mlist"></div></div></div>');
   bindInputs();drawDest();
-  SHELL.page.onclick=e=>{if(e.target.closest('#mgo'))regMerc();const r=e.target.closest('[data-ret]');if(r)entregar(r.dataset.ret);};},
+  SHELL.page.onclick=e=>{const dm=e.target.closest('[data-dm]');if(dm){F.modo=dm.dataset.dm;F.dest=null;F.setorDest='';$$('#mdm [data-dm]').forEach(x=>x.setAttribute('aria-pressed',String(x===dm)));drawDest();return;}
+   if(e.target.closest('#mgo'))regMerc();const r=e.target.closest('[data-ret]');if(r)entregar(r.dataset.ret);};},
  update(){banners();if(!$('#mlist'))return;const pd=new Set(pend().m.map(m=>m.id));const rows=ST.d.merc.slice().sort((a,b)=>new Date(a.CHEGADA)-new Date(b.CHEGADA));$('#mcount').textContent=rows.length;
   $('#mlist').innerHTML=rows.length?rows.map(m=>{const old=pd.has(m.id);return '<div class="row'+(old?' flag':'')+'"><div class="main"><div class="t">'+esc(m.DESTINATARIO_NOME||'—')+'</div><div class="meta">'+esc([m.DESCRICAO,m.REMETENTE,m.VOLUMES&&m.VOLUMES+' vol.','chegou '+quando(m.CHEGADA)].filter(Boolean).join(' · '))+'</div>'+(old?'<div class="tags"><span class="chip warn dot">Aguardando há '+fmt.dur(idade(m.CHEGADA))+'</span></div>':'')+'</div><div class="act"><button class="btn sm primary" data-ret="'+m.id+'">Entregar</button></div></div>';}).join(''):'<div class="empty">Nada aguardando retirada.</div>';}
 };
+const SETOR_GERAL='Polystell (geral)';
+const destSetorial=m=>!String(m.DESTINATARIO_MATRICULA||'').trim()&&(/^Setor: /.test(m.DESTINATARIO_NOME||'')||m.DESTINATARIO_NOME===SETOR_GERAL);
 function drawDest(){const F=ST.f.m;const box=$('#destbox');if(!box)return;
+ if(F.modo==='setor'){box.innerHTML='<select id="msetd" aria-label="Setor de destino"><option value="">— escolha o setor —</option><option value="__geral"'+(F.setorDest==='__geral'?' selected':'')+'>'+SETOR_GERAL+'</option></select><span class="hint">Para encomendas da empresa ou de um setor, sem uma pessoa específica. Na retirada, a portaria registra quem levou.</span>';
+  P.dir().then(lista=>{const sel=$('#msetd');if(!sel)return;[...new Set(lista.map(c=>c.dep).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='Setor: '+d;if(F.setorDest===d)o.selected=true;sel.appendChild(o);});}).catch(()=>{});
+  $('#msetd').onchange=e=>{F.setorDest=e.target.value;if(F.setorDest&&F.setorDest!=='__geral'){F.setor=F.setorDest;const s=$('#mse');if(s)s.value=F.setor;}};return;}
  picker(box,{value:F.dest,label:'Destinatário',placeholder:'Buscar no diretório…',onPick:c=>{F.dest=c;if(!F.setor&&c.dep){F.setor=c.dep;const s=$('#mse');if(s)s.value=c.dep;}drawDest();},onClear:()=>{F.dest=null;drawDest();}});}
 async function regMerc(){if(needTurno())return;const F=ST.f.m;
- if(!F.dest){toast('Selecione o destinatário no diretório.','err');$('#destbox input')?.focus();return;}
+ const setorial=F.modo==='setor';
+ if(setorial&&!F.setorDest){toast('Escolha o setor de destino (ou "Polystell (geral)").','err');$('#msetd')?.focus();return;}
+ if(!setorial&&!F.dest){toast('Selecione o destinatário no diretório — ou use "Setor / Polystell" para encomendas da empresa.','err');$('#destbox input')?.focus();return;}
+ const destNome=setorial?(F.setorDest==='__geral'?SETOR_GERAL:'Setor: '+F.setorDest):F.dest.nome;
  const vol=Number(F.vol);const vi=$('#mvo');if(!Number.isInteger(vol)||vol<1||vol>999){vi.setAttribute('aria-invalid','true');vi.focus();toast('Volumes: informe um número inteiro de 1 a 999.','err');return;}vi.removeAttribute('aria-invalid');
  const b=$('#mgo');b.disabled=true;
- try{await P.add('merc',{DESTINATARIO_NOME:F.dest.nome,DESTINATARIO_MATRICULA:F.dest.mat||'',SETOR:F.setor.trim(),REMETENTE:F.rem.trim(),DESCRICAO:F.desc.trim(),VOLUMES:vol,CHEGADA:new Date().toISOString(),STATUS:'Aguardando retirada',RETIRADA_PROPRIA:true,PORTEIRO_RECEB:porteiro()});
-  toast('Mercadoria registrada para '+F.dest.nome);Object.assign(F,{dest:null,setor:'',vol:'1',rem:'',desc:''});if(ST.view==='mercadorias'){VIEWS.mercadorias.mount();VIEWS.mercadorias.update();}refresh();}
+ try{await P.add('merc',{DESTINATARIO_NOME:destNome,DESTINATARIO_MATRICULA:setorial?'':(F.dest.mat||''),SETOR:F.setor.trim(),REMETENTE:F.rem.trim(),DESCRICAO:F.desc.trim(),VOLUMES:vol,CHEGADA:new Date().toISOString(),STATUS:'Aguardando retirada',RETIRADA_PROPRIA:!setorial,PORTEIRO_RECEB:porteiro()});
+  toast('Mercadoria registrada para '+destNome);Object.assign(F,{dest:null,setor:'',vol:'1',rem:'',desc:'',setorDest:''});if(ST.view==='mercadorias'){VIEWS.mercadorias.mount();VIEWS.mercadorias.update();}refresh();}
  catch(e){writeErr(e);}finally{const x=$('#mgo');if(x)x.disabled=false;}}
-function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id);if(!m)return;let outro=false;
- dialog({title:'Entregar mercadoria',html:'<p><b>'+esc(m.DESTINATARIO_NOME||'—')+'</b> · '+esc([m.DESCRICAO,m.REMETENTE].filter(Boolean).join(' · ')||'—')+'</p><div class="seg" id="dq" style="margin-bottom:14px"><button type="button" data-q="0" aria-pressed="true">O próprio destinatário</button><button type="button" data-q="1" aria-pressed="false">Outra pessoa retira</button></div>'+
-  '<div id="dt" hidden><div class="field"><label for="drp">Quem está retirando *</label><input id="drp" maxlength="60"></div><div class="field"><label for="dri">Matrícula ou documento</label><input id="dri" maxlength="20"><span class="hint">Documento é gravado mascarado.</span></div></div>',
+function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id);if(!m)return;const setorial=destSetorial(m);let outro=setorial;
+ dialog({title:'Entregar mercadoria',html:'<p><b>'+esc(m.DESTINATARIO_NOME||'—')+'</b> · '+esc([m.DESCRICAO,m.REMETENTE].filter(Boolean).join(' · ')||'—')+'</p>'+(setorial?'<div class="note">Encomenda da empresa/setor: registre quem está levando.</div>':'<div class="seg" id="dq" style="margin-bottom:14px"><button type="button" data-q="0" aria-pressed="true">O próprio destinatário</button><button type="button" data-q="1" aria-pressed="false">Outra pessoa retira</button></div>')+
+  '<div id="dt"'+(setorial?'':' hidden')+'><div class="field"><label for="drp">Quem está retirando *</label><input id="drp" maxlength="60"></div><div class="field"><label for="dri">Matrícula ou documento</label><input id="dri" maxlength="20"><span class="hint">Documento é gravado mascarado.</span></div></div>',
   actions:[{label:'Cancelar',value:null},{label:'Confirmar entrega',kind:'ok',onClick:async d=>{
    const por=outro?d.querySelector('#drp').value.trim():'';if(outro&&!por){d.querySelector('#drp').setAttribute('aria-invalid','true');toast('Informe quem está retirando.','err');return false;}
    try{const at=await P.get('merc',id);if(val(at.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue (outro registro).','warn');refresh();return true;}
@@ -356,13 +397,15 @@ VIEWS.turno={
   '<div class="cols"><div class="panel"><div class="panel-h">'+icon('swap')+'<h2>Plantão atual</h2></div><div id="tcur"></div></div><div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Últimos turnos</h2></div><div class="rows" id="thist"><div class="empty">Carregando…</div></div></div></div>');
   P.ultimosTurnos(12).then(ts=>{const el=$('#thist');if(!el)return;el.innerHTML=ts.length?ts.map(t=>'<div class="row"><div class="main"><div class="t">'+esc((t.DE?t.DE+' → ':'')+t.PARA)+'</div><div class="meta">'+esc(fmt.dmhm(t.CIENCIA_EM))+(t.RECADOS?' · recados: '+esc(t.RECADOS):'')+'</div></div></div>').join(''):'<div class="empty">Nenhum turno registrado ainda.</div>';}).catch(e=>{const el=$('#thist');if(el)el.innerHTML='<div class="empty">'+esc(e.message)+'</div>';});},
  update(){banners();const el=$('#tcur');if(!el)return;
-  el.innerHTML=tAtivo()?'<dl class="kv"><dt>Porteiro</dt><dd>'+esc(ST.turno.PARA)+'</dd><dt>Desde</dt><dd>'+esc(fmt.dmhm(ST.turno.CIENCIA_EM))+'</dd>'+(ST.turno.RECADOS?'<dt>Recados recebidos</dt><dd>'+esc(ST.turno.RECADOS)+'</dd>':'')+'</dl><button class="btn primary" data-turno>'+icon('swap')+'Passar o turno</button>'
-   :'<p class="note">Nenhum turno aberto'+(ST.turno?' (o último foi '+esc(fmt.dmhm(ST.turno.CIENCIA_EM))+', com '+esc(ST.turno.PARA)+')':'')+'.</p><button class="btn primary" data-turno>'+icon('swap')+'Abrir turno</button>';}
+  const hs=P.horarios().map(m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  el.innerHTML=tAtivo()?'<dl class="kv"><dt>Porteiro</dt><dd>'+esc(ST.turno.PARA)+'</dd><dt>Desde</dt><dd>'+esc(fmt.dmhm(ST.turno.CIENCIA_EM))+'</dd><dt>Troca prevista</dt><dd>'+esc(fmt.dmhm(P.fimDoTurno(ST.turno)))+'</dd>'+(ST.turno.RECADOS?'<dt>Recados recebidos</dt><dd>'+esc(ST.turno.RECADOS)+'</dd>':'')+'</dl><button class="btn primary" data-turno>'+icon('swap')+'Passar o turno</button>'
+   :'<p class="note">Nenhum turno aberto'+(ST.turno?' (o último foi '+esc(fmt.dmhm(ST.turno.CIENCIA_EM))+', com '+esc(ST.turno.PARA)+')':'')+'.</p><button class="btn primary" data-turno>'+icon('swap')+'Abrir turno</button>';
+  el.insertAdjacentHTML('beforeend','<div class="note">'+(hs.length?'Troca de turno às <b>'+esc(hs.join(' e '))+'</b>. Na hora, o app abre a passagem de turno; depois de '+P.param('TURNO_TOLERANCIA')+' min sem passar, os registros pedem um turno novo.':'Turno vale 13 h corridas (horários de troca não configurados).')+'</div>');}
 };
-async function dlgTurno(){const ativos=P.porteiros.filter(p=>p.ativo);
+async function dlgTurno(opt={}){const auto=opt&&opt.auto instanceof Date?opt.auto:null;const ativos=P.porteiros.filter(p=>p.ativo);
  if(!ativos.length){dialog({title:'Nenhum porteiro cadastrado',html:'<p>O cadastro de porteiros é feito pela TI em <b>Segurança (TI)</b>. Sem porteiro cadastrado, o turno não pode ser aberto.</p>',actions:ST.isTI?[{label:'Fechar',value:null},{label:'Ir para Segurança (TI)',kind:'primary',value:'go'}]:[{label:'Fechar',value:null}]}).then(v=>{if(v==='go')go('seguranca');});return;}
  const de=tAtivo()?ST.turno.PARA:'';const resumo=P.resumoTurno(ST.d);
- await dialog({title:tAtivo()?'Passagem de turno':'Abrir turno',
+ await dialog({title:auto?'Hora da troca de turno — '+fmt.hm(auto):tAtivo()?'Passagem de turno':'Abrir turno',
   html:(de?'<dl class="kv"><dt>Sai do posto</dt><dd>'+esc(de)+'</dd></dl>':'')+'<div class="field"><label for="tpara">'+(de?'Assume o posto *':'Porteiro de plantão *')+'</label><select id="tpara"><option value="">— selecione —</option>'+ativos.filter(p=>p.nome!==de).map(p=>'<option>'+esc(p.nome)+'</option>').join('')+'</select></div>'+
    '<span class="lbl">Situação do posto (registrada automaticamente)</span><pre class="resumo">'+esc(resumo)+'</pre>'+
    (de?'<div class="field"><label for="trec">Recados para o próximo turno</label><textarea id="trec" maxlength="1000" placeholder="Pendências, avisos, chaves, rondas…"></textarea></div>':''),
@@ -375,11 +418,12 @@ VIEWS.seguranca={
    '<div class="cols"><div><div class="panel"><div class="panel-h">'+icon('gear')+'<h2>Funções</h2></div><div id="sfun"></div></div><div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Prazos e alertas</h2></div><div id="spz"></div><button class="btn primary" id="spzsave" type="button" style="margin-top:12px">Salvar prazos</button></div></div>'+
    '<div class="panel"><div class="panel-h">'+icon('user')+'<h2>Porteiros</h2><span class="sp"><span class="count" id="spc"></span></span></div><div class="grid2"><div class="field"><label for="snm">Nome do porteiro *</label><input id="snm" maxlength="60"></div><div class="field"><label for="sob">Empresa / observação</label><input id="sob" maxlength="80"></div></div><button class="btn primary" id="sadd" type="button">'+icon('plus')+'Cadastrar porteiro</button><div class="rows" id="spl" style="margin-top:14px"></div></div></div>'+
    '<div class="note">As alterações ficam em 00_Parametros_Apps (APP = Portaria) e valem para o computador e o celular na próxima atualização.</div>');
-  SHELL.page.oninput=e=>{const i=e.target.closest('[data-pz]');if(i)i.dataset.dirty='1';};
+  SHELL.page.oninput=e=>{const i=e.target.closest('[data-pz],[data-pzt]');if(i)i.dataset.dirty='1';};
   SHELL.page.onchange=async e=>{const sw=e.target.closest('[data-flag]');if(!sw)return;sw.disabled=true;
    try{await P.saveParam(sw.dataset.flag,sw.checked?'Sim':'Não');await P.loadParams();toast('Função '+(sw.checked?'ativada':'desativada')+'.');}catch(er){sw.checked=!sw.checked;writeErr(er);}finally{sw.disabled=false;}};
   SHELL.page.onclick=async e=>{
-   if(e.target.closest('#spzsave')){const b=e.target.closest('#spzsave');b.disabled=true;try{for(const i of $$('[data-pz]')){const n=Number(i.value);if(!(n>0)){i.setAttribute('aria-invalid','true');throw new Error('Prazos devem ser números maiores que zero.');}i.removeAttribute('aria-invalid');if(n!==P.param(i.dataset.pz))await P.saveParam(i.dataset.pz,n);}await P.loadParams();this.drawConfig();toast('Prazos salvos.');chrome();}catch(er){writeErr(er);}finally{b.disabled=false;}}
+   if(e.target.closest('#spzsave')){const b=e.target.closest('#spzsave');b.disabled=true;try{for(const i of $$('[data-pz]')){const n=Number(i.value);if(!(n>0)){i.setAttribute('aria-invalid','true');throw new Error('Prazos devem ser números maiores que zero.');}i.removeAttribute('aria-invalid');if(n!==P.param(i.dataset.pz))await P.saveParam(i.dataset.pz,n);}
+    for(const i of $$('[data-pzt]')){const v=i.value.trim();if(i.dataset.pzt==='TURNO_HORARIOS'&&v!=='-'&&!/^([01]\d|2[0-3]):[0-5]\d(\s*,\s*([01]\d|2[0-3]):[0-5]\d)*$/.test(v)){i.setAttribute('aria-invalid','true');throw new Error('Horários no formato 06:00,18:00.');}i.removeAttribute('aria-invalid');if(v!==String(P.param(i.dataset.pzt)))await P.saveParam(i.dataset.pzt,v);}await P.loadParams();this.drawConfig();toast('Prazos salvos.');chrome();}catch(er){writeErr(er);}finally{b.disabled=false;}}
    if(e.target.closest('#sadd')){const n=$('#snm').value.trim();if(n.length<3){$('#snm').setAttribute('aria-invalid','true');toast('Informe o nome completo do porteiro.','err');return;}
     if(P.porteiros.some(p=>norm(p.nome)===norm(n))){toast('Este porteiro já está cadastrado.','warn');return;}
     const b=$('#sadd');b.disabled=true;try{await P.addPorteiro(n,$('#sob').value.trim());await P.loadParams();$('#snm').value='';$('#sob').value='';toast('Porteiro cadastrado.');this.update();}catch(er){writeErr(er);}finally{b.disabled=false;}}
@@ -388,11 +432,12 @@ VIEWS.seguranca={
  drawConfig(){if(!$('#sfun'))return;
   const f2='<span class="chip warn" title="Depende de fluxo do Power Automate ainda não implantado">Fase 2 — fluxo ainda não implantado</span>';
   $('#sfun').innerHTML=P.PARAM_DEF.filter(p=>p.t==='bool').map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div><label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label></div>').join('');
-  $('#spz').innerHTML=P.PARAM_DEF.filter(p=>p.t==='num').map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div><input type="number" min="1" step="1" data-pz="'+p.k+'" value="'+esc(P.param(p.k))+'" aria-label="'+esc(p.d)+'"></div>').join('');},
+  $('#spz').innerHTML=P.PARAM_DEF.filter(p=>p.t==='num'||p.t==='text').map(p=>'<div class="setrow"><div class="main"><b>'+esc(p.d)+'</b><span>'+esc(p.k)+'</span>'+(p.fase2?'<div style="margin-top:5px">'+f2+'</div>':'')+'</div>'+(p.t==='text'?'<input type="text" style="width:150px" data-pzt="'+p.k+'" value="'+esc(P.param(p.k))+'" aria-label="'+esc(p.d)+'">':'<input type="number" min="1" step="1" data-pz="'+p.k+'" value="'+esc(P.param(p.k))+'" aria-label="'+esc(p.d)+'">')+'</div>').join('');},
  update(){banners();if(!$('#spl'))return;
   /* funções: refletem o servidor (gravam na hora, não têm rascunho); prazos: só os não editados */
   $$('[data-flag]').forEach(i=>{if(!i.disabled)i.checked=P.on(i.dataset.flag);});
   $$('[data-pz]').forEach(i=>{if(!i.dataset.dirty&&document.activeElement!==i)i.value=P.param(i.dataset.pz);});
+  $$('[data-pzt]').forEach(i=>{if(!i.dataset.dirty&&document.activeElement!==i)i.value=P.param(i.dataset.pzt);});
   const ps=P.porteiros;$('#spc').textContent=ps.filter(p=>p.ativo).length;
   $('#spl').innerHTML=ps.length?ps.map(p=>'<div class="row"><div class="main"><div class="t">'+esc(p.nome)+'</div><div class="meta">'+esc(p.obs||'—')+'</div></div><div class="act"><span class="chip dot '+(p.ativo?'ok':'')+'">'+(p.ativo?'Ativo':'Inativo')+'</span><button class="btn sm" data-pt="'+p.id+'" data-on="'+(p.ativo?'0':'1')+'">'+(p.ativo?'Desativar':'Reativar')+'</button></div></div>').join(''):'<div class="empty">Nenhum porteiro cadastrado.</div>';}
 };
@@ -424,6 +469,7 @@ VIEWS.logistica={
   SHELL.page.onclick=e=>{const F=ST.f.l;
    const t=e.target.closest('[data-lt]');if(t){if(!F.id){F.tipo=t.dataset.lt;this.drawForm();}return;}
    if(e.target.closest('#lgo')){salvarPrevisao();return;}
+   if(e.target.closest('#lnt')){dlgTransportadora();return;}
    if(e.target.closest('#lnew')){ST.f.l=LFORM0();this.drawForm();return;}
    const ed=e.target.closest('[data-led]');if(ed){editarPrevisao(ed.dataset.led);return;}
    const cn=e.target.closest('[data-lcan]');if(cn)cancelarPrevisao(cn.dataset.lcan);};},
@@ -431,7 +477,7 @@ VIEWS.logistica={
   el.innerHTML='<div class="panel-h">'+icon(F.id?'refresh':'plus')+'<h2>'+(F.id?'Editar previsão':'Nova previsão')+'</h2></div>'+
    '<div class="seg" id="ltipo" style="margin-bottom:14px">'+['Coleta','Entrega'].map(x=>'<button type="button" data-lt="'+x+'" aria-pressed="'+(F.tipo===x)+'"'+(F.id&&F.tipo!==x?' disabled':'')+'>'+x+'</button>').join('')+'</div>'+
    '<div class="grid2"><div class="field"><label for="ldia">Data *</label><input id="ldia" type="date" min="'+todayKey()+'" data-bind="l.dia" value="'+esc(F.dia)+'"></div><div class="field"><label for="lhora">Hora prevista</label><input id="lhora" type="time" data-bind="l.hora" value="'+esc(F.hora)+'"></div></div>'+
-   (col?'<div class="field"><label for="ltr">Transportadora *</label>'+(ts.length?'<select id="ltr" data-bind="l.transp"><option value="">— escolha no cadastro —</option>'+ts.map(x=>'<option value="'+x.id+'"'+(String(F.transp)===x.id?' selected':'')+'>'+esc(x.nome)+(x.cnpj?' · '+esc(x.cnpj):'')+'</option>').join('')+'</select><span class="hint">Não está na lista? Cadastre em 00_Cadastro_Transportador, com razão social e CNPJ conferidos.</span>':'<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Nenhuma transportadora no cadastro 00_Cadastro_Transportador.</span></div>')+'</div>'
+   (col?'<div class="field"><div class="lrot"><label for="ltr">Transportadora *</label><button class="btn sm" id="lnt" type="button">'+icon('plus')+'Nova transportadora</button></div>'+(ts.length?'<select id="ltr" data-bind="l.transp"><option value="">— escolha no cadastro —</option>'+ts.map(x=>'<option value="'+x.id+'"'+(String(F.transp)===x.id?' selected':'')+'>'+esc(x.nome)+(x.cnpj?' · '+esc(x.cnpj):'')+'</option>').join('')+'</select><span class="hint">Não está na lista? Cadastre em 00_Cadastro_Transportador, com razão social e CNPJ conferidos.</span>':'<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Nenhuma transportadora no cadastro 00_Cadastro_Transportador.</span></div>')+'</div>'
     :'<div class="field"><label for="lrem">Remetente (quem envia) *</label><input id="lrem" maxlength="80" data-bind="l.rem" placeholder="Fornecedor, cliente…" value="'+esc(F.rem)+'"><span class="hint">Na entrega a transportadora costuma ser desconhecida — informe quem envia.</span></div>')+
    '<div class="grid2"><div class="field"><label for="lnf">Nota fiscal</label><input id="lnf" maxlength="20" data-bind="l.nf" value="'+esc(F.nf)+'"></div><div class="field"><label for="lord">'+(col?'Ordem de carregamento':'Pedido / ordem')+'</label><input id="lord" maxlength="30" data-bind="l.ordem" value="'+esc(F.ordem)+'"></div></div>'+
    '<div class="grid2"><div class="field"><label for="lpl">Placa (se souber)</label><input id="lpl" maxlength="8" style="text-transform:uppercase" data-bind="l.placa" placeholder="ABC1D23" value="'+esc(F.placa)+'"></div><div class="field"><label for="lmo">Motorista (se souber)</label><input id="lmo" maxlength="60" data-bind="l.mot" value="'+esc(F.mot)+'"></div></div>'+
@@ -446,6 +492,27 @@ VIEWS.logistica={
     '<div class="act">'+(pode?'<button class="btn sm" data-led="'+p.id+'">Editar</button><button class="btn sm" data-lcan="'+p.id+'">Cancelar</button>':'')+'</div></div>';});
   $('#llist').innerHTML=rows.length?h:'<div class="empty">Nenhuma coleta ou entrega prevista entre ontem e os próximos 14 dias.</div>';}
 };
+function dlgTransportadora(){
+ dialog({title:'Nova transportadora',html:'<div class="field"><label for="tcn">CNPJ *</label><div class="lrot2"><input id="tcn" maxlength="18" inputmode="numeric" placeholder="00.000.000/0000-00"><button class="btn sm" id="tcq" type="button">'+icon('search')+'Consultar na Receita</button></div><span class="hint" id="tst">O CNPJ é conferido (dígitos) e a razão social vem da Receita, quando disponível.</span></div>'+
+  '<div class="field"><label for="trz">Razão social *</label><input id="trz" maxlength="120"></div>'+
+  '<div class="grid2"><div class="field"><label for="ttl">Telefone</label><input id="ttl" maxlength="20" inputmode="tel"></div><div class="field"><label for="tct">Contato</label><input id="tct" maxlength="60"></div></div>'+
+  '<div class="field"><label for="tem">E-mail</label><input id="tem" type="email" maxlength="80"></div>',
+  actions:[{label:'Cancelar',value:null},{label:'Cadastrar',kind:'primary',onClick:async d=>{
+   const cn=d.querySelector('#tcn'),rz=d.querySelector('#trz');
+   if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');toast('CNPJ inválido — confira os números.','err');return false;}cn.removeAttribute('aria-invalid');
+   if(rz.value.trim().length<3){rz.setAttribute('aria-invalid','true');toast('Informe a razão social.','err');return false;}
+   try{const r=await P.salvarTransportadora({razao:rz.value,cnpj:cn.value,tel:d.querySelector('#ttl').value,contato:d.querySelector('#tct').value,email:d.querySelector('#tem').value});
+    const t=r.ja||r.novo;ST.f.l.transp=String(t.id);
+    toast(r.ja?'Esta transportadora já estava cadastrada ('+r.ja.nome+') — selecionada.':'Transportadora cadastrada e selecionada.',r.ja?'warn':'ok');VIEWS.logistica.drawForm();return true;}
+   catch(e){if(e.code==='validacao'){toast(e.message,'err');return false;}if(e.status===403){toast('Sem permissão para cadastrar transportadoras (00_Cadastro_Transportador). Peça à TI.','err');return false;}writeErr(e);return false;}}}]});
+ setTimeout(()=>{const cn=$('#tcn'),bq=$('#tcq'),st=$('#tst');if(!cn)return;
+  const consulta=async()=>{if(!P.cnpjValido(cn.value)){cn.setAttribute('aria-invalid','true');st.textContent='CNPJ inválido — confira os números.';return;}cn.removeAttribute('aria-invalid');cn.value=P.fmtCnpj(cn.value);
+   bq.disabled=true;st.textContent='Consultando a Receita…';const r=await P.consultaCnpj(cn.value);bq.disabled=false;
+   if(r&&r.razao){$('#trz').value=r.razao;if(r.tel&&!$('#ttl').value)$('#ttl').value=r.tel;if(r.email&&!$('#tem').value)$('#tem').value=r.email;
+    st.innerHTML=(/ativa/i.test(r.situacao)?'<span class="chip ok dot">Receita: '+esc(r.situacao)+'</span>':'<span class="chip err dot">Receita: '+esc(r.situacao||'situação não informada')+'</span> Confira antes de cadastrar.')+(r.fantasia?' · '+esc(r.fantasia):'');}
+   else if(r&&r.naoEncontrado)st.innerHTML='<span class="chip err dot">CNPJ não encontrado na Receita</span> Confira os números.';
+   else st.textContent='Consulta à Receita indisponível agora — confira no cartão CNPJ e digite a razão social.';};
+  bq.onclick=consulta;cn.addEventListener('input',()=>{if(String(cn.value).replace(/\D/g,'').length===14)consulta();});},0);}
 async function salvarPrevisao(){const F=ST.f.l;
  const f={TIPO:F.tipo,dia:F.dia,HORA:F.hora,transp:F.transp,REMETENTE:F.rem,NF:F.nf,ORDEM:F.ordem,AREA:F.area,PLACA:F.placa,MOTORISTA:F.mot};
  const erro=P.validarPrev(f);if(erro){toast(erro,'err');return;}
@@ -513,6 +580,7 @@ function autorizarExpedicao(id){const v=ST.d.openV.find(x=>x.id===id);if(!v)retu
   await refresh();
   if(ST.posto&&!tAtivo())dlgTurno();
   setInterval(()=>{if(!document.hidden)refresh();},60000);
+  setInterval(()=>{const t=ST.turnoMarca,ok=tAtivo(),f=!!P.trocaPendente(ST.turno);if(t!==ok+'|'+f){ST.turnoMarca=ok+'|'+f;chrome();banners();}checaTroca();},20000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
  }catch(e){console.error(e);PS.screens.error('Não foi possível abrir o posto',e.message);}
 })();
