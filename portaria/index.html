@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.8">
+<link rel="stylesheet" href="/core/polystell.css?v=2.9">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -40,12 +40,34 @@
 .rtab tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 @media print{.ps-side,.ps-top,.ps-backdrop,.toolbar,.seg,#banners,.ps-pagehead p,.ps-sess,#ps-toast{display:none!important}.ps-main{margin:0!important}.ps-page{padding:0!important}.panel{border:0;padding:0}.rprintonly{display:block;margin-bottom:8px}}
 pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;border-radius:9px;padding:10px 12px;margin:0 0 12px;color:#44526a}
+.em-acionar{border:2px solid #f3c4c4;background:#fffafa}
+.em-big{width:100%;min-height:64px;font-size:18px;font-weight:800;letter-spacing:.3px}
+.em-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.em-chips button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-weight:600;font-size:14px;min-height:44px}
+.em-chips button[aria-pressed="true"]{background:#b42318;border-color:#b42318;color:#fff}
+.em-locais{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.em-locais button{border:1px solid var(--line);background:#f6f8fb;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;color:#44526a}
+.em-ativa{background:#b42318;color:#fff;border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.em-ativa h2{margin:0 0 4px;font-size:22px;line-height:1.2;color:#fff}
+.em-ativa p{margin:0;opacity:.92;font-size:14px}
+.em-ativa .sim{display:inline-block;background:#fff;color:#b42318;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:2px}
+.em-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.em-kpis div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.em-kpis b{display:block;font-size:26px;line-height:1.1}
+.em-kpis span{font-size:12.5px;color:var(--muted)}
+.em-kpis .falta b{color:#b42318}
+.em-kpis .ok b{color:var(--ok)}
+#elist .row.marcado{background:#f2fbf6}
+#elist .act .btn{min-height:44px;font-size:15px;padding:0 16px}
+.em-tel{display:flex;gap:6px;flex-wrap:wrap}
+.em-tel a{text-decoration:none}
+@media(max-width:560px){.em-kpis b{font-size:22px}.em-ativa h2{font-size:19px}}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.8"></script>
-<script src="comum.js?v=2.8"></script>
+<script src="/core/polystell.js?v=2.9"></script>
+<script src="comum.js?v=2.9"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -66,7 +88,7 @@ const ST={view:'painel',isTI:false,isExp:false,isRH:false,posto:true,log:false,r
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
     lv:{canc:false},
     r:{q:'',ft:'Todos',de:todayKey(),ate:todayKey(),tipo:'Todos',bq:''}}};
-const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_GUARITA='grp-portaria-guarita',GRUPO_RH='grp-portaria-rh';
+const GRUPO_TI='grp-plataforma-admin',GRUPO_EXP='grp-portaria-expedicao',GRUPO_GUARITA='grp-portaria-guarita',GRUPO_RH='grp-portaria-rh',GRUPO_BRIG='grp-portaria-brigada';
 /* a guarita é a conta da portaria (permissão direta) ou quem estiver no grupo da guarita */
 const CONTAS_POSTO=['portaria@polystell.com.br'];
 let SHELL=null,TRANSP={};
@@ -81,7 +103,7 @@ const NAV=()=>[
  {id:'ocorrencias',label:'Ocorrências',icon:'alert',section:'Operação',hidden:!ST.posto},
  {id:'historico',label:'Histórico do dia',icon:'clock',section:'Posto',hidden:!ST.posto},
  {id:'turno',label:'Turno',icon:'swap',section:'Posto',hidden:!ST.posto},
- {id:'emergencia',label:'Emergência',icon:'alert',section:'Posto',hidden:!(ST.posto&&P.temEmergencia())},
+ {id:'emergencia',label:'Emergência',icon:'alert',section:'Segurança',hidden:!ST.emerg},
  {id:'logistica',label:'Coletas e entregas',icon:'calendar',section:'Logística',hidden:!ST.log},
  {id:'autorizar',label:'Autorizar coletas',icon:'check',section:'Logística',hidden:!ST.log},
  {id:'presenca',label:'Na planta agora',icon:'users',section:'RH',hidden:!ST.rh},
@@ -89,8 +111,8 @@ const NAV=()=>[
  {id:'seguranca',label:'Segurança (TI)',icon:'gear',section:'Administração',hidden:!ST.isTI}];
 const VIEW_LOG=['logistica','autorizar'];
 const VIEW_RH=['presenca','consultas'];
-const podeVer=v=>v==='seguranca'?ST.isTI:VIEW_LOG.includes(v)?ST.log:VIEW_RH.includes(v)?ST.rh:ST.posto;
-const inicial=()=>ST.posto?'painel':ST.log?'logistica':'presenca';
+const podeVer=v=>v==='emergencia'?ST.emerg:v==='seguranca'?ST.isTI:VIEW_LOG.includes(v)?ST.log:VIEW_RH.includes(v)?ST.rh:ST.posto;
+const inicial=()=>ST.posto?'painel':ST.log?'logistica':ST.rh?'presenca':'emergencia';
 const TIPOS_P=['Colaborador','Diretoria','Visitante','Prestador','Terceiro'];
 const MODAIS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Outro'];
 const FILTROS={'Todos':null,'Colaboradores':['Colaborador','Diretoria'],'Visitantes':['Visitante'],'Prestadores':['Prestador'],'Terceiros':['Terceiro']};
@@ -116,7 +138,7 @@ async function doRefresh(){
  const plan=ST.posto?[['openP',P.abertosP],['openV',P.abertosV],['movVHoje',P.veicHoje],['movPHoje',P.pessoasHoje],['agenda',P.agendaHoje],['agendaRec',P.agendaRecente],['prev',P.prevHoje],['merc',P.mercAguardando],['ocor',P.ocorAbertas],['turno',P.turnoAtual],['params',P.loadParams]]
   :[...(ST.log?[['openV',P.abertosV],['movVHoje',P.veicHoje]]:[]),...(ST.rh?[['openP',P.abertosP],['movPHoje',P.pessoasHoje]]:[]),['params',P.loadParams]];
  if(ST.log)plan.push(['prevR',prevR]);
- if(ST.posto&&P.temEmergencia())plan.push(['emerg',P.emergenciaAtiva]);
+ if(ST.emerg)plan.push(['emerg',P.emergenciaAtiva]);
  const pendAntes=ST.sync.at?new Set(ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').map(v=>v.id)):new Set();
  const rs=await Promise.allSettled(plan.map(([,f])=>f()));const fails=[];
  rs.forEach((r,i)=>{const k=plan[i][0];if(r.status!=='fulfilled'){fails.push(r.reason);return;}if(k==='turno'){ST.turno=r.value.turno;}else if(k!=='params')ST.d[k]=r.value;});
@@ -129,28 +151,28 @@ async function doRefresh(){
  checaTroca();aposEmerg();
 }
 /* emergência: a guarita enxerga quem está dentro, então completa a lista de evacuação se quem acionou não pôde (brigadista) */
-async function aposEmerg(){const em=ST.d.emerg;if(!ST.posto||!em)return;
- if(!P.listaDe(em)&&!ST.enchendo){ST.enchendo=true;try{if(await P.preencherLista(em))ST.d.emerg=await P.emergenciaAtiva();}catch(e){console.warn('Lista de evacuação',e.message);}finally{ST.enchendo=false;}banners();}
- if(ST.emergVista===em.id)return;ST.emergVista=em.id;const d=$('#ps-dlg');if(d&&d.open)return;
+async function aposEmerg(){const em=ST.d.emerg;if(!ST.emerg||!em)return;
+ if(ST.posto&&!P.listaDe(em)&&!ST.enchendo){ST.enchendo=true;try{if(await P.preencherLista(em))ST.d.emerg=await P.emergenciaAtiva();}catch(e){console.warn('Lista de evacuação',e.message);}finally{ST.enchendo=false;}banners();}
+ if(ST.emergVista===em.id)return;if(ST.view==='emergencia'){ST.emergVista=em.id;return;}const d=$('#ps-dlg');if(d&&d.open)return;ST.emergVista=em.id;
  const sim=val(em.TIPO)==='Simulado';
  const ok=await dialog({title:sim?'Emergência SIMULADA acionada':'EMERGÊNCIA ACIONADA',html:'<div class="banner err">'+icon('alert')+'<span><b>'+esc(val(em.TIPO))+'</b> · '+esc(em.LOCAL||'')+' · '+fmt.hm(em.INICIO)+' · acionada por '+esc(em.ACIONADO_POR||'—')+'</span></div>'+(em.MENSAGEM?'<p>'+esc(em.MENSAGEM)+'</p>':'')+'<p>Abra a lista de evacuação para a chamada no ponto de encontro.</p>',
-  actions:[{label:'Agora não',value:false},{label:'Abrir emergência',kind:'danger solid',value:true}]});if(ok)location.assign('emergencia.html');}
-async function checaEmergencia(){if(!ST.posto||!P.temEmergencia()||running)return;try{const em=await P.emergenciaAtiva();const antes=ST.d.emerg;ST.d.emerg=em;
+  actions:[{label:'Agora não',value:false},{label:'Abrir emergência',kind:'danger solid',value:true}]});if(ok)go('emergencia');}
+async function checaEmergencia(){if(!ST.emerg||running||ST.view==='emergencia')return;try{const em=await P.emergenciaAtiva();const antes=ST.d.emerg;ST.d.emerg=em;
  if((antes&&antes.id)!==(em&&em.id)||(em&&!P.listaDe(antes)!==!P.listaDe(em))){banners();chrome();}aposEmerg();}catch(e){console.warn('Emergência',e.message);}}
 function chrome(){if(!SHELL)return;const pd=pend();
  const aguard=ST.d.openV.filter(v=>val(v.FINALIDADE)==='Coleta'&&val(v.AUT_EXPEDICAO)!=='Autorizado').length;
- SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length+pd.t.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length}});
+ SHELL.setCounts({pessoas:{n:ST.d.openP.length,alert:pd.p.length+pd.t.length>0},veiculos:{n:ST.d.openV.length,alert:pd.v.length>0},mercadorias:{n:ST.d.merc.length,alert:pd.m.length>0},ocorrencias:{n:ST.d.ocor.length},autorizar:{n:aguard,alert:aguard>0},presenca:{n:ST.d.openP.length},emergencia:{n:ST.d.emerg?1:0,alert:true}});
  if(ST.sync.err)SHELL.setSync('bad','Falha ao atualizar'+(ST.sync.at?' · dados de '+fmt.hm(ST.sync.at):''));
  else if(ST.sync.at)SHELL.setSync('ok','Atualizado às '+fmt.hm(ST.sync.at));
- if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>'+(ST.log?'Logística':'RH')+'</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>'+(ST.log&&ST.rh?'Expedição · RH':ST.log?'Expedição':'Consulta')+'</span></div>');return;}
+ if(!ST.posto){SHELL.setCtx('<div class="ps-ctx"><small>'+(ST.log?'Logística':ST.rh?'RH':'Brigada')+'</small><b>'+esc(PS.auth.account?.name||'')+'</b><span>'+(ST.log&&ST.rh?'Expedição · RH':ST.log?'Expedição':ST.rh?'Consulta':'Emergência')+'</span></div>');return;}
  SHELL.setCtx(tAtivo()?'<div class="ps-ctx"><small>Plantão</small><b>'+esc(ST.turno.PARA)+'</b><span>desde '+quando(ST.turno.CIENCIA_EM)+' · até '+fmt.hm(P.fimDoTurno(ST.turno))+'</span><button data-turno>Trocar turno</button></div>'
   :'<div class="ps-ctx"><small>Plantão</small><b>Nenhum turno aberto</b><button data-turno>Abrir turno</button></div>');}
 function banners(){const el=$('#banners');if(!el)return;let h='';
- const em=ST.posto&&ST.d.emerg;if(em){const sim=val(em.TIPO)==='Simulado';h+='<div class="banner err em-banner" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(sim?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · desde '+fmt.hm(em.INICIO)+'. '+(P.listaDe(em)?'Lista de evacuação pronta.':'Montando a lista de evacuação…')+'</span><a class="btn sm danger solid" href="emergencia.html">Abrir emergência</a></div>';}
+ const em=ST.emerg&&ST.view!=='emergencia'&&ST.d.emerg;if(em){const sim=val(em.TIPO)==='Simulado';h+='<div class="banner err em-banner" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(sim?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · desde '+fmt.hm(em.INICIO)+'. '+(P.listaDe(em)?'Lista de evacuação pronta.':'Montando a lista de evacuação…')+'</span><button class="btn sm danger solid" type="button" data-go="emergencia">Abrir emergência</button></div>';}
  if(ST.sync.err)h+='<div class="banner err">'+icon('cloudoff')+'<span><b>Os dados podem estar desatualizados.</b> '+esc(ST.sync.err)+'</span><button class="btn sm" data-refresh>'+icon('refresh')+'Tentar agora</button></div>';
- const fimT=ST.posto&&P.trocaPendente(ST.turno);
+ const fimT=ST.posto&&ST.view!=='emergencia'&&P.trocaPendente(ST.turno);
  if(fimT)h+='<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(fimT)+').</b> Passe o turno para o porteiro que assume o posto.</span><button class="btn sm primary" data-turno>Passar o turno</button></div>';
- if(ST.posto&&!tAtivo())h+='<div class="banner warn">'+icon('swap')+'<span><b>Nenhum turno aberto.</b> Abra o turno para registrar movimentos com o nome do porteiro.</span><button class="btn sm primary" data-turno>Abrir turno</button></div>';
+ if(ST.posto&&ST.view!=='emergencia'&&!tAtivo())h+='<div class="banner warn">'+icon('swap')+'<span><b>Nenhum turno aberto.</b> Abra o turno para registrar movimentos com o nome do porteiro.</span><button class="btn sm primary" data-turno>Abrir turno</button></div>';
  if(ST.d.trunc)h+='<div class="banner warn">'+icon('alert')+'<span>Algumas listas passaram do limite de leitura e não foram carregadas por completo. Avise a TI.</span></div>';
  el.innerHTML=h;}
 function needTurno(){if(tAtivo()||!ST.posto)return false;dlgTurno();return true;}
@@ -159,10 +181,10 @@ function writeErr(e){if(e.code==='session'){toast(e.message,'warn');return;}
 /* ---------------- navegação ---------------- */
 const VIEWS={};
 function page(title,sub,body,acts=''){SHELL.page.innerHTML='<div class="ps-pagehead"><div><h1>'+esc(title)+'</h1>'+(sub?'<p>'+esc(sub)+'</p>':'')+'</div>'+acts+'</div><div id="banners"></div>'+body;banners();}
-function go(v){if(v==='emergencia'){location.assign('emergencia.html');return;}if(!VIEWS[v]||!podeVer(v))v=inicial();ST.view=v;SHELL.setCurrent(v,TITLES[v]);SHELL.page.oninput=null;SHELL.page.onclick=null;SHELL.page.onchange=null;VIEWS[v].mount();VIEWS[v].update();SHELL.page.focus({preventScroll:true});window.scrollTo(0,0);}
+function go(v){if(!VIEWS[v]||!podeVer(v))v=inicial();clearTimeout(EM.timer);ST.view=v;SHELL.setCurrent(v,TITLES[v]);SHELL.page.oninput=null;SHELL.page.onclick=null;SHELL.page.onchange=null;VIEWS[v].mount();VIEWS[v].update();SHELL.page.focus({preventScroll:true});window.scrollTo(0,0);}
 function bindInputs(onLive){SHELL.page.oninput=e=>{const b=e.target.dataset.bind;if(!b)return;setPath(b,e.target.type==='checkbox'?e.target.checked:e.target.value);if(e.target.dataset.live&&onLive)onLive();};}
 /* na hora da troca, abre a passagem de turno sozinho (uma vez por horário, sem atropelar outra janela aberta) */
-function checaTroca(){if(!ST.posto||!SHELL)return;const fim=P.trocaPendente(ST.turno);if(!fim||ST.trocaAvisada===+fim)return;
+function checaTroca(){if(!ST.posto||!SHELL||ST.view==='emergencia')return;const fim=P.trocaPendente(ST.turno);if(!fim||ST.trocaAvisada===+fim)return;
  const d=$('#ps-dlg');if(d&&d.open)return;ST.trocaAvisada=+fim;banners();dlgTurno({auto:fim});}
 document.addEventListener('click',e=>{if(e.target.closest('[data-turno]'))dlgTurno();if(e.target.closest('[data-refresh]'))refresh();
  const k=e.target.closest('[data-go]');if(k)go(k.dataset.go);});
@@ -185,7 +207,7 @@ VIEWS.painel={
  mount(){page('Painel do posto','Visão do turno: quem está dentro, o que está previsto e o que precisa de atenção.',
   '<div class="kpis" id="kpis"></div><div class="cols"><div class="panel"><div class="panel-h">'+icon('calendar')+'<h2>Agenda de hoje</h2><span class="sp"><span class="count" id="agc"></span></span></div><div class="rows" id="agl"></div></div>'+
   '<div><div class="panel"><div class="panel-h">'+icon('truck')+'<h2>Coletas e entregas previstas</h2><span class="sp"><span class="count" id="pvc"></span></span></div><div class="rows" id="pvl"></div></div>'+
-  '<div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Pendências</h2><span class="sp"><span class="count" id="pdc"></span></span></div><div class="rows" id="pdl"></div></div></div></div>',P.temEmergencia()?'<a class="btn danger" href="emergencia.html">'+icon('alert')+'Emergência</a>':'');
+  '<div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Pendências</h2><span class="sp"><span class="count" id="pdc"></span></span></div><div class="rows" id="pdl"></div></div></div></div>',ST.emerg?'<button class="btn danger" type="button" data-go="emergencia">'+icon('alert')+'Emergência</button>':'');
   SHELL.page.onclick=e=>{const c=e.target.closest('[data-chegada]');if(c)chegada(c.dataset.chegada);const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);}};},
  update(){banners();if(!$('#kpis'))return;const pd=pend(),D=ST.d;
   const prevAg=D.agenda.filter(a=>['Agendado','Na portaria'].includes(val(a.STATUS))&&!P.abertoDoAgend(D.openP,a.id)).length;
@@ -518,6 +540,97 @@ VIEWS.seguranca={
   const ps=P.porteiros;$('#spc').textContent=ps.filter(p=>p.ativo).length;
   $('#spl').innerHTML=ps.length?ps.map(p=>'<div class="row"><div class="main"><div class="t">'+esc(p.nome)+'</div><div class="meta">'+esc(p.obs||'—')+'</div></div><div class="act"><span class="chip dot '+(p.ativo?'ok':'')+'">'+(p.ativo?'Ativo':'Inativo')+'</span><button class="btn sm" data-pt="'+p.id+'" data-on="'+(p.ativo?'0':'1')+'">'+(p.ativo?'Desativar':'Reativar')+'</button></div></div>').join(''):'<div class="empty">Nenhum porteiro cadastrado.</div>';}
 };
+/* ================= EMERGÊNCIA (guarita, TI e Brigada) =================
+   Acionar grava em 09_Emergencias (uma ativa por vez, ATIVA_CHAVE exclusiva); o fluxo do
+   Power Automate avisa brigadistas e o grupo da Brigada no WhatsApp (a chave da Evolution API
+   fica só no fluxo). A lista de evacuação é o instantâneo de quem estava dentro; a chamada no
+   ponto de encontro é compartilhada (09_Emergencia_Chamada, uma marca por pessoa). */
+const TIPOS_E=['Incêndio','Vazamento químico','Pessoa ferida / mal súbito','Evacuação','Simulado','Outro'];
+const EM={em:null,marcas:[],brig:[],hist:[],f:{tipo:'',local:'',msg:''},aba:'faltam',q:'',busy:false,again:false,timer:null,prob:null};
+const quemEm=()=>ST.isGuarita&&tAtivo()?'Portaria · '+ST.turno.PARA:(PS.auth.account?.name||PS.auth.account?.username||'');
+const telE=d=>{const x=String(d||'').replace(/\D/g,'');return x?(x.length<=11?'55'+x:x):'';};
+const emBloq=()=>!!(EM.prob&&EM.prob.length);
+function emProbHtml(){if(!emBloq())return '';
+ return '<div class="banner err">'+icon('alert')+'<span><b>Emergência com estrutura incompleta no SharePoint.</b> Avise a TI:<br>'+EM.prob.map(esc).join('<br>')+'</span></div>';}
+function emBrigHtml(){const at=EM.brig.filter(b=>b.ativo);
+ return '<div class="panel"><div class="panel-h">'+icon('users')+'<h2>Brigada</h2><span class="sp"><span class="count">'+at.length+'</span></span></div><div class="rows">'+(at.length?at.map(b=>'<div class="row"><div class="main"><div class="t">'+esc(b.nome)+'</div><div class="meta">'+esc([b.funcao,b.tel&&fmtFone(b.tel)].filter(Boolean).join(' · '))+'</div></div><div class="act em-tel">'+(b.tel?'<a class="btn sm" href="tel:+'+telE(b.tel)+'">Ligar</a>':'')+(b.wa?'<a class="btn sm" href="https://wa.me/'+telE(b.wa)+'" target="_blank" rel="noopener">WhatsApp</a>':'')+'</div></div>').join(''):'<div class="empty">Nenhum brigadista cadastrado. A TI cadastra em Segurança (TI) → Brigada de emergência.</div>')+'</div></div>';}
+VIEWS.emergencia={
+ mount(){EM.em=ST.d.emerg||null;this.draw();emAtualizar(true);},
+ draw(){EM.em?emTelaAtiva():emTelaAcionar();},
+ update(){const em=ST.d.emerg||null;if((em&&em.id)!==(EM.em&&EM.em.id)){emAtualizar(true);return;}banners();}
+};
+/* ---------- sem emergência ativa: acionar ---------- */
+function emTelaAcionar(){const F=EM.f;const locais=String(P.param('EMERG_LOCAIS')||'').split(',').map(x=>x.trim()).filter(Boolean);
+ page('Emergência','Aciona a Brigada no WhatsApp e abre a lista de evacuação com a chamada no ponto de encontro.',emProbHtml()+
+  '<div class="cols"><div><div class="panel em-acionar"><div class="panel-h">'+icon('alert')+'<h2>Acionar emergência</h2></div>'+
+  '<span class="lbl">Tipo *</span><div class="em-chips" id="etipo">'+TIPOS_E.map(t=>'<button type="button" data-et="'+esc(t)+'" aria-pressed="'+(F.tipo===t)+'">'+esc(t)+'</button>').join('')+'</div>'+
+  '<div class="field"><label for="eloc">Local *</label><input id="eloc" maxlength="80" value="'+esc(F.local)+'" placeholder="Ex.: Produção — linha 2"><div class="em-locais">'+locais.map(l=>'<button type="button" data-el="'+esc(l)+'">'+esc(l)+'</button>').join('')+'</div></div>'+
+  '<div class="field"><label for="emsg">Detalhes (opcional)</label><textarea id="emsg" maxlength="400" placeholder="O que está acontecendo, rota de saída, ponto de encontro…">'+esc(F.msg)+'</textarea></div>'+
+  '<button class="btn danger solid em-big" type="button" id="ego"'+(emBloq()?' disabled':'')+'>'+icon('alert')+'ACIONAR EMERGÊNCIA</button>'+
+  '<div class="note">Avisa no WhatsApp os brigadistas ativos e o grupo da Brigada. Use "Simulado" para treinamentos.</div></div></div>'+
+  '<div>'+emBrigHtml()+'<div class="panel"><div class="panel-h">'+icon('clock')+'<h2>Últimas emergências</h2></div><div class="rows">'+(EM.hist.length?EM.hist.map(h=>'<div class="row"><div class="main"><div class="t">'+esc(val(h.TIPO))+' · '+esc(h.LOCAL||'')+'</div><div class="meta">'+esc(fmt.dmhm(h.INICIO))+(h.ENCERRADO_POR?' · encerrada por '+esc(h.ENCERRADO_POR):'')+'</div></div><div class="act"><button class="btn sm" data-eh="'+esc(h.id)+'">Resumo</button></div></div>').join(''):'<div class="empty">Nenhuma emergência registrada.</div>')+'</div></div></div></div>');
+ SHELL.page.oninput=e=>{if(e.target.id==='eloc')F.local=e.target.value;if(e.target.id==='emsg')F.msg=e.target.value;};
+ SHELL.page.onclick=e=>{const t=e.target.closest('[data-et]');if(t){F.tipo=t.dataset.et;$$('#etipo [data-et]').forEach(x=>x.setAttribute('aria-pressed',String(x===t)));return;}
+  const l=e.target.closest('[data-el]');if(l){F.local=l.dataset.el;$('#eloc').value=F.local;return;}
+  const h=e.target.closest('[data-eh]');if(h){const x=EM.hist.find(y=>String(y.id)===h.dataset.eh);if(x)dialog({title:'Resumo da emergência',html:'<pre class="resumo">'+esc(x.RESUMO||'—')+'</pre>'});return;}
+  if(e.target.closest('#ego'))emAcionar();};}
+async function emAcionar(){const F=EM.f;if(emBloq())return;if(!F.tipo){toast('Escolha o tipo de emergência.','err');return;}if(String(F.local).trim().length<2){$('#eloc').setAttribute('aria-invalid','true');toast('Informe o local.','err');return;}
+ const n=EM.brig.filter(b=>b.ativo&&b.wa).length;const sim=F.tipo==='Simulado';
+ const ok=await dialog({title:sim?'Acionar SIMULADO?':'Acionar emergência?',html:'<p><b>'+esc(F.tipo)+'</b> · '+esc(F.local)+'</p><div class="banner '+(sim?'warn':'err')+'">'+icon('alert')+'<span>Envia WhatsApp para <b>'+n+' brigadista(s)</b> e para o grupo da Brigada'+(sim?', identificado como SIMULADO':'')+'.</span></div>',
+  actions:[{label:'Cancelar',value:false},{label:sim?'Acionar simulado':'Acionar agora',kind:'danger solid',value:true}]});if(!ok)return;
+ const b=$('#ego');if(b)b.disabled=true;
+ try{const r=await P.acionarEmergencia({tipo:F.tipo,local:F.local,msg:F.msg,quem:quemEm()});
+  toast(r.ja?'Já havia uma emergência ativa — abrindo a lista.':'Emergência acionada. A Brigada está sendo avisada.',r.ja?'warn':'ok');EM.f={tipo:'',local:'',msg:''};ST.emergVista=(r.novo||r.ja).id;await emAtualizar(true);}
+ catch(e){toast(e.message||'Erro ao acionar.','err');const x=$('#ego');if(x)x.disabled=false;}}
+/* ---------- emergência ativa: lista de evacuação e chamada ---------- */
+function emTelaAtiva(){page('Emergência','','<div id="eatv"></div>'+emProbHtml()+'<div class="cols"><div class="panel"><div class="toolbar"><input type="search" id="eq" placeholder="Buscar nome, empresa, crachá…" aria-label="Buscar na lista de evacuação" value="'+esc(EM.q)+'"></div>'+
+  '<div class="seg" id="eaba" style="margin-bottom:8px"></div><div class="rows" id="elist"></div></div><div><div id="ebrig"></div><div class="panel"><div class="panel-h">'+icon('truck')+'<h2>Veículos no pátio</h2><span class="sp"><span class="count" id="evc"></span></span></div><div class="rows" id="ev"></div></div>'+
+  '<div class="panel"><button class="btn danger solid em-big" type="button" id="eend">Encerrar emergência</button><div class="note">Encerre quando a Brigada liberar a área. O resumo (quem confirmou, quem faltou e tempos) fica registrado.</div></div></div></div>');
+ $('#eq').oninput=e=>{EM.q=e.target.value;emDesenhaAtiva();};
+ SHELL.page.onclick=e=>{const a=e.target.closest('[data-ea]');if(a){EM.aba=a.dataset.ea;emDesenhaAtiva();return;}
+  const m=e.target.closest('[data-em]');if(m){emMarcar(m.dataset.em);return;}
+  const d=e.target.closest('[data-ed]');if(d){emDesmarcar(d.dataset.ed);return;}
+  if(e.target.closest('#eend'))emEncerrar();};
+ emDesenhaAtiva();}
+function emDesenhaAtiva(){const em=EM.em;if(!em||!$('#eatv'))return;const lista=P.listaDe(em);const marc=new Map(EM.marcas.map(m=>[m.PESSOA,m]));const sim=val(em.TIPO)==='Simulado';
+ const pes=lista?lista.p:[];const no=pes.filter(x=>marc.has('P:'+x.i)).length;
+ $('#eatv').innerHTML='<div class="em-ativa" role="alert"><h2>'+icon('alert')+' EMERGÊNCIA ATIVA'+(sim?'<span class="sim">SIMULADO</span>':'')+'</h2><p><b>'+esc(val(em.TIPO))+'</b> · '+esc(em.LOCAL||'')+' · desde '+esc(fmt.hm(em.INICIO))+' ('+fmt.dur(Date.now()-new Date(em.INICIO))+') · acionada por '+esc(em.ACIONADO_POR||'—')+'</p>'+(em.MENSAGEM?'<p style="margin-top:6px">'+esc(em.MENSAGEM)+'</p>':'')+'</div>'+
+  (lista?'<div class="em-kpis"><div><b>'+pes.length+'</b><span>na lista</span></div><div class="ok"><b>'+no+'</b><span>no ponto</span></div><div class="falta"><b>'+(pes.length-no)+'</b><span>faltam</span></div></div>'+(lista.inc?'<div class="banner warn">'+icon('alert')+'<span>A lista pode estar incompleta (leitura acima do limite). Confira com a portaria.</span></div>':'')
+   :'<div class="banner warn">'+icon('clock')+'<span><b>Montando a lista de evacuação…</b> O computador ou o celular da portaria envia quem está dentro em instantes.</span></div>');
+ $('#eaba').innerHTML=[['faltam','Faltam',pes.length-no],['ponto','No ponto',no],['todos','Todos',pes.length]].map(([k,l,n])=>'<button type="button" data-ea="'+k+'" aria-pressed="'+(EM.aba===k)+'">'+l+' <span class="count">'+n+'</span></button>').join('');
+ let rows=pes.slice().sort((a,b)=>String(a.n).localeCompare(String(b.n),'pt-BR'));
+ if(EM.aba==='faltam')rows=rows.filter(x=>!marc.has('P:'+x.i));if(EM.aba==='ponto')rows=rows.filter(x=>marc.has('P:'+x.i));
+ const q=norm(EM.q);if(q)rows=rows.filter(x=>norm([x.n,x.e,x.m,x.a,x.c].join(' ')).includes(q));
+ $('#elist').innerHTML=rows.length?rows.map(x=>{const mk=marc.get('P:'+x.i);return '<div class="row'+(mk?' marcado':'')+'"><div class="main"><div class="t">'+esc(x.n)+'</div><div class="meta">'+esc([x.t,x.m&&'Matr. '+x.m,x.e,x.a&&'recebe: '+x.a,x.c&&'crachá '+x.c].filter(Boolean).join(' · '))+'</div>'+(mk?'<div class="detail">No ponto às '+esc(fmt.hm(mk.HORA))+' · '+esc(mk.MARCADO_POR||'')+'</div>':'')+'</div><div class="act">'+(mk?'<button class="btn sm" data-ed="'+esc(mk.id)+'">Desmarcar</button>':'<button class="btn sm ok" data-em="'+esc(x.i)+'"'+(emBloq()?' disabled':'')+'>'+icon('check')+'No ponto</button>')+'</div></div>';}).join('')
+  :'<div class="empty">'+(lista?(EM.aba==='faltam'?'Todos confirmados no ponto de encontro.':'Ninguém nesta aba.'):'Aguardando a lista…')+'</div>';
+ const vs=lista?lista.v:[];$('#evc').textContent=vs.length;$('#ev').innerHTML=vs.length?vs.map(v=>'<div class="row"><div class="main"><div class="t">'+esc(v.pl)+'</div><div class="meta">'+esc([v.mo,v.e].filter(Boolean).join(' · ')||'—')+'</div></div></div>').join(''):'<div class="empty">Nenhum veículo no pátio.</div>';
+ $('#ebrig').innerHTML=emBrigHtml();}
+async function emMarcar(movId){const lista=P.listaDe(EM.em);const x=lista&&lista.p.find(y=>String(y.i)===String(movId));if(!x)return;const quem=quemEm();
+ try{const r=await P.marcarNoPonto(EM.em.id,'P:'+x.i,x.n,quem);if(r.item)EM.marcas.push({...r.item,PESSOA:'P:'+x.i,HORA:new Date().toISOString(),MARCADO_POR:quem});emDesenhaAtiva();emAtualizar();}catch(e){writeErr(e);}}
+async function emDesmarcar(id){const m=EM.marcas.find(x=>String(x.id)===String(id));if(!m)return;
+ try{await P.desmarcar(m);EM.marcas=EM.marcas.filter(x=>x!==m);emDesenhaAtiva();emAtualizar();}catch(e){writeErr(e);}}
+async function emEncerrar(){const em=EM.em;const lista=P.listaDe(em);const marc=new Set(EM.marcas.map(m=>m.PESSOA));const falt=lista?lista.p.filter(x=>!marc.has('P:'+x.i)):[];
+ const ok=await dialog({title:'Encerrar emergência?',html:(falt.length?'<div class="banner warn">'+icon('alert')+'<span><b>'+falt.length+' pessoa(s) não confirmada(s)</b> no ponto de encontro: '+esc(falt.slice(0,8).map(x=>x.n).join(', '))+(falt.length>8?'…':'')+'</span></div>':'<div class="banner ok">'+icon('check')+'<span>Todos confirmados no ponto de encontro.</span></div>')+'<p>O WhatsApp de encerramento vai para a Brigada.</p>',
+  actions:[{label:'Voltar',value:false},{label:'Encerrar',kind:'danger solid',value:true}]});if(!ok)return;
+ try{const r=await P.encerrarEmergencia(em,quemEm());if(r.ja)toast('A emergência já tinha sido encerrada.','warn');else toast('Emergência encerrada.');
+  await emAtualizar(true);if(r.resumo)dialog({title:'Resumo registrado',html:'<pre class="resumo">'+esc(r.resumo)+'</pre>'});}
+ catch(e){writeErr(e);}}
+/* ---------- dados: a tela se atualiza a cada 6 s com emergência ativa (20 s sem) ---------- */
+async function emAtualizar(redesenha){if(ST.view!=='emergencia')return;if(EM.busy){EM.again=(EM.again===true||redesenha)?true:'1';return;}EM.busy=true;
+ try{if(EM.prob===null){try{EM.prob=await P.conferirEmergencia();}catch(e){EM.prob=[e.message||'Falha ao conferir a estrutura.'];}if(EM.prob.length)redesenha=true;}
+  let em=await P.emergenciaAtiva();
+  if(em&&!P.listaDe(em)&&ST.posto){try{if(await P.preencherLista(em))em=await P.emergenciaAtiva();}catch(e){console.warn('Lista de evacuação',e.message);}}
+  const mudou=(em&&em.id)!==(EM.em&&EM.em.id);EM.em=em;ST.d.emerg=em;if(em)ST.emergVista=em.id;
+  if(em)EM.marcas=await P.chamadaDe(em.id);
+  if(mudou||redesenha||!EM.brig.length){try{EM.brig=await P.brigadistas();}catch(e){console.warn('Brigada',e.message);}}
+  if(!em&&(mudou||redesenha)){try{EM.hist=await P.ultimasEmergencias(8);}catch(e){console.warn('Histórico',e.message);}}
+  if(ST.view!=='emergencia')return;
+  if(mudou||redesenha)VIEWS.emergencia.draw();else if(em)emDesenhaAtiva();
+  if(mudou)chrome();}
+ catch(e){const b=$('#banners');if(b)b.innerHTML='<div class="banner err">'+icon('cloudoff')+'<span><b>Sem conexão com o Microsoft 365.</b> '+esc(e.message||'')+' Tentando de novo…</span></div>';}
+ finally{EM.busy=false;if(EM.again){const r=EM.again===true;EM.again=false;emAtualizar(r);}else emAgenda();}}
+function emAgenda(){clearTimeout(EM.timer);if(ST.view!=='emergencia')return;EM.timer=setTimeout(()=>{if(!document.hidden)emAtualizar();else emAgenda();},EM.em?6000:20000);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ST.view==='emergencia')emAtualizar();});
 /* ---- Brigada (09_Brigada): telefone e WhatsApp usados no aviso da emergência (o envio é do Power Automate) ---- */
 const FUNCOES_B=['Líder','Brigadista','Socorrista','Apoio'];
 const BFORM0=()=>({id:null,etag:null,nome:'',mat:'',funcao:'Brigadista',tel:'',wa:''});
@@ -717,7 +830,9 @@ function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMoviment
  toast('Arquivo gerado: '+ST.r.rows.length+' movimento(s).');}
 /* ================= início ================= */
 (async function init(){
- PS.screens.loading('Abrindo o posto da portaria…');
+ PS.screens.loading('Abrindo a Portaria…');
+ /* link direto do WhatsApp (…/portaria/#emergencia): guardado para sobreviver ao login */
+ try{if(location.hash==='#emergencia')sessionStorage.setItem('portaria-tela','emergencia');}catch{}
  let acc;
  try{acc=await PS.auth.init();}
  catch(e){PS.screens.error(e.code==='https'?'Endereço não seguro':'Não foi possível iniciar',e.message);return;}
@@ -726,20 +841,25 @@ function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMoviment
   const g=await PS.groups();
   ST.isTI=!!g&&g.has(GRUPO_TI);ST.isExp=!!g&&g.has(GRUPO_EXP);
   ST.isGuarita=(!!g&&g.has(GRUPO_GUARITA))||CONTAS_POSTO.includes(String(acc.username||'').toLowerCase());
-  ST.isRH=!!g&&g.has(GRUPO_RH);
+  ST.isRH=!!g&&g.has(GRUPO_RH);ST.isBrig=!!g&&g.has(GRUPO_BRIG);
   ST.posto=ST.isTI||ST.isGuarita;ST.log=ST.isTI||ST.isExp;ST.rh=ST.isTI||ST.isRH;
-  if(!ST.posto&&!ST.log&&!ST.rh){PS.screens.error('Sem perfil na Portaria','Sua conta não tem perfil de guarita, Expedição, RH ou TI neste aplicativo.',{retry:g===null,
+  if(!ST.posto&&!ST.log&&!ST.rh&&!ST.isBrig){PS.screens.error('Sem perfil na Portaria','Sua conta não tem perfil de guarita, Expedição, RH, Brigada ou TI neste aplicativo.',{retry:g===null,
     details:[...(g===null?['Não foi possível ler seus grupos no Microsoft 365 — tente novamente ou fale com a TI.']:[]),'Para agendar uma visita, use "Minhas visitas".','Se você precisa de acesso, peça à TI.'],
     action:{label:'Agendar uma visita',onClick:()=>{location.href='agendar.html';}}});return;}
   const b=await P.boot({posto:ST.posto,log:ST.log,rh:ST.rh});
   if(!b.ok){const det=b.faltando.slice();if(g===null)det.push('Não foi possível ler seus grupos no Microsoft 365 (a Expedição e a TI dependem disso). Peça à TI para conferir a permissão GroupMember.Read.All do app.');
    PS.screens.error('Estrutura incompleta no SharePoint','A Portaria precisa destes itens antes de operar. Ajuste e tente novamente:',{details:det});return;}
+  ST.emerg=(ST.posto||ST.isBrig)&&P.temEmergencia();
+  if(!ST.posto&&!ST.log&&!ST.rh&&!ST.emerg){PS.screens.error('Emergência indisponível','Sua conta é da Brigada, mas as listas da emergência não foram encontradas ou estão sem permissão para você.',{details:['Peça à TI para conferir 09_Emergencias, 09_Emergencia_Chamada e 09_Brigada.','Em caso de emergência, acione o alarme e ligue para a portaria.']});return;}
   PS.auth.ready();window.addEventListener('ps:session',()=>refresh());
   TRANSP=await P.transp();
-  SHELL=PS.mount({app:'Portaria',nav:NAV(),current:inicial(),onNav:go,account:acc});
-  go(inicial());
+  let tela=null;try{tela=sessionStorage.getItem('portaria-tela');sessionStorage.removeItem('portaria-tela');}catch{}
+  if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+  const v0=tela&&podeVer(tela)?tela:inicial();
+  SHELL=PS.mount({app:'Portaria',nav:NAV(),current:v0,onNav:go,account:acc});
+  go(v0);
   await refresh();
-  if(ST.posto&&!tAtivo())dlgTurno();
+  if(ST.posto&&!tAtivo()&&ST.view!=='emergencia')dlgTurno();
   setInterval(()=>{if(!document.hidden)refresh();},60000);
   setInterval(()=>{if(!document.hidden)checaEmergencia();},15000);
   setInterval(()=>{const t=ST.turnoMarca,ok=tAtivo(),f=!!P.trocaPendente(ST.turno);if(t!==ok+'|'+f){ST.turnoMarca=ok+'|'+f;chrome();banners();}checaTroca();},20000);

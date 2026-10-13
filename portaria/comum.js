@@ -97,20 +97,22 @@ const LISTAS_AG=['agend'];
 const LISTAS_RH=['movP','movV','params'];
 const LISTAS_EMERG=['emerg','chamada','brigada','params'];
 let COLS={};
-async function boot({posto=true,log=false,agendar=false,rh=false,emergencia=false}={}){
- const all=await sp.lists();
- const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[]),...(emergencia?LISTAS_EMERG:[])]);
- const faltando=[];
- for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n]||(k==='cadColab'?all['00_Cadastro_Colaboradores']:undefined);if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
- if(faltando.length)return {ok:false,faltando};
- const checks=await Promise.all(Object.entries(ESTRUTURA).filter(([k])=>precisa.has(k)&&L[k]).map(async([k,cols])=>{try{const have=await sp.columns(L[k]);COLS[k]=have;const out=[],nm=LISTAS[k];
+/* contrato de uma lista: colunas, índices, valores exclusivos, tipos, opções e pesquisas */
+async function conferir(k){const cols=ESTRUTURA[k];try{const have=await sp.columns(L[k]);COLS[k]=have;const out=[],nm=LISTAS[k];
   cols.filter(c=>!have.has(c)).forEach(c=>out.push(nm+': falta a coluna '+c));
   (INDICES[k]||[]).filter(c=>have.has(c)&&!have.get(c).indexed).forEach(c=>out.push(nm+': crie o índice na coluna '+c));
   (UNICOS[k]||[]).filter(c=>have.has(c)&&!have.get(c).enforceUniqueValues).forEach(c=>out.push(nm+': ative "Exigir valores exclusivos" na coluna '+c));
   Object.entries(TIPOS[k]||{}).forEach(([c,t])=>{if(have.has(c)&&!tipoOk(have.get(c),t))out.push(nm+': a coluna '+c+' precisa ser do tipo '+TIPO_NOME[t]);});
   Object.entries(OPCOES[k]||{}).forEach(([c,ops])=>{const col=have.get(c);if(!col||!col.choice)return;const tem=(col.choice.choices||[]);ops.filter(o=>!tem.includes(o)).forEach(o=>out.push(nm+': a coluna '+c+' precisa da opção "'+o+'"'));});
   Object.entries(PESQUISAS[k]||{}).forEach(([c,alvo])=>{const col=have.get(c);if(!col||!L[alvo])return;if(!col.lookup)out.push(nm+': a coluna '+c+' precisa ser do tipo Pesquisa');else if(guid(col.lookup.listId)!==guid(L[alvo]))out.push(nm+': a coluna '+c+' deve pesquisar na lista '+LISTAS[alvo]);});
-  return out;}catch(e){return [LISTAS[k]+': '+e.message];}}));
+  return out;}catch(e){return [LISTAS[k]+': '+e.message];}}
+async function boot({posto=true,log=false,agendar=false,rh=false,emergencia=false}={}){
+ const all=await sp.lists();
+ const precisa=new Set([...(posto?LISTAS_POSTO:[]),...(log?LISTAS_LOG:[]),...(agendar?LISTAS_AG:[]),...(rh?LISTAS_RH:[]),...(emergencia?LISTAS_EMERG:[])]);
+ const faltando=[];
+ for(const[k,n]of Object.entries(LISTAS)){L[k]=all[n]||(k==='cadColab'?all['00_Cadastro_Colaboradores']:undefined);if(!L[k]&&precisa.has(k)&&!OPCIONAIS.has(k))faltando.push('Lista '+n+' não encontrada (ou sem permissão de leitura)');}
+ if(faltando.length)return {ok:false,faltando};
+ const checks=await Promise.all(Object.keys(ESTRUTURA).filter(k=>precisa.has(k)&&L[k]).map(conferir));
  checks.flat().forEach(x=>faltando.push(x));
  for(const k of ['transp','pessoas'])if(L[k]&&!COLS[k]){try{COLS[k]=await sp.columns(L[k]);}catch(e){console.warn('Colunas de '+LISTAS[k]+' indisponíveis',e.message);}}
  if(faltando.length)return {ok:false,faltando};
@@ -421,6 +423,9 @@ async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return nu
  return meus[0]&&val(meus[0].SAIDA_TIPO)==='Temporária'?meus[0]:null;}
 /* ---------- emergência: acionamento, lista de evacuação, chamada no ponto de encontro ---------- */
 const temEmergencia=()=>!!(L.emerg&&L.chamada&&L.brigada);
+/* a emergência confere o próprio contrato na tela dela: lista mal configurada não trava a guarita */
+async function conferirEmergencia(){if(!temEmergencia())return ['Listas 09_Emergencias, 09_Emergencia_Chamada e 09_Brigada não encontradas (ou sem permissão de leitura).'];
+ return (await Promise.all(['emerg','chamada','brigada'].map(conferir))).flat();}
 async function emergenciaAtiva(){if(!L.emerg)return null;const rs=await sp.items(L.emerg,"$expand=fields&$filter=fields/STATUS eq 'Ativa'&$top=5");
  return rs.sort((a,b)=>new Date(b.INICIO)-new Date(a.INICIO))[0]||null;}
 async function ultimasEmergencias(n=10){if(!L.emerg)return [];const rs=await sp.items(L.emerg,"$expand=fields&$filter=fields/STATUS eq 'Encerrada'&$top=200");
@@ -566,7 +571,7 @@ function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
  dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
- temEmergencia,emergenciaAtiva,ultimasEmergencias,brigadistas,salvarBrigadista,setBrigadistaAtivo,instantaneoPresenca,compacta,listaDe,acionarEmergencia,preencherLista,chamadaDe,marcarNoPonto,desmarcar,encerrarEmergencia,
+ temEmergencia,conferirEmergencia,emergenciaAtiva,ultimasEmergencias,brigadistas,salvarBrigadista,setBrigadistaAtivo,instantaneoPresenca,compacta,listaDe,acionarEmergencia,preencherLista,chamadaDe,marcarNoPonto,desmarcar,encerrarEmergencia,
  CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,marcarSaidaFinal,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
