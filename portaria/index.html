@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.11">
+<link rel="stylesheet" href="/core/polystell.css?v=2.12">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -66,8 +66,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.11"></script>
-<script src="comum.js?v=2.11"></script>
+<script src="/core/polystell.js?v=2.12"></script>
+<script src="comum.js?v=2.12"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -831,8 +831,9 @@ function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMoviment
 /* ================= início ================= */
 (async function init(){
  PS.screens.loading('Abrindo a Portaria…');
- /* link direto do WhatsApp (…/portaria/#emergencia): guardado para sobreviver ao login */
- try{if(location.hash==='#emergencia')sessionStorage.setItem('portaria-tela','emergencia');}catch{}
+ /* link direto (…/portaria/?tela=emergencia, ou #emergencia): guardado para sobreviver ao login.
+    O WhatsApp corta o link no '#', por isso o formato com ?tela= é o que vai nas mensagens. */
+ try{const t=new URLSearchParams(location.search).get('tela')||String(location.hash||'').replace('#','');if(t)sessionStorage.setItem('portaria-tela',t);}catch{}
  let acc;
  try{acc=await PS.auth.init();}
  catch(e){PS.screens.error(e.code==='https'?'Endereço não seguro':'Não foi possível iniciar',e.message);return;}
@@ -854,7 +855,7 @@ function exportarRH(){if(!ST.r||!ST.r.rows.length)return;const csv=P.csvMoviment
   PS.auth.ready();window.addEventListener('ps:session',()=>refresh());
   TRANSP=await P.transp();
   let tela=null;try{tela=sessionStorage.getItem('portaria-tela');sessionStorage.removeItem('portaria-tela');}catch{}
-  if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+  if(location.hash||location.search)history.replaceState(null,'',location.pathname);
   const v0=tela&&podeVer(tela)?tela:inicial();
   SHELL=PS.mount({app:'Portaria',nav:NAV(),current:v0,onNav:go,account:acc});
   go(v0);
