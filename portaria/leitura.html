@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.8">
+<link rel="stylesheet" href="/core/polystell.css?v=2.9">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -51,8 +51,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.8"></script>
-<script src="comum.js?v=2.8"></script>
+<script src="/core/polystell.js?v=2.9"></script>
+<script src="comum.js?v=2.9"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -71,7 +71,7 @@ const MODAIS=['Carro','Moto','Ônibus/Fretado','Bicicleta','A pé','Carona','Out
 function verif(mat){let h=7;for(const c of String(mat))h=(h*31+c.charCodeAt(0))%1296;return h.toString(36).padStart(2,'0').toUpperCase();}
 const quando=v=>v&&new Date(v).toDateString()===new Date().toDateString()?fmt.hm(v):fmt.dmhm(v);
 function shell(){
- document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button>'+(P.temEmergencia()?'<a class="lt-sos" id="sos" href="emergencia.html" aria-label="Emergência">SOS</a>':'')+'<button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
+ document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button>'+(P.temEmergencia()?'<a class="lt-sos" id="sos" href="./#emergencia" aria-label="Emergência">SOS</a>':'')+'<button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
  '<div class="lt-accm" id="accm" hidden><strong>'+esc(PS.auth.account?.name||'Conta')+'</strong><small>'+esc(PS.auth.account?.username||'')+'</small><a href="'+PS.cfg.hubUrl+'">'+icon('grid')+'Todos os aplicativos</a><a href="./">'+icon('home')+'Portaria no computador</a><button type="button" id="sair">'+icon('logout')+'Sair da conta</button></div>'+
  '<main class="lt-wrap"><div id="ban"></div><section class="lt-cam" id="cam"><video id="video" playsinline muted></video><div class="mira"></div><div class="hint" id="hint">Aponte para o QR do crachá ou do convite</div></section>'+
  '<form class="lt-manual" id="mf"><input id="mc" autocomplete="off" inputmode="text" placeholder="Ou digite matrícula / código do convite" aria-label="Matrícula ou código do convite"><button class="btn primary" type="submit">OK</button></form><div id="res" aria-live="polite"></div></main>';
@@ -83,7 +83,7 @@ function shell(){
 }
 function paintTurno(){const b=$('#tb');if(!b)return;const ok=tAtivo();b.className='lt-turno'+(ok?'':' off');b.textContent=ok?'Plantão: '+S.turno.PARA:'Abrir turno';
  const em=S.em,sos=$('#sos');if(sos)sos.classList.toggle('on',!!em);
- $('#ban').innerHTML=(em?'<div class="banner err" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(val(em.TIPO)==='Simulado'?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · '+fmt.hm(em.INICIO)+'</span><a class="btn sm danger solid" href="emergencia.html">Abrir</a></div>':'')+(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(P.trocaPendente(S.turno)?'<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(P.trocaPendente(S.turno))+').</b> Toque em Plantão para passar o turno.</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
+ $('#ban').innerHTML=(em?'<div class="banner err" role="alert">'+icon('alert')+'<span><b>EMERGÊNCIA ATIVA'+(val(em.TIPO)==='Simulado'?' (SIMULADO)':'')+'</b> — '+esc(val(em.TIPO))+' · '+esc(em.LOCAL||'')+' · '+fmt.hm(em.INICIO)+'</span><a class="btn sm danger solid" href="./#emergencia">Abrir</a></div>':'')+(S.syncErr?'<div class="banner err">'+icon('cloudoff')+'<span><b>Sem sincronização com o Microsoft 365.</b> Última confirmação do turno '+(S.lidoEm?'às '+fmt.hm(S.lidoEm):'—')+'. '+esc(S.syncErr)+'</span></div>':'')+(P.trocaPendente(S.turno)?'<div class="banner warn">'+icon('swap')+'<span><b>Hora da troca de turno ('+fmt.hm(P.trocaPendente(S.turno))+').</b> Toque em Plantão para passar o turno.</span></div>':'')+(ok?'':'<div class="banner warn">'+icon('swap')+'<span>Nenhum turno válido aberto. Abra o turno para registrar entradas e saídas.</span></div>');}
 /* na hora da troca, abre a passagem sozinho uma vez (só com o leitor livre) */
 function checaTroca(){const fim=P.trocaPendente(S.turno);if(!fim||S.trocaAvisada===+fim||S.mode!=='scan')return;const d=$('#ps-dlg');if(d&&d.open)return;S.trocaAvisada=+fim;dlgTurno();}
 /* emergência: avisa no celular e completa a lista de evacuação (a guarita enxerga quem está dentro) */
