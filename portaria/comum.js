@@ -51,7 +51,7 @@ const OPCOES={
  params:{APP:['Portaria']},
  emerg:{TIPO:['Incêndio','Vazamento químico','Pessoa ferida / mal súbito','Evacuação','Simulado','Outro'],STATUS:['Ativa','Encerrada']},
  chamada:{STATUS:['No ponto']},
- brigada:{FUNCAO:['Líder','Brigadista','Socorrista','Apoio']}
+ brigada:{FUNCAO:['Coordenador','Chefe','Brigadista','Apoio']}
 };
 const PESQUISAS={movP:{AGENDAMENTO:'agend'},movV:{PREVISAO:'prevV'},prevV:{TRANSPORTADORA:'transp'}};
 /* situações do diretório que permitem ENTRAR (lista explícita) */
@@ -431,9 +431,10 @@ async function emergenciaAtiva(){if(!L.emerg)return null;const rs=await sp.items
  return rs.sort((a,b)=>new Date(b.INICIO)-new Date(a.INICIO))[0]||null;}
 async function ultimasEmergencias(n=10){if(!L.emerg)return [];const rs=await sp.items(L.emerg,"$expand=fields&$filter=fields/STATUS eq 'Encerrada'&$top=200");
  return rs.sort((a,b)=>new Date(b.INICIO)-new Date(a.INICIO)).slice(0,n);}
+const ordemFuncao=f=>{const i=['Coordenador','Chefe','Brigadista','Apoio'].indexOf(f);return i<0?9:i;};
 async function brigadistas(){if(!L.brigada)return [];const rs=await sp.items(L.brigada,'$expand=fields&$top=500');
  return rs.map(r=>({id:r.id,nome:String(r.NOME||r.Title||'').trim(),mat:String(r.MATRICULA??'').trim(),funcao:val(r.FUNCAO)||'Brigadista',tel:String(r.TELEFONE||'').trim(),wa:String(r.WHATSAPP||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}))
-  .filter(b=>b.nome).sort((a,b)=>(a.funcao==='Líder'?0:1)-(b.funcao==='Líder'?0:1)||a.nome.localeCompare(b.nome,'pt-BR'));}
+  .filter(b=>b.nome).sort((a,b)=>ordemFuncao(a.funcao)-ordemFuncao(b.funcao)||a.nome.localeCompare(b.nome,'pt-BR'));}
 const soDigitos=v=>String(v||'').replace(/\D/g,'');
 function salvarBrigadista(f,id){const nome=String(f.nome||'').trim();if(nome.length<3)throw Object.assign(new Error('Informe o nome do brigadista.'),{code:'validacao'});
  const tel=soDigitos(f.tel),wa=soDigitos(f.wa);if(!tel&&!wa)throw Object.assign(new Error('Informe telefone ou WhatsApp.'),{code:'validacao'});
