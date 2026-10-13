@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.10">
+<link rel="stylesheet" href="/core/polystell.css?v=2.11">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -66,8 +66,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.10"></script>
-<script src="comum.js?v=2.10"></script>
+<script src="/core/polystell.js?v=2.11"></script>
+<script src="comum.js?v=2.11"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -632,7 +632,7 @@ async function emAtualizar(redesenha){if(ST.view!=='emergencia')return;if(EM.bus
 function emAgenda(){clearTimeout(EM.timer);if(ST.view!=='emergencia')return;EM.timer=setTimeout(()=>{if(!document.hidden)emAtualizar();else emAgenda();},EM.em?6000:20000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ST.view==='emergencia')emAtualizar();});
 /* ---- Brigada (09_Brigada): telefone e WhatsApp usados no aviso da emergência (o envio é do Power Automate) ---- */
-const FUNCOES_B=['Líder','Brigadista','Socorrista','Apoio'];
+const FUNCOES_B=['Coordenador','Chefe','Brigadista','Apoio'];
 const BFORM0=()=>({id:null,etag:null,nome:'',mat:'',funcao:'Brigadista',tel:'',wa:''});
 const fmtFone=d=>{const x=String(d||'').replace(/\D/g,'');return x.length===11?'('+x.slice(0,2)+') '+x.slice(2,7)+'-'+x.slice(7):x.length===10?'('+x.slice(0,2)+') '+x.slice(2,6)+'-'+x.slice(6):x;};
 async function carregaBrig(){if(!P.temEmergencia()){drawBrig();return;}try{ST.brig=await P.brigadistas();ST.brigErr=null;}catch(e){ST.brigErr=e.message;}drawBrig();}
