@@ -72,6 +72,7 @@ const PARAM_DEF=[
  {mod:'ESG',k:'CO2_KM_BICICLETA',d:'Bicicleta',t:'dec',v:0,esg:true},
  {mod:'ESG',k:'CO2_KM_A_PE',d:'A pé',t:'dec',v:0,esg:true},
  {mod:'ESG',k:'CO2_KM_OUTRO',d:'Outro',t:'dec',v:null,esg:true},
+ {mod:'Funções',k:'EMERG_CHAMADA',d:'Chamada no ponto de encontro na emergência (marcar "No ponto" pessoa a pessoa)',t:'bool',v:'Sim'},
  {mod:'Emergência',k:'EMERG_LOCAIS',d:'Locais sugeridos no acionamento de emergência (separados por vírgula)',t:'text',v:'Portaria, Produção, Expedição, Almoxarifado, Laboratório, Escritório, Estacionamento'},
  {mod:'Turno',k:'TURNO_HORARIOS',d:'Horários de troca de turno (HH:MM, separados por vírgula)',t:'text',v:'06:00,18:00'},
  {mod:'Turno',k:'TURNO_TOLERANCIA',d:'Tolerância para passar o turno depois do horário (minutos)',t:'num',v:60},
@@ -474,7 +475,8 @@ async function encerrarEmergencia(em,quem){const cur=await getItem('emerg',em.id
  const ult=marcas.map(m=>new Date(m.HORA).getTime()).filter(Boolean).sort((a,b)=>b-a)[0];
  const dur=ms=>{const m=Math.round(ms/6e4);return m<60?m+' min':Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');};
  const resumo=['Tipo: '+val(cur.TIPO)+' · Local: '+cur.LOCAL,'Acionada por '+cur.ACIONADO_POR+' em '+new Date(cur.INICIO).toLocaleString('pt-BR'),'Encerrada por '+quem+' em '+new Date().toLocaleString('pt-BR')+' (duração '+dur(Date.now()-new Date(cur.INICIO).getTime())+')',
-  'No ponto de encontro: '+noPonto+' de '+tot+(ult?' · última confirmação '+dur(ult-new Date(cur.INICIO).getTime())+' após o acionamento':''),faltaram.length?'Não confirmados: '+faltaram.join(', '):'Todos confirmados.'].join('\n');
+  ...(on('EMERG_CHAMADA')?['No ponto de encontro: '+noPonto+' de '+tot+(ult?' · última confirmação '+dur(ult-new Date(cur.INICIO).getTime())+' após o acionamento':''),faltaram.length?'Não confirmados: '+faltaram.join(', '):'Todos confirmados.']
+   :['Na lista de evacuação: '+tot+' pessoa(s). Chamada no ponto de encontro desativada em Segurança (TI).'])].join('\n');
  try{await sp.patch(L.emerg,em.id,{STATUS:'Encerrada',FIM:now(),ENCERRADO_POR:quem,ATIVA_CHAVE:'E#'+em.id,RESUMO:resumo.slice(0,60000)},{etag:cur._etag});}
  catch(e){if(e.status===412){const at=await getItem('emerg',em.id);if(val(at.STATUS)!=='Ativa')return {ja:true};}throw e;}
  return {ok:true,resumo};}
