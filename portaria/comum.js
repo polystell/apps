@@ -475,8 +475,12 @@ async function encerrarEmergencia(em,quem){const cur=await getItem('emerg',em.id
  const faltaram=lista?lista.p.filter(x=>!ok.has('P:'+x.i)).map(x=>x.n):[];
  const ult=marcas.map(m=>new Date(m.HORA).getTime()).filter(Boolean).sort((a,b)=>b-a)[0];
  const dur=ms=>{const m=Math.round(ms/6e4);return m<60?m+' min':Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');};
- const resumo=['Tipo: '+val(cur.TIPO)+' · Local: '+cur.LOCAL,'Acionada por '+cur.ACIONADO_POR+' em '+new Date(cur.INICIO).toLocaleString('pt-BR'),'Encerrada por '+quem+' em '+new Date().toLocaleString('pt-BR')+' (duração '+dur(Date.now()-new Date(cur.INICIO).getTime())+')',
-  ...(on('EMERG_CHAMADA')?['No ponto de encontro: '+noPonto+' de '+tot+(ult?' · última confirmação '+dur(ult-new Date(cur.INICIO).getTime())+' após o acionamento':''),faltaram.length?'Não confirmados: '+faltaram.join(', '):'Todos confirmados.']
+ /* linhas curtas, uma informação por linha: o resumo é lido no WhatsApp, no celular */
+ const hm=d=>new Date(d).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+ const resumo=['Tipo: '+val(cur.TIPO),'Local: '+cur.LOCAL,'Data: '+new Date(cur.INICIO).toLocaleDateString('pt-BR'),
+  'Início: '+hm(cur.INICIO)+' · acionada por '+cur.ACIONADO_POR,
+  'Fim: '+hm(Date.now())+' · encerrada por '+quem+' · duração '+dur(Date.now()-new Date(cur.INICIO).getTime()),
+  ...(on('EMERG_CHAMADA')?['No ponto de encontro: '+noPonto+' de '+tot,...(ult?['Última confirmação: '+dur(ult-new Date(cur.INICIO).getTime())+' após o acionamento']:[]),faltaram.length?'Não confirmados: '+faltaram.join(', '):'Todos confirmados.']
    :['Na lista de evacuação: '+tot+' pessoa(s). Chamada no ponto de encontro desativada em Segurança (TI).'])].join('\n');
  try{await sp.patch(L.emerg,em.id,{STATUS:'Encerrada',FIM:now(),ENCERRADO_POR:quem,ATIVA_CHAVE:'E#'+em.id,RESUMO:resumo.slice(0,60000)},{etag:cur._etag});}
  catch(e){if(e.status===412){const at=await getItem('emerg',em.id);if(val(at.STATUS)!=='Ativa')return {ja:true};}throw e;}
