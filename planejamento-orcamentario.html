@@ -475,6 +475,13 @@ function render(){
     render();});
   const deps=allowedDepts();
   if(deps.length&&!deps.includes(S.dept))S.dept=deps[0];
+  const _as=ANOS();
+  if(_as.length){
+    if(!S.ano||!DB.ex[S.ano])S.ano=_as[_as.length-1];
+    if(!S.aAno||!DB.ex[S.aAno])S.aAno=S.ano;
+    if(!S.pAno||!DB.ex[S.pAno])S.pAno=S.ano;
+    if(DB.plan[S.ano]===undefined)DB.plan[S.ano]=DB.plan[S.ano]||[];
+  }
   ({plan:renderPlan,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
 }
 function setHead(t,m){document.getElementById('vTitle').textContent=t;document.getElementById('vMeta').textContent=m;}
@@ -913,6 +920,9 @@ function doImport(){
 }
 
 /* ============================ ACOMPANHAMENTO ========================== */
+const revLimite=(a,m)=>new Date(a,m+1,10,23,59,59);
+const revAberta=(a,m)=>new Date()<=revLimite(a,m);
+const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
 function renderAcomp(){
   const deps=allowedDepts();
   if(!ANOS().length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=noExPanel();return;}
@@ -929,7 +939,7 @@ function renderAcomp(){
   }else{
     const real=cache;
     const ULT=real.length?Math.max(...real.map(r=>Number(r.mes)))-1:-1;
-    setHead(`Acompanhamento ${S.ano}`,ULT>=0?'Realizado at\u00e9 '+MES[ULT].toLowerCase():'');
+    setHead(`Acompanhamento ${S.ano}`,ULT>=0?('Realizado at\u00e9 '+MES[ULT].toLowerCase()+(revAberta(S.ano,ULT)?` \u00b7 revis\u00f5es de ${MES[ULT].toLowerCase()} abertas at\u00e9 ${revData(S.ano,ULT)}`:'')):'');
     const its=itemsOf(S.ano,S.dept);
     const rmap={};real.forEach(r=>{const k=r.cc+'|'+r.cat;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.mes)-1]+=Number(r.valor)||0;});
     const keys=[...new Set([...its.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
@@ -976,9 +986,11 @@ function openExtrato(cc,cat,m){
   const rows=(((DB.real[S.ano]||{})[S.dept])||[]).filter(r=>r.cc===cc&&r.cat===cat&&Number(r.mes)===m+1).sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
   const tot=rows.reduce((a,r)=>a+(Number(r.valor)||0),0);
   document.getElementById('mTitle').textContent=`${ccDesc(cc)||cc} \u00b7 ${catDesc(cat)||cat} \u00b7 ${MES[m]}/${S.ano}`;
-  document.getElementById('mBody').innerHTML=rows.length
+  const rAb=revAberta(S.ano,m);
+  const revLine='<p style="margin:12px 2px 0;font-size:12px;color:'+(rAb?'#1e7e34':'var(--mute)')+'">'+(rAb?('Encontrou um lan\u00e7amento incorreto? Solicite a revis\u00e3o ao Financeiro at\u00e9 <b>'+revData(S.ano,m)+'</b>.'):('Prazo de revis\u00e3o destes lan\u00e7amentos encerrado em '+revData(S.ano,m)+'.'))+'</p>';
+  document.getElementById('mBody').innerHTML=(rows.length
     ?`<table class="simple"><thead><tr><th>Compet\u00eancia</th><th>Tipo</th><th>Documento</th><th>NF</th><th>Fornecedor</th><th style="text-align:right">Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtD(String(r.data||''))}</td><td class="code">${esc(r.tipo||'')}</td><td class="code">${esc(r.doc||'')}</td><td class="code">${esc(r.nf||'')}</td><td>${esc(r.forn||'')}${r.obs?`<span class="detline">${esc(r.obs)}</span>`:''}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${moneyC(Number(r.valor)||0)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5" style="text-align:right;font-weight:600;padding:10px 8px">Total \u00b7 ${rows.length} lan\u00e7amento(s)</td><td style="text-align:right;font-weight:700;padding:10px 8px">${moneyC(tot)}</td></tr></tfoot></table>`
-    :'<p class="empty">Nenhum lan\u00e7amento.</p>';
+    :'<p class="empty">Nenhum lan\u00e7amento.</p>')+revLine;
   document.getElementById('modal').hidden=false;
 }
 
@@ -1237,7 +1249,10 @@ function renderPrazos(){
       const j=await addItem(CFG.lists.ex,{Title:String(next),ANO:next,STATUS:'Aberto',PRAZO_Q1:prazos[0]+'T12:00:00Z',PRAZO_Q2:prazos[1]+'T12:00:00Z',PRAZO_Q3:prazos[2]+'T12:00:00Z',PRAZO_Q4:prazos[3]+'T12:00:00Z'});
       DB.ex[next]={Id:j.Id,status:'Aberto',prazos,enc:[false,false,false,false]};
       DB.plan[next]=DB.plan[next]||[];
-      S.pAno=next;render();
+      S.pAno=next;
+      if(!S.ano||!DB.ex[S.ano])S.ano=next;
+      if(!S.aAno||!DB.ex[S.aAno])S.aAno=next;
+      render();
       toast(`Exercício ${next} aberto. Confira os prazos; os gestores já podem planejar ${next}.`);
     }catch(e){fail(e);}finally{busy(false);}
   };
