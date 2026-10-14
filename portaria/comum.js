@@ -61,8 +61,9 @@ const ADMIN_FINAL=['Cancelado','Não veio'];
 /* parâmetros editáveis na tela Segurança (TI); fase2 = depende de fluxo ainda não implantado */
 const PARAM_DEF=[
  {mod:'Funções',k:'MODAL_OBRIGATORIO',d:'Exigir o modal de transporte na entrada de colaborador (ESG)',t:'bool',v:'Sim'},
- {mod:'Funções',k:'ENVIA_QR_WA',d:'Enviar o QR do convite por WhatsApp ao visitante',t:'bool',v:'Não',fase2:true},
- {mod:'Funções',k:'AVISO_MERCADORIA',d:'Avisar chegada e entrega de mercadoria no WhatsApp',t:'bool',v:'Não',fase2:true},
+ {mod:'Funções',k:'ENVIA_QR_WA',d:'Enviar o QR do convite por WhatsApp ao visitante',t:'bool',v:'Não'},
+ {mod:'Funções',k:'AVISO_MERCADORIA',d:'Avisar chegada e entrega de mercadoria no WhatsApp',t:'bool',v:'Não'},
+ {mod:'Funções',k:'AVISO_ANFITRIAO',d:'Avisar o anfitrião no WhatsApp quando a visita entrar',t:'bool',v:'Não'},
  {mod:'Funções',k:'LIBERACAO_WHATSAPP',d:'Anfitrião libera a entrada respondendo 1/2 no WhatsApp',t:'bool',v:'Não',fase2:true},
  {mod:'ESG',k:'ESG_IDA_VOLTA',d:'Calcular ida e volta (distância × 2 por dia)',t:'bool',v:'Sim',esg:true},
  {mod:'ESG',k:'CO2_KM_CARRO',d:'Carro',t:'dec',v:null,esg:true},
