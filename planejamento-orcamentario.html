@@ -403,7 +403,7 @@ async function loadReal(ano,dept){
 }
 
 /* ============================== ESTADO UI ============================= */
-const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false};
+const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false,grp:null};
 const fmt=n=>{const v=Math.round(n*100)/100;return Number.isInteger(v)?v.toLocaleString('pt-BR'):v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const money=n=>'R$ '+fmt(n);
 const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -448,11 +448,16 @@ function prazoStatus(dept,ano,q){
   return {s:'Enviado',c:'ok'};
 }
 const allowedDepts=()=>S.role.all?[...new Set([...planDepts(S.ano),...myDepts()])].sort():myDepts();
+const gruposComp=()=>{const map={};DB.ccs.forEach(c=>{const g=String(c.GESTAO||'').trim();if(!g)return;(map[g]=map[g]||[]).push(c);});
+  return Object.keys(map).sort().map(ctrl=>{const ccs=map[ctrl];const descs=[...new Set(ccs.map(c=>c.DESC_CC||''))];
+    return {ctrl,ccs:ccs.map(c=>c.COD_CC),label:(descs.length===1&&descs[0]?descs[0]+' \u00b7 ':'')+(deptName(ctrl)||ctrl)};});};
+const myGrupos=()=>{const gs=gruposComp();if(!gs.length)return [];if(S.role.admin)return gs;const mine=myDepts();return gs.filter(g=>mine.includes(g.ctrl));};
 
 const NAVICON={
  gest:'<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
  prazos:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
  plan:'<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+ comp:'<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
  acomp:'<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
  aprov:'<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
 };
@@ -460,6 +465,7 @@ function views(){
   const v=[];
   if(S.role.admin){v.push(['gest','Gestores','Cadastros']);v.push(['prazos','Exercícios e prazos','Cadastros']);}
   v.push(['plan','Planejamento','Operações']);
+  if(myGrupos().length)v.push(['comp','Compartilhado','Operações']);
   v.push(['acomp','Acompanhamento','Operações']);
   if(S.role.aprov)v.push(['aprov','Aprovação','Operações']);
   return v;
@@ -482,7 +488,7 @@ function render(){
     if(!S.pAno||!DB.ex[S.pAno])S.pAno=S.ano;
     if(DB.plan[S.ano]===undefined)DB.plan[S.ano]=DB.plan[S.ano]||[];
   }
-  ({plan:renderPlan,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
+  ({plan:renderPlan,comp:renderComp,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
 }
 function setHead(t,m){document.getElementById('vTitle').textContent=t;document.getElementById('vMeta').textContent=m;}
 function deptTabs(deps){return deps.length>1?`<div class="tabs" role="group" aria-label="Departamento">${deps.map(d=>`<button class="tab" data-dept="${d}" aria-pressed="${S.dept===d}">${esc(deptName(d))}</button>`).join('')}</div>`:`<b>${esc(deptName(deps[0]||''))}</b>`;}
@@ -919,6 +925,63 @@ function doImport(){
   runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length} itens importados como rascunho em ${ano} (${money(pv.total)}).`)).catch(fail);
 }
 
+/* ============================ COMPARTILHADO =========================== */
+function renderComp(){
+  const gs=myGrupos();
+  if(!ANOS().length){setHead('Compartilhado','');document.getElementById('view').innerHTML=noExPanel();return;}
+  if(!gs.length){setHead('Compartilhado','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Nenhum centro de custo compartilhado sob sua gestão.</p></div>`;return;}
+  if(!S.grp||!gs.some(g=>g.ctrl===S.grp))S.grp=gs[0].ctrl;
+  const G=gs.find(g=>g.ctrl===S.grp);
+  const canEdit=S.role.admin||myDepts().includes(S.grp);
+  setHead(`Compartilhado ${S.ano}`,canEdit?'O que você edita aqui vale como o planejamento do departamento':'');
+  const set=new Set(G.ccs);
+  const its=(DB.plan[S.ano]||[]).filter(i=>set.has(i.cc)).sort((a,b)=>a.dept.localeCompare(b.dept)||a.cc.localeCompare(b.cc)||a.det.localeCompare(b.det));
+  const ms=[0,1,2,3,4,5,6,7,8,9,10,11];
+  const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
+  const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
+  let h=`<div class="row"><div class="seg" role="group" aria-label="Grupo">${gs.map(g=>`<button data-grp="${g.ctrl}" aria-pressed="${S.grp===g.ctrl}">${esc(g.label)}</button>`).join('')}</div>${yearSeg(S.ano,'data-ano')}</div>`;
+  h+=`<div class="stats"><div class="stat"><span>Previsto no ano</span><b>${money(its.reduce((a,i)=>a+i.prev.reduce((x,y)=>x+y,0),0))}</b></div><div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div><div class="stat"><span>Aguardando diretoria</span><b>${money(sumIf((i,m)=>i.st[m]==='Pendente'))}</b></div><div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div><div class="stat"><span>Departamentos</span><b>${new Set(its.map(i=>i.dept)).size} de ${DB.depts.length}</b></div></div>`;
+  let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
+  [0,1,2,3].forEach(q=>{t+=`<th class="qh" colspan="3">${QLAB[q]}</th>`;});
+  t+=`<th class="tot" rowspan="2">Total</th></tr><tr>`;
+  ms.forEach(m=>{t+=`<th class="mh ${m%3===0?'qs':''}">${MES[m]}</th>`;});
+  t+=`</tr></thead><tbody>`;
+  if(!its.length)t+=`<tr><td class="empty" colspan="14">Nenhum item deste grupo em ${S.ano}. Os gestores lançam pelo Planejamento de cada departamento e tudo aparece aqui.</td></tr>`;
+  [...new Set(its.map(i=>i.dept))].sort().forEach(dep=>{
+    const g=its.filter(i=>i.dept===dep);
+    const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0);
+    const gest=[...new Set(DB.vincs.filter(v=>v.cod===dep).map(v=>v.nome))].join(', ');
+    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(dep))}</span><span class="code">${dep}</span>${gest?`<span class="detline">${esc(gest)}</span>`:''}</td><td colspan="12"></td><td class="tot">${money(sub)}</td></tr>`;
+    g.forEach(i=>{
+      const rt=ms.reduce((b,m)=>b+vig(i,m),0);
+      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}</td>`;
+      ms.forEach(m=>{
+        const st=i.prev[m]>0?i.st[m]:'';
+        const ap=st==='Aprovado'&&i.apr[m]!=null;
+        const show=ap?i.apr[m]:i.prev[m];
+        const cut=ap&&Math.abs(i.apr[m]-i.prev[m])>0.005;
+        const mot=i.mot[m]?' · '+i.mot[m]:'';
+        const tip=ap?`Aprovado · ${money(i.apr[m])}${cut?` (pedido ${money(i.prev[m])})`:''}${mot}`:st==='Reprovado'?`Reprovado${mot}`:st;
+        t+=`<td class="c ${m%3===0?'qs':''} ${st?'s-'+st:''} ${cut?'cut':''}" title="${esc(tip)}"><input data-key="${esc(i.key)}-${m}" data-ikey="${esc(i.key)}" data-m="${m}" inputmode="decimal" value="${show?fmt(show):''}" ${(!canEdit||!mOpen(S.ano,m,i.dept))?'disabled':''} aria-label="${esc(i.det)} – ${MES[m]}"></td>`;
+      });
+      t+=`<td class="tot">${money(rt)}</td></tr>`;
+    });
+  });
+  t+=`</tbody><tfoot><tr><td class="item">Total · ${esc(G.label)}</td>`;
+  ms.forEach(m=>{t+=`<td class="${m%3===0?'qs':''}">${fmt(its.reduce((a,i)=>a+vig(i,m),0))}</td>`;});
+  t+=`<td class="tot">${money(its.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0))}</td></tr></tfoot></table></div>`;
+  h+=t;
+  h+=`<div class="legend"><span><i class="sw" style="background:var(--panel)"></i>Rascunho</span><span><i class="sw" style="background:var(--warn-soft)"></i>Aguardando diretoria</span><span><i class="sw" style="background:var(--ok-soft)"></i>Aprovado</span><span><i class="sw" style="background:var(--bad-soft)"></i>Reprovado</span><span><i class="sw" style="background:linear-gradient(225deg,var(--warn) 30%,var(--panel) 30%)"></i>Aprovado com ajuste</span></div>`;
+  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
+  v.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{S.grp=b.dataset.grp;render();});
+  v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
+  v.querySelectorAll('td.c input').forEach(inp=>{
+    inp.onfocus=()=>inp.select();
+    inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
+    inp.onchange=()=>editCell(inp.dataset.ikey,+inp.dataset.m,parse(inp.value));
+  });
+}
+
 /* ============================ ACOMPANHAMENTO ========================== */
 const revLimite=(a,m)=>new Date(a,m+1,10,23,59,59);
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
@@ -1343,7 +1406,7 @@ async function refreshData(){
   try{
     const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
       getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
-      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
+      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
@@ -1376,7 +1439,7 @@ async function start(){
     DB.me.uid=await ensureUser(DB.me.email);
     const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
       getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
-      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO&$top=2000'),
+      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
       getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
       getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
       getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
