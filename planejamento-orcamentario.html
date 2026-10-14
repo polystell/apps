@@ -706,7 +706,7 @@ async function persistCell(it,m,ano){
     try{await mergeItem(CFG.lists.plan,it.ids[m],{GESTORId:DB.me.uid});}catch(e){console.warn('GESTOR não gravado na linha',it.ids[m],e.message);}
   }
 }
-function setCell(it,m,v){
+function setCell(it,m,v,keepPend){
   const shown=it.st[m]==='Aprovado'&&it.apr[m]!=null?it.apr[m]:it.prev[m];
   if(v===shown)return {changed:false};
   const old=it.prev[m];
@@ -714,16 +714,17 @@ function setCell(it,m,v){
   it.prev[m]=v;
   let ev=null;
   if(s==='Aprovado'){it.st[m]=v>0?'Pendente':'Rascunho';it.apr[m]=null;delete it.mot[m];ev='re';}
-  else if(s==='Pendente'){it.st[m]='Rascunho';it.apr[m]=null;delete it.mot[m];ev='ca';}
+  else if(s==='Pendente'){if(keepPend&&v>0){it.st[m]='Pendente';ev='kp';}else{it.st[m]='Rascunho';ev='ca';}it.apr[m]=null;delete it.mot[m];}
   else {it.st[m]='Rascunho';it.apr[m]=null;delete it.mot[m];}
   return {changed:true,ev};
 }
-function editCell(key,m,v){
+function editCell(key,m,v,keepPend){
   const it=findItem(key);if(!it)return;
-  const r=setCell(it,m,v);
+  const r=setCell(it,m,v,keepPend);
   if(!r.changed){rerenderKeepFocus();return;}
   if(r.ev==='re')toast(`${MES[m]} de “${it.det}” já estava aprovado. Voltou para aprovação.`,'warn');
   if(r.ev==='ca')toast(`Envio de ${MES[m]} de “${it.det}” cancelado. Reenvie quando terminar os ajustes.`);
+  if(r.ev==='kp')toast(`Valor de ${MES[m]} de “${it.det}” ajustado — segue aguardando a diretoria.`);
   const ano=S.ano;
   busy(true);persistCell(it,m,ano).catch(fail).finally(()=>busy(false));
   rerenderKeepFocus();
@@ -978,7 +979,7 @@ function renderComp(){
   v.querySelectorAll('td.c input').forEach(inp=>{
     inp.onfocus=()=>inp.select();
     inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
-    inp.onchange=()=>editCell(inp.dataset.ikey,+inp.dataset.m,parse(inp.value));
+    inp.onchange=()=>editCell(inp.dataset.ikey,+inp.dataset.m,parse(inp.value),true);
   });
 }
 
