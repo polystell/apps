@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.16">
+<link rel="stylesheet" href="/core/polystell.css?v=2.17">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -61,13 +61,15 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 #elist .act .btn{min-height:44px;font-size:15px;padding:0 16px}
 .em-tel{display:flex;gap:6px;flex-wrap:wrap}
 .em-tel a{text-decoration:none}
+#olist .orow .meta .i{width:14px;height:14px;vertical-align:-2px}
+@media(max-width:700px){#olist .orow{flex-wrap:wrap}#olist .orow .act{width:100%;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}}
 @media(max-width:560px){.em-kpis b{font-size:22px}.em-ativa h2{font-size:19px}}
 </style>
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.16"></script>
-<script src="comum.js?v=2.16"></script>
+<script src="/core/polystell.js?v=2.17"></script>
+<script src="comum.js?v=2.17"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -83,7 +85,7 @@ const ST={view:'painel',isTI:false,isExp:false,isRH:false,posto:true,log:false,r
  f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
     v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:'',auto:{}},
     m:{dest:null,setor:'',vol:'1',rem:'',desc:'',modo:'pessoa',setorDest:''},
-    o:{tipo:'Segurança',grav:'Baixa',desc:'',envNome:'',envPlaca:'',aba:'abertas',q:''},
+    o:{tipo:'Segurança',grav:'Baixa',desc:'',env:null,envNome:'',envPlaca:'',aba:'abertas',q:''},
     h:{k:'p',q:''},
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
     lv:{canc:false},
@@ -148,6 +150,7 @@ async function doRefresh(){
  ST.sync=fails.length?{at:ST.sync.at,err:(fails[0]?.message||'erro')+(fails.length>1?' (+'+(fails.length-1)+' consulta(s))':'')}:{at:new Date(),err:null};
  if(ST.posto&&!fails.length&&tAtivo()){try{const fixed=await P.reconciliar(ST.d.agendaRec||[],ST.d.openP);if(fixed)ST.d.agenda=await P.agendaHoje();}catch(e){console.warn(e);}}
  chrome();if(VIEWS[ST.view]?.update)VIEWS[ST.view].update();
+ if(ST.view==='ocorrencias'&&ST.f.o.aba==='encerradas')carregaEnc();
  checaTroca();aposEmerg();
 }
 /* emergência: a guarita enxerga quem está dentro, então completa a lista de evacuação se quem acionou não pôde (brigadista) */
@@ -417,7 +420,7 @@ async function saidaVeic(id,vObj){if(needTurno())return;const v=vObj||ST.d.openV
     try{const r=await P.saidaVeiculo(v,{porteiro:porteiro(),excecao:m.value});if(r.jaSaiu){toast('A saída já tinha sido registrada (outro dispositivo).','warn');}else if(r.parcial){toast(r.parcial,'warn');}else toast('Saída registrada como exceção. Ocorrência aberta para a Segurança.','warn');refresh();return true;}catch(e){writeErr(e);return false;}}}]});
   return;}
  await dialog({title:'Saída do veículo',html:'<p>Placa <b>'+esc(v.PLACA)+'</b> · '+esc(val(v.FINALIDADE)||'')+' · no pátio há '+fmt.dur(idade(v.ENTRADA))+'</p>',
-  actions:[{label:'Cancelar',value:null},{label:'Confirmar saída',kind:'primary',onClick:async()=>{try{const r=await P.saidaVeiculo(v,{porteiro:porteiro()});if(r.precisaExcecao){toast('A autorização da Expedição não consta no registro atual. Confira e, se for o caso, registre como exceção.','warn');await refresh();const nv=ST.d.openV.find(x=>x.id===v.id);if(nv)setTimeout(()=>saidaVeic(nv.id,nv),60);return true;}if(r.jaSaiu)toast('A saída já tinha sido registrada (outro dispositivo).','warn');else toast('Saída registrada: '+v.PLACA);refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
+  actions:[{label:'Cancelar',value:null},{label:'Confirmar saída',kind:'primary',onClick:async()=>{try{const r=await P.saidaVeiculo(v,{porteiro:porteiro()});if(r.precisaExcecao){toast('A autorização da Expedição não consta no registro atual. Confira e, se for o caso, registre como exceção.','warn');await refresh();const nv=ST.d.openV.find(x=>x.id===v.id);if(nv)setTimeout(()=>saidaVeic(nv.id,nv),60);return true;}if(r.autMudou){toast('A Expedição alterou a autorização desta coleta depois da tela carregar — confira antes de liberar.','warn');refresh();return true;}if(r.jaSaiu)toast('A saída já tinha sido registrada (outro dispositivo).','warn');else toast('Saída registrada: '+v.PLACA);refresh();return true;}catch(e){writeErr(e);return false;}}}]});}
 /* ================= MERCADORIAS ================= */
 VIEWS.mercadorias={
  mount(){const F=ST.f.m;
@@ -456,49 +459,75 @@ function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id)
   '<div id="dt"'+(setorial?'':' hidden')+'><div class="field"><label for="drp">Quem está retirando *</label><input id="drp" maxlength="60"></div><div class="field"><label for="dri">Matrícula ou documento</label><input id="dri" maxlength="20"><span class="hint">Documento é gravado mascarado.</span></div></div>',
   actions:[{label:'Cancelar',value:null},{label:'Confirmar entrega',kind:'ok',onClick:async d=>{
    const por=outro?d.querySelector('#drp').value.trim():'';if(outro&&!por){d.querySelector('#drp').setAttribute('aria-invalid','true');toast('Informe quem está retirando.','err');return false;}
-   try{await P.conferirTurno(porteiro());const at=await P.get('merc',id);if(val(at.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue (outro registro).','warn');refresh();return true;}
-    await P.patch('merc',id,{STATUS:'Entregue',RETIRADA_PROPRIA:!outro,RETIRADO_POR:outro?por:(m.DESTINATARIO_NOME||''),RETIRADO_IDENT:outro?P.maskDoc(d.querySelector('#dri').value):(m.DESTINATARIO_MATRICULA||''),DATA_RETIRADA:new Date().toISOString(),PORTEIRO_ENTREGA:porteiro()});
+   try{await P.conferirTurno(porteiro());const at=await P.get('merc',id);if(val(at.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue'+(at.RETIRADO_POR?' ('+at.RETIRADO_POR+')':'')+' — outro registro.','warn');refresh();return true;}
+    const campos={STATUS:'Entregue',RETIRADA_PROPRIA:!outro,RETIRADO_POR:outro?por:(m.DESTINATARIO_NOME||''),RETIRADO_IDENT:outro?P.maskDoc(d.querySelector('#dri').value):(m.DESTINATARIO_MATRICULA||''),DATA_RETIRADA:new Date().toISOString(),PORTEIRO_ENTREGA:porteiro()};
+    try{await P.patch('merc',id,campos,{etag:at._etag});}
+    catch(e2){if(e2.status!==412)throw e2;const de=await P.get('merc',id);
+     if(val(de.STATUS)==='Entregue'){toast('Esta mercadoria já foi entregue'+(de.RETIRADO_POR?' ('+de.RETIRADO_POR+')':'')+' — outro registro.','warn');refresh();return true;}
+     await P.patch('merc',id,campos,{etag:de._etag});}
     toast('Entrega registrada.');refresh();return true;}catch(e){writeErr(e);return false;}}}]});
  setTimeout(()=>{const q=$('#dq');if(q)q.onclick=e=>{const b=e.target.closest('[data-q]');if(!b)return;outro=b.dataset.q==='1';$$('#dq [data-q]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('#dt').hidden=!outro;if(outro)$('#drp').focus();};},0);}
 /* ================= OCORRÊNCIAS ================= */
 VIEWS.ocorrencias={
  mount(){const F=ST.f.o;
-  const pessoasHoje=[...new Map([...ST.d.openP,...ST.d.movPHoje].map(m=>[norm(m.NOME),{n:m.NOME,mat:String(m.MATRICULA||'').trim(),e:m.EMPRESA||''}])).values()];
+  /* chave nome+matrícula: homônimos aparecem separados, cada um com a sua identidade */
+  const pessoasHoje=[...new Map([...ST.d.openP,...ST.d.movPHoje].map(m=>[norm(m.NOME)+'|'+String(m.MATRICULA||'').trim(),{n:m.NOME,mat:String(m.MATRICULA||'').trim(),e:m.EMPRESA||''}])).values()];
   const placasHoje=[...new Set([...ST.d.openV,...ST.d.movVHoje].map(v=>v.PLACA).filter(Boolean))];
   page('Ocorrências','Registro e tratamento das ocorrências da portaria. Encerrar pede um parecer e fica registrado.',
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Registrar ocorrência</h2></div>'+
    '<div class="grid2"><div class="field"><label for="ot">Tipo</label><select id="ot" data-bind="o.tipo">'+['Segurança','Acesso indevido','Veículo','Mercadoria','Estrutura','Outro'].map(t=>'<option'+(F.tipo===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="field"><label for="og">Gravidade</label><select id="og" data-bind="o.grav">'+['Baixa','Média','Alta'].map(t=>'<option'+(F.grav===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div></div>'+
-   '<div class="grid2"><div class="field"><label for="oenv">Pessoa envolvida (opcional)</label><input id="oenv" list="oenvl" maxlength="80" autocomplete="off" data-bind="o.envNome" value="'+esc(F.envNome)+'" placeholder="Quem está ou passou hoje, ou digite"><datalist id="oenvl">'+pessoasHoje.map(p=>'<option value="'+esc(p.n)+'">'+esc([p.mat&&'Matr. '+p.mat,p.e].filter(Boolean).join(' · '))+'</option>').join('')+'</datalist></div>'+
+   '<div class="grid2"><div class="field"><label for="oenv">Pessoa envolvida (opcional)</label><div id="oenvbox"></div></div>'+
    '<div class="field"><label for="opl">Veículo envolvido (opcional)</label><input id="opl" list="opll" maxlength="8" style="text-transform:uppercase" autocomplete="off" data-bind="o.envPlaca" value="'+esc(F.envPlaca)+'" placeholder="ABC1D23"><datalist id="opll">'+placasHoje.map(p=>'<option value="'+esc(p)+'">').join('')+'</datalist></div></div>'+
    '<div class="field"><label for="od">Descrição *</label><textarea id="od" data-bind="o.desc" maxlength="2000" placeholder="O que aconteceu, quem estava envolvido, horário…">'+esc(F.desc)+'</textarea></div>'+
    '<button class="btn primary block" id="ogo" type="button">Registrar ocorrência</button><div class="note">Gravidade <b>Alta</b>: comunique a Segurança imediatamente, além do registro. Fotos podem ser anexadas no item da lista.</div></div>'+
-   '<div class="panel"><div class="toolbar"><div class="seg" id="oaba"><button type="button" data-oaba="abertas" aria-pressed="'+(F.aba!=='encerradas')+'">Em aberto <span class="count" id="ocount"></span></button><button type="button" data-oaba="encerradas" aria-pressed="'+(F.aba==='encerradas')+'">Encerradas</button></div>'+
+   '<div class="panel"><div class="toolbar"><div class="seg" id="oaba"><button type="button" data-oaba="abertas" aria-pressed="'+(F.aba!=='encerradas')+'">Em aberto <span class="count" id="ocount"></span></button><button type="button" data-oaba="encerradas" aria-pressed="'+(F.aba==='encerradas')+'">Encerradas <small>(últimas 50)</small></button></div>'+
    '<input type="search" data-bind="o.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar tipo, descrição, nome, placa…" aria-label="Buscar ocorrências"></div><div class="rows" id="olist"></div></div></div>');
-  bindInputs(()=>this.update());
+  bindInputs(()=>this.update());this.drawEnv(pessoasHoje);
   SHELL.page.onclick=e=>{if(e.target.closest('#ogo')){regOcor();return;}
    const ab=e.target.closest('[data-oaba]');if(ab){ST.f.o.aba=ab.dataset.oaba;$$('#oaba [data-oaba]').forEach(x=>x.setAttribute('aria-pressed',String(x===ab)));if(ab.dataset.oaba==='encerradas'&&!ST.ocorEnc)carregaEnc();this.update();return;}
    const an=e.target.closest('[data-oan]');if(an){anOcor(an.dataset.oan);return;}
+   if(e.target.closest('[data-oretry]')){ST.ocorEncErr=null;this.update();carregaEnc();return;}
    const en=e.target.closest('[data-oen]');if(en){dlgEncerrarOcor(en.dataset.oen);return;}
    const o=e.target.closest('[data-oc]');if(o){const x=(ST.f.o.aba==='encerradas'?(ST.ocorEnc||[]):ST.d.ocor).find(y=>y.id===o.dataset.oc);if(x)dlgOcor(x);}};},
+ /* quem está/passou hoje, escolhido com identidade (nome + matrícula) — homônimos não se misturam */
+ drawEnv(lista){const box=$('#oenvbox');if(!box)return;const F=ST.f.o;
+  if(F.env){box.innerHTML='<div class="selbox"><div class="main"><b>'+esc(F.env.n)+'</b><div class="meta">'+esc([F.env.mat&&'Matr. '+F.env.mat,F.env.e].filter(Boolean).join(' · ')||'sem matrícula')+'</div></div><button type="button" data-x>trocar</button></div>';box.querySelector('[data-x]').onclick=()=>{F.env=null;F.envNome='';this.drawEnv(lista);};return;}
+  box.innerHTML='<div class="pick"><input id="oenv" type="search" maxlength="80" autocomplete="off" placeholder="Quem está ou passou hoje, ou digite" aria-label="Pessoa envolvida" value="'+esc(F.envNome)+'"><div class="menu" hidden></div></div>';
+  const inp=box.querySelector('input'),menu=box.querySelector('.menu');let res=[];
+  const show=()=>{F.envNome=inp.value;const q=norm(inp.value);res=q.length<2?[]:lista.filter(p=>norm(p.n+' '+p.mat).includes(q)).slice(0,8);
+   menu.hidden=!res.length;menu.innerHTML=res.map((c,i)=>'<button type="button" data-i="'+i+'"><b>'+esc(c.n)+'</b><div class="meta">'+esc(c.mat?'Matr. '+c.mat:'sem matrícula')+(c.e?' · '+esc(c.e):'')+'</div></button>').join('');};
+  inp.addEventListener('input',show);
+  inp.addEventListener('blur',()=>setTimeout(()=>{menu.hidden=true;},200));
+  menu.onclick=e=>{const b=e.target.closest('[data-i]');if(!b)return;F.env=res[+b.dataset.i];F.envNome='';this.drawEnv(lista);};},
  update(){banners();if(!$('#olist'))return;const F=ST.f.o;const enc=F.aba==='encerradas';
   let rows=(enc?(ST.ocorEnc||[]):ST.d.ocor).slice().sort((a,b)=>new Date((enc?b.DATA_ENCERRAMENTO:b.Created)||0)-new Date((enc?a.DATA_ENCERRAMENTO:a.Created)||0));
   const q=norm(F.q);if(q)rows=rows.filter(o=>norm([val(o.TIPO),o.DESCRICAO,o.ENV_NOME,o.ENV_PLACA,o.REGISTRADO_POR,o.ENCERRADO_POR,o.PARECER].join(' ')).includes(q));
   $('#ocount').textContent=ST.d.ocor.length;
   $('#olist').innerHTML=rows.length?rows.map(o=>{const g=val(o.GRAVIDADE),st=val(o.STATUS);
-   const vinc=[o.ENV_NOME&&'👤 '+o.ENV_NOME,o.ENV_PLACA&&'🚗 '+o.ENV_PLACA].filter(Boolean).join(' · ');
-   return '<div class="row"><div class="main"><div class="t">'+esc(val(o.TIPO))+(vinc?' <span class="meta">'+esc(vinc)+'</span>':'')+'</div><div class="meta">'+esc(String(o.DESCRICAO||'').slice(0,140))+(String(o.DESCRICAO||'').length>140?'…':'')+'</div><div class="detail">'+esc((enc?'Encerrada '+(o.DATA_ENCERRAMENTO?quando(o.DATA_ENCERRAMENTO):'')+(o.ENCERRADO_POR?' por '+o.ENCERRADO_POR:''):'Registrada '+(o.Created?quando(o.Created):'')+(o.REGISTRADO_POR?' por '+o.REGISTRADO_POR:'')))+'</div></div>'+
+   const vinc=[o.ENV_NOME&&icon('user')+' '+esc(o.ENV_NOME),o.ENV_PLACA&&icon('car')+' '+esc(o.ENV_PLACA)].filter(Boolean).join(' · ');
+   return '<div class="row orow"><div class="main"><div class="t">'+esc(val(o.TIPO))+(vinc?' <span class="meta">'+vinc+'</span>':'')+'</div><div class="meta">'+esc(String(o.DESCRICAO||'').slice(0,140))+(String(o.DESCRICAO||'').length>140?'…':'')+'</div><div class="detail">'+esc((enc?'Encerrada '+(o.DATA_ENCERRAMENTO?quando(o.DATA_ENCERRAMENTO):'')+(o.ENCERRADO_POR?' por '+o.ENCERRADO_POR:''):'Registrada '+(o.Created?quando(o.Created):'')+(o.REGISTRADO_POR?' por '+o.REGISTRADO_POR:'')))+'</div></div>'+
     '<div class="act"><span class="chip dot '+(g==='Alta'?'err':g==='Média'?'warn':'')+'">'+esc(g)+'</span><span class="chip">'+esc(st)+'</span><button class="btn sm" data-oc="'+esc(o.id)+'">Ver</button>'+(enc?'':(st==='Aberta'?'<button class="btn sm" data-oan="'+esc(o.id)+'">Em análise</button>':'')+'<button class="btn sm primary" data-oen="'+esc(o.id)+'">Encerrar</button>')+'</div></div>';}).join('')
-   :'<div class="empty">'+(enc?(ST.ocorEnc?'Nenhuma ocorrência encerrada'+(q?' para a busca':'')+'.':'Carregando…'):'Nenhuma ocorrência em aberto'+(q?' para a busca':'')+'.')+'</div>';}
+   :'<div class="empty">'+(enc?(ST.ocorEncErr&&!ST.ocorEnc?'':ST.ocorEnc?'Nenhuma ocorrência encerrada'+(q?' nas últimas 50':'')+'.':'Carregando…'):'Nenhuma ocorrência em aberto'+(q?' para a busca':'')+'.')+'</div>';
+  if(enc){let ex='';
+   if(ST.ocorEncErr)ex+='<div class="banner err">'+icon('cloudoff')+'<span><b>Não foi possível consultar as encerradas.</b> '+esc(ST.ocorEncErr)+(ST.ocorEnc?' Mostrando a última leitura, que pode estar desatualizada.':'')+'</span><button class="btn sm" data-oretry type="button">Tentar novamente</button></div>';
+   if(!ST.ocorEncErr&&ST.ocorEnc&&q)ex+='<div class="detail" style="margin-top:8px">A busca olha só as últimas 50 encerradas.</div>';
+   $('#olist').insertAdjacentHTML('afterbegin',ex);}}
 };
 function dlgOcor(x){dialog({title:val(x.TIPO)+' · '+val(x.GRAVIDADE),html:'<dl class="kv"><dt>Situação</dt><dd>'+esc(val(x.STATUS))+'</dd>'+(x.ENV_NOME?'<dt>Pessoa</dt><dd>'+esc(x.ENV_NOME)+(x.ENV_MATRICULA?' · Matr. '+esc(x.ENV_MATRICULA):'')+'</dd>':'')+(x.ENV_PLACA?'<dt>Veículo</dt><dd>'+esc(x.ENV_PLACA)+'</dd>':'')+'<dt>Registrada</dt><dd>'+esc((x.REGISTRADO_POR||'—')+(x.Created?' · '+quando(x.Created):''))+'</dd>'+(val(x.STATUS)==='Encerrada'?'<dt>Encerrada</dt><dd>'+esc((x.ENCERRADO_POR||'—')+(x.DATA_ENCERRAMENTO?' · '+quando(x.DATA_ENCERRAMENTO):''))+'</dd>':'')+'</dl><p style="white-space:pre-wrap">'+esc(x.DESCRICAO||'')+'</p>'+(x.PARECER?'<div class="lbl">Parecer</div><pre class="resumo">'+esc(x.PARECER)+'</pre>':'')});}
 async function regOcor(){if(needTurno())return;const F=ST.f.o;const d=F.desc.trim();const t=$('#od');
  if(d.length<5){t.setAttribute('aria-invalid','true');t.focus();toast('Descreva a ocorrência.','err');return;}t.removeAttribute('aria-invalid');
- const nomeEnv=F.envNome.trim();const matEnv=nomeEnv?String(([...ST.d.openP,...ST.d.movPHoje].find(m=>norm(m.NOME)===norm(nomeEnv))||{}).MATRICULA||'').trim():'';
+ const sel=F.env;const nomeEnv=sel?sel.n:F.envNome.trim();
+ const cands=nomeEnv&&!sel?[...new Set([...ST.d.openP,...ST.d.movPHoje].filter(m=>norm(m.NOME)===norm(nomeEnv)).map(m=>String(m.MATRICULA||'').trim()).filter(Boolean))]:[];
+ const matEnv=sel?(sel.mat||''):(cands.length===1?cands[0]:'');
  const placaEnv=F.envPlaca.trim()?P.normPlaca(F.envPlaca):'';
  const b=$('#ogo');b.disabled=true;
- try{await P.conferirTurno(porteiro());await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro(),ENV_NOME:nomeEnv,ENV_MATRICULA:matEnv,ENV_PLACA:placaEnv});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:'',envNome:'',envPlaca:''});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
+ try{await P.conferirTurno(porteiro());await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro(),ENV_NOME:nomeEnv,ENV_MATRICULA:matEnv,ENV_PLACA:placaEnv});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:'',envNome:'',envPlaca:'',env:null});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#ogo');if(x)x.disabled=false;}}
-async function carregaEnc(){try{ST.ocorEnc=await P.ocorrenciasEncerradas(50);}catch(e){ST.ocorEnc=[];toast(e.message||'Erro ao carregar encerradas.','err');}if(ST.view==='ocorrencias')VIEWS.ocorrencias.update();}
+let encBusy=false;
+async function carregaEnc(){if(encBusy)return;encBusy=true;
+ try{ST.ocorEnc=await P.ocorrenciasEncerradas(50);ST.ocorEncErr=null;}
+ catch(e){ST.ocorEncErr=e.message||'Falha na consulta.';}
+ finally{encBusy=false;}if(ST.view==='ocorrencias')VIEWS.ocorrencias.update();}
 async function anOcor(id){if(needTurno())return;try{await P.conferirTurno(porteiro());const r=await P.analisarOcorrencia(id);if(r.ja)toast('Esta ocorrência já foi encerrada em outro computador.','warn');else toast('Marcada como "Em análise".');refresh();}catch(e){writeErr(e);}}
 function dlgEncerrarOcor(id){const x=ST.d.ocor.find(y=>y.id===id);if(!x||needTurno())return;
  dialog({title:'Encerrar ocorrência',html:'<p><b>'+esc(val(x.TIPO))+'</b> · '+esc(val(x.GRAVIDADE))+(x.ENV_NOME?' · '+esc(x.ENV_NOME):'')+(x.ENV_PLACA?' · '+esc(x.ENV_PLACA):'')+'</p><div class="field"><label for="opar">Parecer (o que foi feito) *</label><textarea id="opar" maxlength="2000" placeholder="Como foi tratada, providências, conclusão…"></textarea></div>',
@@ -540,9 +569,9 @@ VIEWS.seguranca={
   SHELL.page.onchange=async e=>{const sw=e.target.closest('[data-flag]');if(!sw)return;sw.disabled=true;
    try{await P.saveParam(sw.dataset.flag,sw.checked?'Sim':'Não');await P.loadParams();toast('Função '+(sw.checked?'ativada':'desativada')+'.');}catch(er){sw.checked=!sw.checked;writeErr(er);}finally{sw.disabled=false;}};
   SHELL.page.onclick=async e=>{
-   if(e.target.closest('#sesgsave')){const b=e.target.closest('#sesgsave');b.disabled=true;try{for(const i of $$('[data-pzd]')){const v=i.value.trim().replace(',','.');if(v!==''&&!(/^\d+(\.\d{1,5})?$/.test(v))){i.setAttribute('aria-invalid','true');throw new Error('Fator: número maior ou igual a zero (ex.: 0,12).');}i.removeAttribute('aria-invalid');const atual=P.param(i.dataset.pzd);const novo=v===''?null:Number(v);if(novo!==atual)await P.saveParam(i.dataset.pzd,v===''?'':String(novo));}await P.loadParams();this.drawConfig();toast('Fatores de emissão salvos.');}catch(er){writeErr(er);}finally{b.disabled=false;}}
+   if(e.target.closest('#sesgsave')){const b=e.target.closest('#sesgsave');b.disabled=true;try{for(const i of $$('[data-pzd]')){const v=i.value.trim().replace(',','.');if(v!==''&&!(/^\d+(\.\d{1,5})?$/.test(v))){i.setAttribute('aria-invalid','true');throw new Error('Fator: número maior ou igual a zero (ex.: 0,12).');}i.removeAttribute('aria-invalid');const atual=P.param(i.dataset.pzd);const novo=v===''?null:Number(v);if(novo!==atual)await P.saveParam(i.dataset.pzd,v===''?'':String(novo));}await P.loadParams();this.redesenha(['pzd']);toast('Fatores de emissão salvos.');}catch(er){writeErr(er);}finally{b.disabled=false;}}
    if(e.target.closest('#spzsave')){const b=e.target.closest('#spzsave');b.disabled=true;try{for(const i of $$('[data-pz]')){const n=Number(i.value);if(!(n>0)){i.setAttribute('aria-invalid','true');throw new Error('Prazos devem ser números maiores que zero.');}i.removeAttribute('aria-invalid');if(n!==P.param(i.dataset.pz))await P.saveParam(i.dataset.pz,n);}
-    for(const i of $$('[data-pzt]')){const v=i.value.trim();if(i.dataset.pzt==='TURNO_HORARIOS'&&v!=='-'&&!/^([01]\d|2[0-3]):[0-5]\d(\s*,\s*([01]\d|2[0-3]):[0-5]\d)*$/.test(v)){i.setAttribute('aria-invalid','true');throw new Error('Horários no formato 06:00,18:00.');}i.removeAttribute('aria-invalid');if(v!==String(P.param(i.dataset.pzt)))await P.saveParam(i.dataset.pzt,v);}await P.loadParams();this.drawConfig();toast('Prazos salvos.');chrome();}catch(er){writeErr(er);}finally{b.disabled=false;}}
+    for(const i of $$('[data-pzt]')){const v=i.value.trim();if(i.dataset.pzt==='TURNO_HORARIOS'&&v!=='-'&&!/^([01]\d|2[0-3]):[0-5]\d(\s*,\s*([01]\d|2[0-3]):[0-5]\d)*$/.test(v)){i.setAttribute('aria-invalid','true');throw new Error('Horários no formato 06:00,18:00.');}i.removeAttribute('aria-invalid');if(v!==String(P.param(i.dataset.pzt)))await P.saveParam(i.dataset.pzt,v);}await P.loadParams();this.redesenha(['pz','pzt']);toast('Prazos salvos.');chrome();}catch(er){writeErr(er);}finally{b.disabled=false;}}
    if(e.target.closest('#sadd')){const n=$('#snm').value.trim();if(n.length<3){$('#snm').setAttribute('aria-invalid','true');toast('Informe o nome completo do porteiro.','err');return;}
     if(P.porteiros.some(p=>norm(p.nome)===norm(n))){toast('Este porteiro já está cadastrado.','warn');return;}
     const b=$('#sadd');b.disabled=true;try{await P.addPorteiro(n,$('#sob').value.trim());await P.loadParams();$('#snm').value='';$('#sob').value='';toast('Porteiro cadastrado.');this.update();}catch(er){writeErr(er);}finally{b.disabled=false;}}
@@ -552,6 +581,10 @@ VIEWS.seguranca={
    const be=e.target.closest('[data-bed]');if(be){const b=ST.brig.find(x=>String(x.id)===be.dataset.bed);if(b){ST.fb={id:b.id,etag:b._etag,nome:b.nome,mat:b.mat,funcao:b.funcao,tel:b.tel,wa:b.wa};drawBrig();$('#sbnm').focus();}return;}
    const ba=e.target.closest('[data-bat]');if(ba){ba.disabled=true;try{await P.setBrigadistaAtivo(ba.dataset.bat,ba.dataset.on==='1');await carregaBrig();}catch(er){writeErr(er);ba.disabled=false;}}};
   this.drawConfig();ST.fb=BFORM0();carregaBrig();},
+ /* redesenha mantendo os rascunhos não salvos das OUTRAS seções (salvar fatores não descarta um prazo em edição) */
+ redesenha(salvos){const snap=[];['pz','pzt','pzd'].filter(a=>!salvos.includes(a)).forEach(a=>$$('[data-'+a+']').forEach(i=>{if(i.dataset.dirty&&document.activeElement!==i)snap.push([a,i.getAttribute('data-'+a),i.value]);}));
+  this.drawConfig();
+  snap.forEach(([a,k,v])=>{const i=$('[data-'+a+'="'+k+'"]');if(i){i.value=v;i.dataset.dirty='1';}});},
  drawConfig(){if(!$('#sfun'))return;
   const f2='<span class="chip warn" title="Depende de fluxo do Power Automate ainda não implantado">Fase 2 — fluxo ainda não implantado</span>';
   const sw=p=>'<label class="sw"><input type="checkbox" data-flag="'+p.k+'"'+(P.on(p.k)?' checked':'')+' aria-label="'+esc(p.d)+'"><span></span></label>';
@@ -631,15 +664,18 @@ function emDesenhaAtiva(){const em=EM.em;if(!em||!$('#eatv'))return;const cham=P
  if(cham){if(EM.aba==='faltam')rows=rows.filter(x=>!marc.has('P:'+x.i));if(EM.aba==='ponto')rows=rows.filter(x=>marc.has('P:'+x.i));}
  const q=norm(EM.q);if(q)rows=rows.filter(x=>norm([x.n,x.e,x.m,x.a,x.c].join(' ')).includes(q));
  $('#elist').innerHTML=rows.length?rows.map(x=>{const mk=marc.get('P:'+x.i);return '<div class="row'+(mk?' marcado':'')+'"><div class="main"><div class="t">'+esc(x.n)+'</div><div class="meta">'+esc([x.t,x.m&&'Matr. '+x.m,x.e,x.a&&'recebe: '+x.a,x.c&&'crachá '+x.c].filter(Boolean).join(' · '))+'</div>'+(mk?'<div class="detail">No ponto às '+esc(fmt.hm(mk.HORA))+' · '+esc(mk.MARCADO_POR||'')+'</div>':'')+'</div>'+(cham?'<div class="act">'+(mk?'<button class="btn sm" data-ed="'+esc(mk.id)+'">Desmarcar</button>':'<button class="btn sm ok" data-em="'+esc(x.i)+'"'+(emBloq()?' disabled':'')+'>'+icon('check')+'No ponto</button>')+'</div>':'')+'</div>';}).join('')
-  :'<div class="empty">'+(lista?(cham&&EM.aba==='faltam'?'Todos confirmados no ponto de encontro.':cham?'Ninguém nesta aba.':'Ninguém na lista.'):'Aguardando a lista…')+'</div>';
+  :'<div class="empty">'+(lista?(q?'Ninguém na busca — limpe o campo para ver a lista completa.':cham&&EM.aba==='faltam'?(lista.inc?'Todos da lista parcial confirmados — a lista pode não ter todo mundo.':'Todos confirmados no ponto de encontro.'):cham?'Ninguém nesta aba.':'Ninguém na lista.'):'Aguardando a lista…')+'</div>';
  const vs=lista?lista.v:[];$('#evc').textContent=vs.length;$('#ev').innerHTML=vs.length?vs.map(v=>'<div class="row"><div class="main"><div class="t">'+esc(v.pl)+'</div><div class="meta">'+esc([v.mo,v.e].filter(Boolean).join(' · ')||'—')+'</div></div></div>').join(''):'<div class="empty">Nenhum veículo no pátio.</div>';
  $('#ebrig').innerHTML=emBrigHtml();}
 async function emMarcar(movId){const lista=P.listaDe(EM.em);const x=lista&&lista.p.find(y=>String(y.i)===String(movId));if(!x)return;const quem=quemEm();
- try{const r=await P.marcarNoPonto(EM.em.id,'P:'+x.i,x.n,quem);if(r.item)EM.marcas.push({...r.item,PESSOA:'P:'+x.i,HORA:new Date().toISOString(),MARCADO_POR:quem});emDesenhaAtiva();emAtualizar();}catch(e){writeErr(e);}}
+ try{const r=await P.marcarNoPonto(EM.em.id,'P:'+x.i,x.n,quem);
+  if(r.encerrada){toast('Esta emergência já foi encerrada em outro aparelho — atualizando a tela.','warn');emAtualizar(true);return;}
+  if(r.item)EM.marcas.push({...r.item,PESSOA:'P:'+x.i,HORA:new Date().toISOString(),MARCADO_POR:quem});emDesenhaAtiva();emAtualizar();}catch(e){writeErr(e);}}
 async function emDesmarcar(id){const m=EM.marcas.find(x=>String(x.id)===String(id));if(!m)return;
  try{await P.desmarcar(m);EM.marcas=EM.marcas.filter(x=>x!==m);emDesenhaAtiva();emAtualizar();}catch(e){writeErr(e);}}
 async function emEncerrar(){const em=EM.em;const cham=P.on('EMERG_CHAMADA');const lista=P.listaDe(em);const marc=new Set(EM.marcas.map(m=>m.PESSOA));const falt=lista?lista.p.filter(x=>!marc.has('P:'+x.i)):[];
- const ok=await dialog({title:'Encerrar emergência?',html:(!cham?'':falt.length?'<div class="banner warn">'+icon('alert')+'<span><b>'+falt.length+' pessoa(s) não confirmada(s)</b> no ponto de encontro: '+esc(falt.slice(0,8).map(x=>x.n).join(', '))+(falt.length>8?'…':'')+'</span></div>':'<div class="banner ok">'+icon('check')+'<span>Todos confirmados no ponto de encontro.</span></div>')+'<p>O WhatsApp de encerramento vai para a Brigada.</p>',
+ const avisoLista=!lista?'<div class="banner err">'+icon('alert')+'<span><b>A lista de evacuação não foi carregada.</b> O resumo vai registrar que a chamada não pôde ser feita.</span></div>':lista.inc?'<div class="banner warn">'+icon('alert')+'<span><b>A lista está incompleta</b> (leitura acima do limite) — pode haver pessoas fora dela.</span></div>':'';
+ const ok=await dialog({title:'Encerrar emergência?',html:avisoLista+(!cham||!lista?'':falt.length?'<div class="banner warn">'+icon('alert')+'<span><b>'+falt.length+' pessoa(s) não confirmada(s)</b> no ponto de encontro: '+esc(falt.slice(0,8).map(x=>x.n).join(', '))+(falt.length>8?'…':'')+'</span></div>':(lista&&lista.inc?'':'<div class="banner ok">'+icon('check')+'<span>Todos confirmados no ponto de encontro.</span></div>'))+'<p>O WhatsApp de encerramento vai para a Brigada.</p>',
   actions:[{label:'Voltar',value:false},{label:'Encerrar',kind:'danger solid',value:true}]});if(!ok)return;
  try{const r=await P.encerrarEmergencia(em,quemEm());if(r.ja)toast('A emergência já tinha sido encerrada.','warn');else toast('Emergência encerrada.');
   await emAtualizar(true);if(r.resumo)dialog({title:'Resumo registrado',html:'<pre class="resumo">'+esc(r.resumo)+'</pre>'});}
