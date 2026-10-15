@@ -453,6 +453,24 @@ async function veiculos(force){if(!temVeiculos())return null;
  VEIC_AT=Date.now();return VEIC;}
 async function placasDe(mat){const m=String(mat||'').trim();if(!m)return [];const v=await veiculos();return v?v.filter(x=>x.vinc==='Colaborador'&&x.mat===m):[];}
 async function donoDaPlaca(placa){const p=normPlaca(placa);if(!p||!placaValida(p))return null;const v=await veiculos();return v?v.find(x=>x.placa===p)||null:null;}
+const veicProblemas=()=>{if(!L.veic)return ['Lista 00_Cadastro_Veiculos não encontrada (ou sem permissão de leitura).'];
+ if(!COLS.veic)return ['Não foi possível ler as colunas da 00_Cadastro_Veiculos.'];
+ return VEIC_COLS.filter(c=>!COLS.veic.has(c)).map(c=>'00_Cadastro_Veiculos: falta a coluna '+c+' (crie com esse nome exato, sem acento)');};
+async function veiculosCadastro(){if(!temVeiculos())return [];const rs=await sp.items(L.veic,'$expand=fields&$top=999');
+ return rs.filter(r=>val(r.VINCULO)==='Colaborador').map(r=>({id:r.id,placa:normPlaca(r.PLACA),tipo:val(r.TIPO)||'Carro',modelo:[val(r.MARCA),val(r.MODELO)].filter(Boolean).join(' '),mat:String(r.MATRICULA??'').trim(),nome:String(r.MOTORISTA||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}));}
+async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro de veículos indisponível (colunas faltando na 00_Cadastro_Veiculos).');
+ const placa=normPlaca(f.placa);if(!placaValida(placa))throw Object.assign(new Error('Placa inválida. Use o formato ABC1D23 ou ABC1234.'),{code:'validacao'});
+ const mat=String(f.mat||'').trim(),nome=String(f.nome||'').trim();
+ if(!mat||!nome)throw Object.assign(new Error('Escolha o colaborador dono do veículo.'),{code:'validacao'});
+ const todos=await sp.items(L.veic,'$expand=fields&$top=999');
+ const outro=todos.find(r=>String(r.id)!==String(id||'')&&normPlaca(r.PLACA)===placa&&r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao');
+ if(outro)throw Object.assign(new Error('A placa '+placa+' já está ativa no cadastro ('+(val(outro.VINCULO)||'sem vínculo')+(outro.MOTORISTA?' · '+outro.MOTORISTA:'')+'). Edite ou desative a linha existente.'),{code:'validacao'});
+ const fields={PLACA:placa,VINCULO:'Colaborador',MATRICULA:mat,MOTORISTA:nome};
+ if(COLS.veic.has('TIPO'))fields.TIPO=f.tipo==='Moto'?'Moto':'Carro';
+ if(COLS.veic.has('MODELO'))fields.MODELO=String(f.modelo||'').trim();
+ if(!id)fields.ATIVO=true;
+ VEIC=null;return id?sp.patch(L.veic,id,fields):sp.add(L.veic,fields);}
+const setVeiculoAtivo=(id,ativo)=>{VEIC=null;return sp.patch(L.veic,id,{ATIVO:!!ativo});};
 async function salvarVeiculoColab({placa,modal,mat,nome}){if(!temVeiculos())return {sem:true};const p=normPlaca(placa);
  const v=await veiculos(true);if(v.some(x=>x.placa===p))return {dup:true};
  const f={PLACA:p,VINCULO:'Colaborador',MATRICULA:String(mat||'').trim(),MOTORISTA:String(nome||'').trim(),ATIVO:true};
@@ -560,8 +578,8 @@ function esgPorMovimento(rows,dist){const out=new Map();if(!dist)return out;cons
  diasColaborador(rows).forEach(d=>{const km=d.mat&&dist.has(d.mat)?dist.get(d.mat)*mult:null;if(km==null)return;const f=d.modal?param(chaveCO2(d.modal)):null;out.set(d.mov.id,{km,kg:f==null?null:km*f});});return out;}
 function csvMovimentos(rows,dist){const esg=esgPorMovimento(rows,dist);const n2=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');const q=v=>{let s=String(v??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
  const dt=v=>v?new Date(v).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(',',''):'';
- const cab=['Entrada','Saída','Tipo de saída','Permanência (min)','Tipo','Nome','Matrícula','Empresa','Anfitrião','Meio de transporte','Distância do dia (km)','kg CO2e do dia','Sem crachá','Origem','Porteiro entrada','Porteiro saída'];
- const lin=rows.map(m=>{const e=esg.get(m.id);return [dt(m.ENTRADA),dt(m.SAIDA),val(m.SAIDA_TIPO),m.SAIDA?Math.round((new Date(m.SAIDA)-new Date(m.ENTRADA))/6e4):'',val(m.TIPO),m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,val(m.MODAL),e?n2(e.km):'',e?n2(e.kg):'',m.SEM_CRACHA===true?'Sim':'',val(m.ORIGEM),m.PORTEIRO_ENT,m.PORTEIRO_SAI].map(q).join(';');});
+ const cab=['Entrada','Saída','Tipo de saída','Permanência (min)','Tipo','Nome','Matrícula','Empresa','Anfitrião','Meio de transporte','Placa','Distância do dia (km)','kg CO2e do dia','Sem crachá','Origem','Porteiro entrada','Porteiro saída'];
+ const lin=rows.map(m=>{const e=esg.get(m.id);return [dt(m.ENTRADA),dt(m.SAIDA),val(m.SAIDA_TIPO),m.SAIDA?Math.round((new Date(m.SAIDA)-new Date(m.ENTRADA))/6e4):'',val(m.TIPO),m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,val(m.MODAL),m.PLACA,e?n2(e.km):'',e?n2(e.kg):'',m.SEM_CRACHA===true?'Sim':'',val(m.ORIGEM),m.PORTEIRO_ENT,m.PORTEIRO_SAI].map(q).join(';');});
  return '﻿'+[cab.join(';'),...lin].join('\r\n');}
 /* ---------- agendamento pelo colaborador (agendar.html) ---------- */
 const ALFA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -625,7 +643,7 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,ocorrenciasEncerradas,analisarOcorrencia,encerrarOcorrencia,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
- temVeiculos,veiculos,placasDe,donoDaPlaca,salvarVeiculoColab,
+ temVeiculos,veiculos,placasDe,donoDaPlaca,salvarVeiculoColab,veicProblemas,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
  entradaPessoa,saidaPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});
