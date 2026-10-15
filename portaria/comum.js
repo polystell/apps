@@ -27,7 +27,7 @@ const ESTRUTURA={
  agend:['CODIGO','TIPO','NOME','EMPRESA','DOC_MASC','DATA','HORA','MOTIVO','STATUS','ANFITRIAO_NOME','ANFITRIAO_MATRICULA'],
  prevV:['TIPO','DATA','HORA','TRANSPORTADORA','REMETENTE','PLACA','MOTORISTA','NF','ORDEM','AREA','STATUS'],
  merc:['SETOR','REMETENTE','DESCRICAO','VOLUMES','CHEGADA','STATUS','RETIRADO_POR','RETIRADO_IDENT','RETIRADA_PROPRIA','DATA_RETIRADA','PORTEIRO_ENTREGA','PORTEIRO_RECEB','DESTINATARIO_NOME','DESTINATARIO_MATRICULA'],
- ocor:['TIPO','GRAVIDADE','DESCRICAO','STATUS','REGISTRADO_POR'],
+ ocor:['TIPO','GRAVIDADE','DESCRICAO','STATUS','REGISTRADO_POR','ENV_NOME','ENV_MATRICULA','ENV_PLACA','PARECER','ENCERRADO_POR','DATA_ENCERRAMENTO'],
  turnos:['DE','PARA','RESUMO','RECADOS','CIENCIA_EM'],
  dir:['NOME','MATRICULA','DEPARTAMENTO','SITUACAO','EMAIL'],
  params:['APP','MODULO','CHAVE','VALOR','ATIVO','DESCRICAO'],
@@ -37,7 +37,7 @@ const ESTRUTURA={
 };
 const INDICES={movP:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],movV:['STATUS_MOV','ENTRADA','SAIDA','CHAVE_ABERTA'],agend:['DATA','CODIGO'],prevV:['DATA'],merc:['STATUS'],ocor:['STATUS'],dir:['MATRICULA'],turnos:['CIENCIA_EM'],emerg:['STATUS','ATIVA_CHAVE'],chamada:['EMERG_ID','MARCA_CHAVE']};
 const UNICOS={movP:['CHAVE_ABERTA'],movV:['CHAVE_ABERTA'],emerg:['ATIVA_CHAVE'],chamada:['MARCA_CHAVE']};
-const TIPOS={dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'},emerg:{STATUS:'choice',ATIVA_CHAVE:'text',LISTA:'multi',RESUMO:'multi',PRESENTES:'number'},chamada:{EMERG_ID:'text',MARCA_CHAVE:'text'}};
+const TIPOS={ocor:{PARECER:'multi'},dir:{MATRICULA:'text'},movP:{MATRICULA:'text',STATUS_MOV:'choice',CHAVE_ABERTA:'text'},movV:{STATUS_MOV:'choice',CHAVE_ABERTA:'text'},emerg:{STATUS:'choice',ATIVA_CHAVE:'text',LISTA:'multi',RESUMO:'multi',PRESENTES:'number'},chamada:{EMERG_ID:'text',MARCA_CHAVE:'text'}};
 const TIPO_NOME={text:'Texto (uma linha)',choice:'Escolha',multi:'Várias linhas de texto (texto sem formatação)',number:'Número'};
 const tipoOk=(col,t)=>t==='multi'?!!(col.text&&col.text.allowMultipleLines&&col.text.textType!=='richText'):!!col[t];
 const OPCOES={
@@ -243,6 +243,15 @@ async function prevEntre(dIni,dFim){const k=todayKey();const a=keyShift(k,dIni-1
 const prevHoje=()=>prevEntre(0,0);
 async function mercAguardando(){return sp.items(L.merc,"$expand=fields&$filter=fields/STATUS eq 'Aguardando retirada'&$top=500");}
 async function ocorAbertas(){return sp.items(L.ocor,"$expand=fields&$filter=fields/STATUS eq 'Aberta' or fields/STATUS eq 'Em análise'&$top=300");}
+async function ocorrenciasEncerradas(n=50){const rs=await sp.items(L.ocor,"$expand=fields&$filter=fields/STATUS eq 'Encerrada'&$top=300");
+ return rs.sort((a,b)=>new Date(b.DATA_ENCERRAMENTO||b.Created||0)-new Date(a.DATA_ENCERRAMENTO||a.Created||0)).slice(0,n);}
+/* tratamento: "Em análise" e encerramento com parecer, sempre conferindo a versão (outro computador pode ter mexido) */
+async function analisarOcorrencia(id){const cur=await getItem('ocor',id);if(val(cur.STATUS)==='Encerrada')return {ja:true};if(val(cur.STATUS)==='Em análise')return {ok:true};
+ try{await sp.patch(L.ocor,id,{STATUS:'Em análise'},{etag:cur._etag});}catch(e){if(e.status===412){const at=await getItem('ocor',id);if(val(at.STATUS)==='Encerrada')return {ja:true};}throw e;}return {ok:true};}
+async function encerrarOcorrencia(id,parecer,quem){const par=String(parecer||'').trim();if(par.length<5)throw Object.assign(new Error('Descreva o parecer do encerramento.'),{code:'validacao'});
+ const cur=await getItem('ocor',id);if(val(cur.STATUS)==='Encerrada')return {ja:true};
+ try{await sp.patch(L.ocor,id,{STATUS:'Encerrada',PARECER:par.slice(0,2000),ENCERRADO_POR:quem,DATA_ENCERRAMENTO:now()},{etag:cur._etag});}
+ catch(e){if(e.status===412){const at=await getItem('ocor',id);if(val(at.STATUS)==='Encerrada')return {ja:true};}throw e;}return {ok:true};}
 const getItem=(k,id)=>sp.get(L[k],id);
 /* ---------- regras ---------- */
 const lid=v=>v==null||v===''?'':String(v);
@@ -582,7 +591,7 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  temEmergencia,conferirEmergencia,emergenciaAtiva,ultimasEmergencias,brigadistas,salvarBrigadista,setBrigadistaAtivo,instantaneoPresenca,compacta,listaDe,acionarEmergencia,preencherLista,chamadaDe,marcarNoPonto,desmarcar,encerrarEmergencia,
  CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,marcarSaidaFinal,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
- abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,
+ abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,ocorrenciasEncerradas,analisarOcorrencia,encerrarOcorrencia,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,

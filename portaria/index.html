@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.15">
+<link rel="stylesheet" href="/core/polystell.css?v=2.16">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -66,8 +66,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.15"></script>
-<script src="comum.js?v=2.15"></script>
+<script src="/core/polystell.js?v=2.16"></script>
+<script src="comum.js?v=2.16"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -83,7 +83,7 @@ const ST={view:'painel',isTI:false,isExp:false,isRH:false,posto:true,log:false,r
  f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
     v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:'',auto:{}},
     m:{dest:null,setor:'',vol:'1',rem:'',desc:'',modo:'pessoa',setorDest:''},
-    o:{tipo:'Segurança',grav:'Baixa',desc:''},
+    o:{tipo:'Segurança',grav:'Baixa',desc:'',envNome:'',envPlaca:'',aba:'abertas',q:''},
     h:{k:'p',q:''},
     l:{id:null,etag:null,tipo:'Coleta',dia:todayKey(),hora:'',transp:'',rem:'',nf:'',ordem:'',area:'',placa:'',mot:''},
     lv:{canc:false},
@@ -463,21 +463,50 @@ function entregar(id){if(needTurno())return;const m=ST.d.merc.find(x=>x.id===id)
 /* ================= OCORRÊNCIAS ================= */
 VIEWS.ocorrencias={
  mount(){const F=ST.f.o;
-  page('Ocorrências','Registro de ocorrências da portaria. A Segurança acompanha e encerra.',
+  const pessoasHoje=[...new Map([...ST.d.openP,...ST.d.movPHoje].map(m=>[norm(m.NOME),{n:m.NOME,mat:String(m.MATRICULA||'').trim(),e:m.EMPRESA||''}])).values()];
+  const placasHoje=[...new Set([...ST.d.openV,...ST.d.movVHoje].map(v=>v.PLACA).filter(Boolean))];
+  page('Ocorrências','Registro e tratamento das ocorrências da portaria. Encerrar pede um parecer e fica registrado.',
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Registrar ocorrência</h2></div>'+
    '<div class="grid2"><div class="field"><label for="ot">Tipo</label><select id="ot" data-bind="o.tipo">'+['Segurança','Acesso indevido','Veículo','Mercadoria','Estrutura','Outro'].map(t=>'<option'+(F.tipo===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="field"><label for="og">Gravidade</label><select id="og" data-bind="o.grav">'+['Baixa','Média','Alta'].map(t=>'<option'+(F.grav===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div></div>'+
+   '<div class="grid2"><div class="field"><label for="oenv">Pessoa envolvida (opcional)</label><input id="oenv" list="oenvl" maxlength="80" autocomplete="off" data-bind="o.envNome" value="'+esc(F.envNome)+'" placeholder="Quem está ou passou hoje, ou digite"><datalist id="oenvl">'+pessoasHoje.map(p=>'<option value="'+esc(p.n)+'">'+esc([p.mat&&'Matr. '+p.mat,p.e].filter(Boolean).join(' · '))+'</option>').join('')+'</datalist></div>'+
+   '<div class="field"><label for="opl">Veículo envolvido (opcional)</label><input id="opl" list="opll" maxlength="8" style="text-transform:uppercase" autocomplete="off" data-bind="o.envPlaca" value="'+esc(F.envPlaca)+'" placeholder="ABC1D23"><datalist id="opll">'+placasHoje.map(p=>'<option value="'+esc(p)+'">').join('')+'</datalist></div></div>'+
    '<div class="field"><label for="od">Descrição *</label><textarea id="od" data-bind="o.desc" maxlength="2000" placeholder="O que aconteceu, quem estava envolvido, horário…">'+esc(F.desc)+'</textarea></div>'+
    '<button class="btn primary block" id="ogo" type="button">Registrar ocorrência</button><div class="note">Gravidade <b>Alta</b>: comunique a Segurança imediatamente, além do registro. Fotos podem ser anexadas no item da lista.</div></div>'+
-   '<div class="panel"><div class="panel-h">'+icon('alert')+'<h2>Em aberto</h2><span class="sp"><span class="count" id="ocount"></span></span></div><div class="rows" id="olist"></div></div></div>');
-  bindInputs();SHELL.page.onclick=e=>{if(e.target.closest('#ogo'))regOcor();const o=e.target.closest('[data-oc]');if(o){const x=ST.d.ocor.find(y=>y.id===o.dataset.oc);if(x)dialog({title:val(x.TIPO)+' · '+val(x.GRAVIDADE),html:'<dl class="kv"><dt>Situação</dt><dd>'+esc(val(x.STATUS))+'</dd><dt>Registrada por</dt><dd>'+esc((x.REGISTRADO_POR||'—')+' · '+fmt.dmhm(x.Created))+'</dd></dl><pre class="resumo">'+esc(x.DESCRICAO||'')+'</pre>'});}};},
- update(){banners();if(!$('#olist'))return;const rows=ST.d.ocor.slice().sort((a,b)=>new Date(b.Created||0)-new Date(a.Created||0));$('#ocount').textContent=rows.length;
-  $('#olist').innerHTML=rows.length?rows.map(o=>{const g=val(o.GRAVIDADE);return '<div class="row"><div class="main"><div class="t">'+esc(val(o.TIPO))+'</div><div class="meta">'+esc(String(o.DESCRICAO||'').slice(0,160))+(String(o.DESCRICAO||'').length>160?'…':'')+'</div><div class="tags"><span class="chip dot '+(g==='Alta'?'err':g==='Média'?'warn':'')+'">'+esc(g)+'</span><span class="chip">'+esc(val(o.STATUS))+'</span><span class="chip">'+esc((o.REGISTRADO_POR||'—')+' · '+quando(o.Created))+'</span></div></div><div class="act"><button class="btn sm" data-oc="'+o.id+'">Ver</button></div></div>';}).join(''):'<div class="empty">Nenhuma ocorrência em aberto.</div>';}
+   '<div class="panel"><div class="toolbar"><div class="seg" id="oaba"><button type="button" data-oaba="abertas" aria-pressed="'+(F.aba!=='encerradas')+'">Em aberto <span class="count" id="ocount"></span></button><button type="button" data-oaba="encerradas" aria-pressed="'+(F.aba==='encerradas')+'">Encerradas</button></div>'+
+   '<input type="search" data-bind="o.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar tipo, descrição, nome, placa…" aria-label="Buscar ocorrências"></div><div class="rows" id="olist"></div></div></div>');
+  bindInputs(()=>this.update());
+  SHELL.page.onclick=e=>{if(e.target.closest('#ogo')){regOcor();return;}
+   const ab=e.target.closest('[data-oaba]');if(ab){ST.f.o.aba=ab.dataset.oaba;$$('#oaba [data-oaba]').forEach(x=>x.setAttribute('aria-pressed',String(x===ab)));if(ab.dataset.oaba==='encerradas'&&!ST.ocorEnc)carregaEnc();this.update();return;}
+   const an=e.target.closest('[data-oan]');if(an){anOcor(an.dataset.oan);return;}
+   const en=e.target.closest('[data-oen]');if(en){dlgEncerrarOcor(en.dataset.oen);return;}
+   const o=e.target.closest('[data-oc]');if(o){const x=(ST.f.o.aba==='encerradas'?(ST.ocorEnc||[]):ST.d.ocor).find(y=>y.id===o.dataset.oc);if(x)dlgOcor(x);}};},
+ update(){banners();if(!$('#olist'))return;const F=ST.f.o;const enc=F.aba==='encerradas';
+  let rows=(enc?(ST.ocorEnc||[]):ST.d.ocor).slice().sort((a,b)=>new Date((enc?b.DATA_ENCERRAMENTO:b.Created)||0)-new Date((enc?a.DATA_ENCERRAMENTO:a.Created)||0));
+  const q=norm(F.q);if(q)rows=rows.filter(o=>norm([val(o.TIPO),o.DESCRICAO,o.ENV_NOME,o.ENV_PLACA,o.REGISTRADO_POR,o.ENCERRADO_POR,o.PARECER].join(' ')).includes(q));
+  $('#ocount').textContent=ST.d.ocor.length;
+  $('#olist').innerHTML=rows.length?rows.map(o=>{const g=val(o.GRAVIDADE),st=val(o.STATUS);
+   const vinc=[o.ENV_NOME&&'👤 '+o.ENV_NOME,o.ENV_PLACA&&'🚗 '+o.ENV_PLACA].filter(Boolean).join(' · ');
+   return '<div class="row"><div class="main"><div class="t">'+esc(val(o.TIPO))+(vinc?' <span class="meta">'+esc(vinc)+'</span>':'')+'</div><div class="meta">'+esc(String(o.DESCRICAO||'').slice(0,140))+(String(o.DESCRICAO||'').length>140?'…':'')+'</div><div class="detail">'+esc((enc?'Encerrada '+(o.DATA_ENCERRAMENTO?quando(o.DATA_ENCERRAMENTO):'')+(o.ENCERRADO_POR?' por '+o.ENCERRADO_POR:''):'Registrada '+(o.Created?quando(o.Created):'')+(o.REGISTRADO_POR?' por '+o.REGISTRADO_POR:'')))+'</div></div>'+
+    '<div class="act"><span class="chip dot '+(g==='Alta'?'err':g==='Média'?'warn':'')+'">'+esc(g)+'</span><span class="chip">'+esc(st)+'</span><button class="btn sm" data-oc="'+esc(o.id)+'">Ver</button>'+(enc?'':(st==='Aberta'?'<button class="btn sm" data-oan="'+esc(o.id)+'">Em análise</button>':'')+'<button class="btn sm primary" data-oen="'+esc(o.id)+'">Encerrar</button>')+'</div></div>';}).join('')
+   :'<div class="empty">'+(enc?(ST.ocorEnc?'Nenhuma ocorrência encerrada'+(q?' para a busca':'')+'.':'Carregando…'):'Nenhuma ocorrência em aberto'+(q?' para a busca':'')+'.')+'</div>';}
 };
+function dlgOcor(x){dialog({title:val(x.TIPO)+' · '+val(x.GRAVIDADE),html:'<dl class="kv"><dt>Situação</dt><dd>'+esc(val(x.STATUS))+'</dd>'+(x.ENV_NOME?'<dt>Pessoa</dt><dd>'+esc(x.ENV_NOME)+(x.ENV_MATRICULA?' · Matr. '+esc(x.ENV_MATRICULA):'')+'</dd>':'')+(x.ENV_PLACA?'<dt>Veículo</dt><dd>'+esc(x.ENV_PLACA)+'</dd>':'')+'<dt>Registrada</dt><dd>'+esc((x.REGISTRADO_POR||'—')+(x.Created?' · '+quando(x.Created):''))+'</dd>'+(val(x.STATUS)==='Encerrada'?'<dt>Encerrada</dt><dd>'+esc((x.ENCERRADO_POR||'—')+(x.DATA_ENCERRAMENTO?' · '+quando(x.DATA_ENCERRAMENTO):''))+'</dd>':'')+'</dl><p style="white-space:pre-wrap">'+esc(x.DESCRICAO||'')+'</p>'+(x.PARECER?'<div class="lbl">Parecer</div><pre class="resumo">'+esc(x.PARECER)+'</pre>':'')});}
 async function regOcor(){if(needTurno())return;const F=ST.f.o;const d=F.desc.trim();const t=$('#od');
  if(d.length<5){t.setAttribute('aria-invalid','true');t.focus();toast('Descreva a ocorrência.','err');return;}t.removeAttribute('aria-invalid');
+ const nomeEnv=F.envNome.trim();const matEnv=nomeEnv?String(([...ST.d.openP,...ST.d.movPHoje].find(m=>norm(m.NOME)===norm(nomeEnv))||{}).MATRICULA||'').trim():'';
+ const placaEnv=F.envPlaca.trim()?P.normPlaca(F.envPlaca):'';
  const b=$('#ogo');b.disabled=true;
- try{await P.conferirTurno(porteiro());await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro()});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:''});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
+ try{await P.conferirTurno(porteiro());await P.add('ocor',{TIPO:F.tipo,GRAVIDADE:F.grav,DESCRICAO:d,STATUS:'Aberta',REGISTRADO_POR:porteiro(),ENV_NOME:nomeEnv,ENV_MATRICULA:matEnv,ENV_PLACA:placaEnv});toast('Ocorrência registrada.');Object.assign(F,{tipo:'Segurança',grav:'Baixa',desc:'',envNome:'',envPlaca:''});if(ST.view==='ocorrencias')VIEWS.ocorrencias.mount();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#ogo');if(x)x.disabled=false;}}
+async function carregaEnc(){try{ST.ocorEnc=await P.ocorrenciasEncerradas(50);}catch(e){ST.ocorEnc=[];toast(e.message||'Erro ao carregar encerradas.','err');}if(ST.view==='ocorrencias')VIEWS.ocorrencias.update();}
+async function anOcor(id){if(needTurno())return;try{await P.conferirTurno(porteiro());const r=await P.analisarOcorrencia(id);if(r.ja)toast('Esta ocorrência já foi encerrada em outro computador.','warn');else toast('Marcada como "Em análise".');refresh();}catch(e){writeErr(e);}}
+function dlgEncerrarOcor(id){const x=ST.d.ocor.find(y=>y.id===id);if(!x||needTurno())return;
+ dialog({title:'Encerrar ocorrência',html:'<p><b>'+esc(val(x.TIPO))+'</b> · '+esc(val(x.GRAVIDADE))+(x.ENV_NOME?' · '+esc(x.ENV_NOME):'')+(x.ENV_PLACA?' · '+esc(x.ENV_PLACA):'')+'</p><div class="field"><label for="opar">Parecer (o que foi feito) *</label><textarea id="opar" maxlength="2000" placeholder="Como foi tratada, providências, conclusão…"></textarea></div>',
+  actions:[{label:'Cancelar',value:null},{label:'Encerrar ocorrência',kind:'primary',onClick:async d=>{const par=d.querySelector('#opar').value.trim();
+   if(par.length<5){toast('Descreva o parecer.','err');return false;}
+   try{await P.conferirTurno(porteiro());const r=await P.encerrarOcorrencia(id,par,porteiro());
+    if(r.ja)toast('Esta ocorrência já tinha sido encerrada em outro computador.','warn');else toast('Ocorrência encerrada.');ST.ocorEnc=null;refresh();return true;}
+   catch(e){writeErr(e);return false;}}}]});}
 /* ================= TURNO ================= */
 VIEWS.turno={
  mount(){page('Turno','Passagem de turno com resumo automático. O plantão vale para o computador e o celular.',
