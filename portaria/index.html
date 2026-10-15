@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.17">
+<link rel="stylesheet" href="/core/polystell.css?v=2.18">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -68,8 +68,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.17"></script>
-<script src="comum.js?v=2.17"></script>
+<script src="/core/polystell.js?v=2.18"></script>
+<script src="comum.js?v=2.18"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -437,16 +437,19 @@ VIEWS.mercadorias={
  update(){banners();if(!$('#mlist'))return;const pd=new Set(pend().m.map(m=>m.id));const rows=ST.d.merc.slice().sort((a,b)=>new Date(a.CHEGADA)-new Date(b.CHEGADA));$('#mcount').textContent=rows.length;
   $('#mlist').innerHTML=rows.length?rows.map(m=>{const old=pd.has(m.id);return '<div class="row'+(old?' flag':'')+'"><div class="main"><div class="t">'+esc(m.DESTINATARIO_NOME||'—')+'</div><div class="meta">'+esc([m.DESCRICAO,m.REMETENTE,m.VOLUMES&&m.VOLUMES+' vol.','chegou '+quando(m.CHEGADA)].filter(Boolean).join(' · '))+'</div>'+(old?'<div class="tags"><span class="chip warn dot">Aguardando há '+fmt.dur(idade(m.CHEGADA))+'</span></div>':'')+'</div><div class="act"><button class="btn sm primary" data-ret="'+m.id+'">Entregar</button></div></div>';}).join(''):'<div class="empty">Nada aguardando retirada.</div>';}
 };
-const SETOR_GERAL='Polystell (geral)';
-const destSetorial=m=>!String(m.DESTINATARIO_MATRICULA||'').trim()&&(/^Setor: /.test(m.DESTINATARIO_NOME||'')||m.DESTINATARIO_NOME===SETOR_GERAL);
+const SETOR_GERAL='Polystell';
+/* registros antigos gravados como "Polystell (geral)" continuam reconhecidos */
+const destSetorial=m=>!String(m.DESTINATARIO_MATRICULA||'').trim()&&(/^Setor: /.test(m.DESTINATARIO_NOME||'')||m.DESTINATARIO_NOME===SETOR_GERAL||m.DESTINATARIO_NOME==='Polystell (geral)');
 function drawDest(){const F=ST.f.m;const box=$('#destbox');if(!box)return;
  if(F.modo==='setor'){box.innerHTML='<select id="msetd" aria-label="Setor de destino"><option value="">— escolha o setor —</option><option value="__geral"'+(F.setorDest==='__geral'?' selected':'')+'>'+SETOR_GERAL+'</option></select><span class="hint">Para encomendas da empresa ou de um setor, sem uma pessoa específica. Na retirada, a portaria registra quem levou.</span>';
-  P.dir().then(lista=>{const sel=$('#msetd');if(!sel)return;[...new Set(lista.map(c=>c.dep).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='Setor: '+d;if(F.setorDest===d)o.selected=true;sel.appendChild(o);});}).catch(()=>{});
+  /* setores do cadastro oficial (00_Cadastro_Departamento); sem ele (ou sem permissão), os departamentos do diretório */
+  P.departamentos().then(async ds=>{if(!ds){const l=await P.dir();ds=[...new Set(l.map(c=>c.dep).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));}
+   const sel=$('#msetd');if(!sel)return;ds.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='Setor: '+d;if(F.setorDest===d)o.selected=true;sel.appendChild(o);});}).catch(()=>{});
   $('#msetd').onchange=e=>{F.setorDest=e.target.value;if(F.setorDest&&F.setorDest!=='__geral'){F.setor=F.setorDest;const s=$('#mse');if(s)s.value=F.setor;}};return;}
  picker(box,{value:F.dest,label:'Destinatário',placeholder:'Buscar no diretório…',onPick:c=>{F.dest=c;if(!F.setor&&c.dep){F.setor=c.dep;const s=$('#mse');if(s)s.value=c.dep;}drawDest();},onClear:()=>{F.dest=null;drawDest();}});}
 async function regMerc(){if(needTurno())return;const F=ST.f.m;
  const setorial=F.modo==='setor';
- if(setorial&&!F.setorDest){toast('Escolha o setor de destino (ou "Polystell (geral)").','err');$('#msetd')?.focus();return;}
+ if(setorial&&!F.setorDest){toast('Escolha o setor de destino (ou "Polystell", para a empresa).','err');$('#msetd')?.focus();return;}
  if(!setorial&&!F.dest){toast('Selecione o destinatário no diretório — ou use "Setor / Polystell" para encomendas da empresa.','err');$('#destbox input')?.focus();return;}
  const destNome=setorial?(F.setorDest==='__geral'?SETOR_GERAL:'Setor: '+F.setorDest):F.dest.nome;
  const vol=Number(F.vol);const vi=$('#mvo');if(!Number.isInteger(vol)||vol<1||vol>999){vi.setAttribute('aria-invalid','true');vi.focus();toast('Volumes: informe um número inteiro de 1 a 999.','err');return;}vi.removeAttribute('aria-invalid');

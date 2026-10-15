@@ -18,8 +18,8 @@
 (function(){
 'use strict';
 const {sp,norm,val,dateKey,todayKey}=PS;
-const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador',emerg:'09_Emergencias',chamada:'09_Emergencia_Chamada',brigada:'09_Brigada'};
-const OPCIONAIS=new Set(['transp','pessoas','cadColab','emerg','chamada','brigada']);
+const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',depts:'00_Cadastro_Departamento',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador',emerg:'09_Emergencias',chamada:'09_Emergencia_Chamada',brigada:'09_Brigada'};
+const OPCIONAIS=new Set(['transp','pessoas','cadColab','emerg','chamada','brigada','depts']);
 /* ---------- contrato com o SharePoint (conferido na abertura) ---------- */
 const ESTRUTURA={
  movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA','SAIDA_TIPO'],
@@ -153,6 +153,12 @@ const desligado=c=>!!c&&!podeEntrar(c);
 function buscaColab(lista,q){const n=norm(q);if(n.length<2)return[];return lista.filter(c=>norm(c.nome).includes(n)||c.mat.includes(n)||norm(c.dep).includes(n)).slice(0,8);}
 /* ---------- transportadoras (pesquisa → nome) ---------- */
 let TRANSP_L=[],TRANSP_ALL=[];
+/* setores oficiais (00_Cadastro_Departamento); sem a lista (ou sem permissão), o chamador cai no diretório */
+let DEPS=null,DEPS_AT=0;
+async function departamentos(){if(!L.depts)return null;if(DEPS&&Date.now()-DEPS_AT<20*60e3)return DEPS;
+ try{const rs=await sp.items(L.depts,'$expand=fields&$top=500');
+  DEPS=[...new Set(rs.map(r=>String(r.DEPARTAMENTO||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));DEPS_AT=Date.now();return DEPS;}
+ catch(e){console.warn('Departamentos indisponíveis',e.message);return null;}}
 async function transp(){if(TRANSP)return TRANSP;TRANSP={};if(!L.transp)return TRANSP;
  try{TRANSP_ALL=(await sp.items(L.transp,'$expand=fields&$top=999')).map(t=>({id:t.id,nome:String(t.RAZAO_SOCIAL||t.Title||'').trim(),cnpj:String(t.CNPJ||'').trim(),ativo:t.ATIVO!==false&&norm(val(t.ATIVO))!=='nao'})).filter(t=>t.nome).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   TRANSP_L=TRANSP_ALL.filter(t=>t.ativo);TRANSP_ALL.forEach(t=>TRANSP[t.id]=t.nome);}catch(e){console.warn('Transportadoras indisponíveis',e.message);}return TRANSP;}
@@ -596,7 +602,7 @@ function maskDoc(v){if(String(v||'').includes('*'))return String(v).trim();const
 function normPlaca(p){return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
 const placaValida=p=>/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(normPlaca(p));
 window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,param,on,saveParam,addPorteiro,setPorteiroAtivo,get porteiros(){return PORTEIROS;},get paramsEm(){return PARAMS_AT;},
- dir,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
+ dir,departamentos,colabPorMatricula,podeEntrar,desligado,buscaColab,transp,turnoAtual,turnoValido,trocaPendente,fimDoTurno,horarios,ultimosTurnos,abrirTurno,resumoTurno,
  temEmergencia,conferirEmergencia,emergenciaAtiva,ultimasEmergencias,brigadistas,salvarBrigadista,setBrigadistaAtivo,instantaneoPresenca,presencaEm,compacta,listaDe,acionarEmergencia,preencherLista,chamadaDe,marcarNoPonto,desmarcar,encerrarEmergencia,
  CONSULTA_MAX_DIAS,validarPeriodo,movimentosPeriodo,resumoESG,csvMovimentos,distancias,chaveCO2,foraTemporario,saidaTempHoje,marcarSaidaFinal,
  pessoasExt,buscaPessoaExt,podeCadastrarPessoa,salvarPessoaExt,cnpjValido,cnpjAlfa,fmtCnpj,consultaCnpj,salvarTransportadora,conferirTurno,JANELA_PREV,
