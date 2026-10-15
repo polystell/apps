@@ -403,7 +403,7 @@ async function loadReal(ano,dept){
 }
 
 /* ============================== ESTADO UI ============================= */
-const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false,grp:null,cMode:'plan'};
+const S={view:'plan',dept:null,ano:null,scope:'ANO',tool:null,adding:false,aDept:null,aAno:null,aScope:'ANO',pAno:null,dec:{},imp:null,role:null,rbAdd:false,rbHist:false,grp:null,cMode:'plan',cScope:'ANO'};
 const fmt=n=>{const v=Math.round(n*100)/100;return Number.isInteger(v)?v.toLocaleString('pt-BR'):v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const money=n=>'R$ '+fmt(n);
 const fmtC=n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -937,23 +937,25 @@ function renderComp(){
   setHead(`Compartilhado ${S.ano}`,canEdit?'O que você edita aqui vale como o planejamento do departamento':'');
   const set=new Set(G.ccs);
   const its=(DB.plan[S.ano]||[]).filter(i=>set.has(i.cc)).sort((a,b)=>a.dept.localeCompare(b.dept)||a.cc.localeCompare(b.cc)||a.det.localeCompare(b.det));
-  const ms=[0,1,2,3,4,5,6,7,8,9,10,11];
+  const ms=monthsOf(S.cScope);
+  const quarters=S.cScope==='ANO'?[0,1,2,3]:[S.cScope];
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
   const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
-  let h=`<div class="row"><div class="seg" role="group" aria-label="Grupo">${gs.map(g=>`<button data-grp="${g.ctrl}" aria-pressed="${S.grp===g.ctrl}">${esc(g.label)}</button>`).join('')}</div><span style="display:flex;gap:10px;align-items:center"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div>${yearSeg(S.ano,'data-ano')}</span></div>`;
+  let h=`<div class="row"><div class="seg" role="group" aria-label="Grupo">${gs.map(g=>`<button data-grp="${g.ctrl}" aria-pressed="${S.grp===g.ctrl}">${esc(g.label)}</button>`).join('')}</div>${yearSeg(S.ano,'data-ano')}</div>`;
+  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div><div class="seg" role="group" aria-label="Per\u00edodo">${['ANO',0,1,2,3].map(sc=>`<button data-cscope="${sc}" aria-pressed="${String(S.cScope)===String(sc)}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div></div>`;
   if(S.cMode==='acomp'){renderCompAcomp(h,G,set,its);return;}
   h+=`<div class="stats"><div class="stat"><span>Previsto no ano</span><b>${money(its.reduce((a,i)=>a+i.prev.reduce((x,y)=>x+y,0),0))}</b></div><div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div><div class="stat"><span>Aguardando diretoria</span><b>${money(sumIf((i,m)=>i.st[m]==='Pendente'))}</b></div><div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div><div class="stat"><span>Departamentos</span><b>${new Set(its.map(i=>i.dept)).size} de ${DB.depts.length}</b></div></div>`;
   let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
-  [0,1,2,3].forEach(q=>{t+=`<th class="qh" colspan="3">${QLAB[q]}</th>`;});
+  quarters.forEach(q=>{t+=`<th class="qh" colspan="3">${QLAB[q]}</th>`;});
   t+=`<th class="tot" rowspan="2">Total</th></tr><tr>`;
   ms.forEach(m=>{t+=`<th class="mh ${m%3===0?'qs':''}">${MES[m]}</th>`;});
   t+=`</tr></thead><tbody>`;
-  if(!its.length)t+=`<tr><td class="empty" colspan="14">Nenhum item deste grupo em ${S.ano}. Os gestores lançam pelo Planejamento de cada departamento e tudo aparece aqui.</td></tr>`;
+  if(!its.length)t+=`<tr><td class="empty" colspan="${ms.length+2}">Nenhum item deste grupo em ${S.ano}. Os gestores lançam pelo Planejamento de cada departamento e tudo aparece aqui.</td></tr>`;
   [...new Set(its.map(i=>i.dept))].sort().forEach(dep=>{
     const g=its.filter(i=>i.dept===dep);
     const sub=g.reduce((a,i)=>a+ms.reduce((b,m)=>b+vig(i,m),0),0);
     const gest=[...new Set(DB.vincs.filter(v=>v.cod===dep).map(v=>v.nome))].join(', ');
-    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(dep))}</span><span class="code">${dep}</span>${gest?`<span class="detline">${esc(gest)}</span>`:''}</td><td colspan="12"></td><td class="tot">${money(sub)}</td></tr>`;
+    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(dep))}</span><span class="code">${dep}</span>${gest?`<span class="detline">${esc(gest)}</span>`:''}</td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
       t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}</td>`;
@@ -985,6 +987,7 @@ function renderComp(){
 function bindComp(v){
   v.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{S.grp=b.dataset.grp;render();});
   v.querySelectorAll('[data-cmode]').forEach(b=>b.onclick=()=>{S.cMode=b.dataset.cmode;render();});
+  v.querySelectorAll('[data-cscope]').forEach(b=>b.onclick=()=>{const x=b.dataset.cscope;S.cScope=x==='ANO'?'ANO':Number(x);render();});
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
 }
 function renderCompAcomp(h,G,set,its){
@@ -996,7 +999,8 @@ function renderCompAcomp(h,G,set,its){
     Promise.all(missing.map(d=>loadReal(S.ano,d))).then(()=>{if(S.view==='comp'&&S.cMode==='acomp')render();});
     return;
   }
-  const upto=(a,U)=>U<0?0:a.slice(0,U+1).reduce((x,y)=>x+y,0);
+  const msC=monthsOf(S.cScope);
+  const upto=(a,U)=>msC.reduce((x,m)=>x+(m<=U?a[m]:0),0);
   const perDept={};let ULTg=-1;
   allDeps.forEach(d=>{
     const real=((DB.real[S.ano]||{})[d])||[];
@@ -1012,19 +1016,20 @@ function renderCompAcomp(h,G,set,its){
   let A=0,R=0,over=0;
   Object.values(perDept).forEach(p=>p.rows.forEach(r=>{A+=upto(r.apr,p.ULT);R+=upto(r.rv,p.ULT);for(let m=0;m<=p.ULT;m++)if(r.rv[m]>r.apr[m]+0.005)over++;}));
   if(ULTg<0){vEl.innerHTML=`<div class="panel">${h}<p class="empty">Ainda n\u00e3o h\u00e1 realizado sincronizado para este grupo em ${S.ano}.</p></div>`;bindComp(vEl);return;}
-  h+=`<div class="stats"><div class="stat"><span>Aprovado at\u00e9 ${MES[ULTg].toLowerCase()}</span><b>${moneyC(A)}</b></div><div class="stat"><span>Realizado at\u00e9 ${MES[ULTg].toLowerCase()}</span><b>${moneyC(R)}</b></div><div class="stat"><span>Saldo</span><b class="${A-R<0?'neg':''}">${moneyC(A-R)}</b></div><div class="stat"><span>Meses estourados</span><b>${over}</b></div></div>`;
-  let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Departamento \u00b7 categoria</th>${MES.map((m,k)=>`<th class="mh ${k%3===0?'qs':''}">${m}</th>`).join('')}<th class="tot">Aprovado<br>at\u00e9 ${MES[ULTg]}</th><th class="tot">Realizado<br>at\u00e9 ${MES[ULTg]}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
+  const perLbl=S.cScope==='ANO'?('at\u00e9 '+MES[ULTg].toLowerCase()):('no '+QLAB[S.cScope]);
+  h+=`<div class="stats"><div class="stat"><span>Aprovado ${perLbl}</span><b>${moneyC(A)}</b></div><div class="stat"><span>Realizado ${perLbl}</span><b>${moneyC(R)}</b></div><div class="stat"><span>Saldo</span><b class="${A-R<0?'neg':''}">${moneyC(A-R)}</b></div><div class="stat"><span>Meses estourados</span><b>${over}</b></div></div>`;
+  let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item">Departamento \u00b7 categoria</th>${msC.map(m=>`<th class="mh ${m%3===0?'qs':''}">${MES[m]}</th>`).join('')}<th class="tot">Aprovado<br>${perLbl}</th><th class="tot">Realizado<br>${perLbl}</th><th class="tot">Saldo</th></tr></thead><tbody>`;
   Object.keys(perDept).sort().forEach(d=>{
     const p=perDept[d];
     const gA=p.rows.reduce((a,r)=>a+upto(r.apr,p.ULT),0),gR=p.rows.reduce((a,r)=>a+upto(r.rv,p.ULT),0),gS=gA-gR;
-    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(d))}</span><span class="code">${d}</span></td><td colspan="12"></td><td class="tot">${moneyC(gA)}</td><td class="tot">${moneyC(gR)}</td><td class="tot ${gS<0?'unpl':''}">${moneyC(gS)}</td></tr>`;
+    t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(d))}</span><span class="code">${d}</span></td><td colspan="${msC.length}"></td><td class="tot">${moneyC(gA)}</td><td class="tot">${moneyC(gR)}</td><td class="tot ${gS<0?'unpl':''}">${moneyC(gS)}</td></tr>`;
     p.rows.forEach(r=>{
       const unpl=!r.names.length;
       t+=`<tr><td class="item"><span class="catline"><span class="code">${r.cat}</span> - ${esc(catDesc(r.cat))}</span>${unpl?'<span class="detline unpl">Gasto sem planejamento</span>':`<span class="detline">Itens planejados: ${r.names.map(esc).join(', ')}</span>`}</td>`;
-      for(let m=0;m<12;m++){
+      msC.forEach(m=>{
         const fut=m>p.ULT;const isOver=!fut&&r.rv[m]>r.apr[m]+0.005;const clk=!fut&&r.rv[m]>0;
         t+=`<td class="r ${m%3===0?'qs':''} ${fut?'fut':''} ${isOver?'over':''} ${clk?'click':''}" ${clk?`data-cext="${d}|${r.cc}|${r.cat}|${m}"`:''} title="${fut?'':(clk?'Clique para ver os lan\u00e7amentos':'')}"><div class="rv">${fut?'\u2014':(r.rv[m]?moneyC(r.rv[m]):'0')}</div><div class="av">${r.apr[m]?'de '+fmtC(r.apr[m]):(fut?'':'sem aprovado')}</div></td>`;
-      }
+      });
       const sd=upto(r.apr,p.ULT)-upto(r.rv,p.ULT);
       t+=`<td class="tot">${moneyC(upto(r.apr,p.ULT))}</td><td class="tot">${moneyC(upto(r.rv,p.ULT))}</td><td class="tot ${sd<0?'unpl':''}">${moneyC(sd)}</td></tr>`;
     });
