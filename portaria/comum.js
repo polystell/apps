@@ -18,11 +18,11 @@
 (function(){
 'use strict';
 const {sp,norm,val,dateKey,todayKey}=PS;
-const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',depts:'00_Cadastro_Departamento',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador',emerg:'09_Emergencias',chamada:'09_Emergencia_Chamada',brigada:'09_Brigada'};
-const OPCIONAIS=new Set(['transp','pessoas','cadColab','emerg','chamada','brigada','depts']);
+const LISTAS={movP:'09_Mov_Pessoas',agend:'09_Agendamentos',prevV:'09_Prev_Veiculos',movV:'09_Mov_Veiculos',merc:'09_Mercadorias',ocor:'09_Ocorrencias',turnos:'09_Turnos',dir:'00_Diretorio_Colaboradores',params:'00_Parametros_Apps',transp:'00_Cadastro_Transportador',depts:'00_Cadastro_Departamento',veic:'00_Cadastro_Veiculos',pessoas:'00_Cadastro_Pessoas',cadColab:'00_Cadastro_Colaborador',emerg:'09_Emergencias',chamada:'09_Emergencia_Chamada',brigada:'09_Brigada'};
+const OPCIONAIS=new Set(['transp','pessoas','cadColab','emerg','chamada','brigada','depts','veic']);
 /* ---------- contrato com o SharePoint (conferido na abertura) ---------- */
 const ESTRUTURA={
- movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA','SAIDA_TIPO'],
+ movP:['TIPO','NOME','MATRICULA','EMPRESA','DOC_MASC','MOTIVO','MODAL','SEM_CRACHA','CRACHA','ENTRADA','SAIDA','PORTEIRO_ENT','PORTEIRO_SAI','AGENDAMENTO','STATUS_MOV','ANFITRIAO_NOME','ANFITRIAO_MATRICULA','ORIGEM','CHAVE_ABERTA','SAIDA_TIPO','PLACA'],
  movV:['PLACA','MOTORISTA','EMPRESA','FINALIDADE','NF','PREVISAO','ENTRADA','SAIDA','AUT_EXPEDICAO','AUT_POR','STATUS_MOV','PORTEIRO_ENT','PORTEIRO_SAI','CHAVE_ABERTA'],
  agend:['CODIGO','TIPO','NOME','EMPRESA','DOC_MASC','DATA','HORA','MOTIVO','STATUS','ANFITRIAO_NOME','ANFITRIAO_MATRICULA'],
  prevV:['TIPO','DATA','HORA','TRANSPORTADORA','REMETENTE','PLACA','MOTORISTA','NF','ORDEM','AREA','STATUS'],
@@ -116,7 +116,7 @@ async function boot({posto=true,log=false,agendar=false,rh=false,emergencia=fals
  if(faltando.length)return {ok:false,faltando};
  const checks=await Promise.all(Object.keys(ESTRUTURA).filter(k=>precisa.has(k)&&L[k]).map(conferir));
  checks.flat().forEach(x=>faltando.push(x));
- for(const k of ['transp','pessoas'])if(L[k]&&!COLS[k]){try{COLS[k]=await sp.columns(L[k]);}catch(e){console.warn('Colunas de '+LISTAS[k]+' indisponíveis',e.message);}}
+ for(const k of ['transp','pessoas','veic'])if(L[k]&&!COLS[k]){try{COLS[k]=await sp.columns(L[k]);}catch(e){console.warn('Colunas de '+LISTAS[k]+' indisponíveis',e.message);}}
  if(faltando.length)return {ok:false,faltando};
  if(L.params){try{await loadParams();}catch(e){if(precisa.has('params'))throw e;}}
  return {ok:true};
@@ -442,6 +442,22 @@ async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return nu
  const meus=rs.filter(x=>String(x.MATRICULA||'').trim()===m&&ehHoje(x.SAIDA)).sort((a,b)=>new Date(b.SAIDA)-new Date(a.SAIDA));
  return meus[0]&&val(meus[0].SAIDA_TIPO)==='Temporária'?meus[0]:null;}
 /* ---------- emergência: acionamento, lista de evacuação, chamada no ponto de encontro ---------- */
+/* ---------- veículos de colaboradores (00_Cadastro_Veiculos, opcional) ---------- */
+const VEIC_COLS=['PLACA','VINCULO','MATRICULA','ATIVO'];
+const temVeiculos=()=>!!(L.veic&&COLS.veic&&VEIC_COLS.every(c=>COLS.veic.has(c)));
+let VEIC=null,VEIC_AT=0;
+async function veiculos(force){if(!temVeiculos())return null;
+ if(!force&&VEIC&&Date.now()-VEIC_AT<5*60000)return VEIC;
+ const rs=await sp.items(L.veic,'$expand=fields&$top=999');
+ VEIC=rs.filter(r=>r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao'&&normPlaca(r.PLACA)).map(r=>({id:r.id,placa:normPlaca(r.PLACA),tipo:val(r.TIPO)||'',modelo:[val(r.MARCA),val(r.MODELO)].filter(Boolean).join(' '),cor:val(r.COR)||'',vinc:val(r.VINCULO)||'',mat:String(r.MATRICULA??'').trim(),nome:String(r.MOTORISTA||'').trim()}));
+ VEIC_AT=Date.now();return VEIC;}
+async function placasDe(mat){const m=String(mat||'').trim();if(!m)return [];const v=await veiculos();return v?v.filter(x=>x.vinc==='Colaborador'&&x.mat===m):[];}
+async function donoDaPlaca(placa){const p=normPlaca(placa);if(!p||!placaValida(p))return null;const v=await veiculos();return v?v.find(x=>x.placa===p)||null:null;}
+async function salvarVeiculoColab({placa,modal,mat,nome}){if(!temVeiculos())return {sem:true};const p=normPlaca(placa);
+ const v=await veiculos(true);if(v.some(x=>x.placa===p))return {dup:true};
+ const f={PLACA:p,VINCULO:'Colaborador',MATRICULA:String(mat||'').trim(),MOTORISTA:String(nome||'').trim(),ATIVO:true};
+ if(COLS.veic.has('TIPO'))f.TIPO=modal==='Moto'?'Moto':'Carro';
+ await sp.add(L.veic,f);VEIC=null;return {novo:true};}
 const temEmergencia=()=>!!(L.emerg&&L.chamada&&L.brigada);
 /* a emergência confere o próprio contrato na tela dela: lista mal configurada não trava a guarita */
 async function conferirEmergencia(){if(!temEmergencia())return ['Listas 09_Emergencias, 09_Emergencia_Chamada e 09_Brigada não encontradas (ou sem permissão de leitura).'];
@@ -609,6 +625,7 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,ocorrenciasEncerradas,analisarOcorrencia,encerrarOcorrencia,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
+ temVeiculos,veiculos,placasDe,donoDaPlaca,salvarVeiculoColab,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
  entradaPessoa,saidaPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});

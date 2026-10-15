@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.18">
+<link rel="stylesheet" href="/core/polystell.css?v=2.19">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -51,8 +51,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.18"></script>
-<script src="comum.js?v=2.18"></script>
+<script src="/core/polystell.js?v=2.19"></script>
+<script src="comum.js?v=2.19"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -74,7 +74,7 @@ function shell(){
  document.body.innerHTML='<header class="lt-top"><img src="'+PS.cfg.logo+'" alt="Polystell" onerror="this.outerHTML=\'<span class=fb>polystell.</span>\'"><b>Leitura</b><button class="lt-turno" id="tb"></button>'+(P.temEmergencia()?'<a class="lt-sos" id="sos" href="./#emergencia" aria-label="Emergência">SOS</a>':'')+'<button class="lt-acc" id="acc" aria-label="Conta" aria-expanded="false" aria-controls="accm">'+icon('user')+'</button></header>'+
  '<div class="lt-accm" id="accm" hidden><strong>'+esc(PS.auth.account?.name||'Conta')+'</strong><small>'+esc(PS.auth.account?.username||'')+'</small><a href="'+PS.cfg.hubUrl+'">'+icon('grid')+'Todos os aplicativos</a><a href="./">'+icon('home')+'Portaria no computador</a><button type="button" id="sair">'+icon('logout')+'Sair da conta</button></div>'+
  '<main class="lt-wrap"><div id="ban"></div><section class="lt-cam" id="cam"><video id="video" playsinline muted></video><div class="mira"></div><div class="hint" id="hint">Aponte para o QR do crachá ou do convite</div></section>'+
- '<form class="lt-manual" id="mf"><input id="mc" autocomplete="off" inputmode="text" placeholder="Ou digite matrícula / código do convite" aria-label="Matrícula ou código do convite"><button class="btn primary" type="submit">OK</button></form><div id="res" aria-live="polite"></div></main>';
+ '<form class="lt-manual" id="mf"><input id="mc" autocomplete="off" inputmode="text" placeholder="Ou digite matrícula, placa ou código do convite" aria-label="Matrícula, placa ou código do convite"><button class="btn primary" type="submit">OK</button></form><div id="res" aria-live="polite"></div></main>';
  $('#tb').onclick=dlgTurno;
  const am=$('#accm'),ab=$('#acc');ab.onclick=()=>{am.hidden=!am.hidden;ab.setAttribute('aria-expanded',String(!am.hidden));};
  document.addEventListener('click',e=>{if(!e.target.closest('#acc')&&!e.target.closest('#accm')){am.hidden=true;ab.setAttribute('aria-expanded','false');}});
@@ -118,10 +118,15 @@ async function handle(raw,origem){
   if(m&&m[1].toUpperCase()==='C')await colab(m[2].trim(),(m[3]||'').trim().toUpperCase(),origem);
   else if(m)await convite(m[2].trim());
   else if(/^\d{1,10}$/.test(t))await colab(t,'',origem);
-  else await convite(t);
+  else{let dono=null;if(P.temVeiculos()&&P.placaValida(t)){try{dono=await P.donoDaPlaca(t);}catch{}}
+   if(dono&&dono.vinc==='Colaborador'&&dono.mat)await colab(dono.mat,'',origem,dono);
+   else if(dono){setMode('confirm');
+    const tx=dono.vinc==='Colaborador'?'Veículo de <b>colaborador</b>'+(dono.nome?' · '+esc(dono.nome):'')+', mas o cadastro está sem a matrícula. Complete a coluna MATRICULA na lista 00_Cadastro_Veiculos para liberar a entrada pela placa.':'Veículo de <b>'+esc(dono.vinc||'transportadora/terceiro')+'</b>'+(dono.nome?' · motorista: <b>'+esc(dono.nome)+'</b>':'')+'. Registre a entrada do veículo no computador da portaria (tela Veículos).';
+    card('<h2>Placa '+esc(dono.placa)+'</h2><div class="meta">'+esc([dono.tipo,dono.modelo,dono.cor].filter(Boolean).join(' · ')||'Veículo cadastrado')+'</div><div class="banner info" style="margin-top:8px">'+icon('car')+'<span>'+tx+'</span></div>',btnNova);}
+   else await convite(t);}
  }catch(e){setMode('confirm');card('<h2>Não foi possível consultar</h2><div class="banner err">'+icon('cloudoff')+'<span>'+esc(e.message)+'</span></div>',btnNova);}
 }
-async function colab(mat,ver,origem){
+async function colab(mat,ver,origem,veic=null){
  if(ver&&verif(mat)!==ver){setMode('confirm');navigator.vibrate?.(200);card('<h2>QR não confere</h2><div class="banner err">'+icon('lock')+'<span>O código do crachá não confere. Confira o crachá ou registre manualmente no computador.</span></div>',btnNova);return;}
  const c=await P.colabPorMatricula(mat);
  if(!c){setMode('confirm');card('<h2>Matrícula não encontrada</h2><div class="banner err">'+icon('alert')+'<span>A matrícula <b>'+esc(mat)+'</b> não consta no diretório. Não libere; registre no computador.</span></div>',btnNova);return;}
@@ -138,13 +143,18 @@ async function colab(mat,ver,origem){
   return;}
  if(deslig){setMode('confirm');navigator.vibrate?.([120,60,120]);card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span><b>Situação no diretório: '+esc(c.sit||'não informada')+'.</b> Não libere a entrada e comunique a Segurança.</span></div>',btnNova);return;}
  let ret=null;try{ret=await P.saidaTempHoje(c.mat);}catch{}
- const precisa=P.on('MODAL_OBRIGATORIO')&&!ret;let modal=ret&&val(ret.MODAL)?val(ret.MODAL):null;setMode('confirm');
- const origemTxt=origem==='digitado'?'<span class="chip warn dot">Matrícula digitada</span><div class="detail">Colaborador localizado no diretório, sem leitura do crachá. Confira um documento com foto.</div>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR sem verificador</span><div class="detail">Crachá lido, mas sem o código de conferência. Confira o crachá.</div>';
- card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+(ret?' <span class="chip blue dot">Retorno</span><div class="detail">Saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</div>':'')+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="'+(modal===x)+'">'+esc(x)+'</button>').join('')+'</div>',
+ let pls=[];if(P.temVeiculos()){try{pls=await P.placasDe(c.mat);}catch{}}
+ const plz=[...new Map([...(veic?[veic]:[]),...pls].map(x=>[x.placa,x])).values()];
+ let placaSel=veic?veic.placa:null;
+ const precisa=P.on('MODAL_OBRIGATORIO')&&!ret;let modal=ret&&val(ret.MODAL)?val(ret.MODAL):(veic&&!ret?(veic.tipo==='Moto'?'Moto':'Carro'):null);setMode('confirm');
+ const origemTxt=veic?'<span class="chip blue dot">Placa '+esc(veic.placa)+'</span><div class="detail">Identificado pelo veículo cadastrado'+(veic.tipo||veic.modelo?' ('+esc([veic.tipo,veic.modelo].filter(Boolean).join(' '))+')':'')+'. Sem leitura do crachá — confira quem está dirigindo.</div>':origem==='digitado'?'<span class="chip warn dot">Matrícula digitada</span><div class="detail">Colaborador localizado no diretório, sem leitura do crachá. Confira um documento com foto.</div>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR sem verificador</span><div class="detail">Crachá lido, mas sem o código de conferência. Confira o crachá.</div>';
+ card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+(ret?' <span class="chip blue dot">Retorno</span><div class="detail">Saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</div>':'')+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="'+(modal===x)+'">'+esc(x)+'</button>').join('')+'</div>'+(plz.length?'<span class="lt-lbl">Veículo (opcional)</span><div class="lt-modais" id="pl">'+plz.map(x=>'<button type="button" data-pl="'+esc(x.placa)+'" aria-pressed="'+(placaSel===x.placa)+'">'+esc(x.placa)+(x.tipo==='Moto'?' (moto)':'')+'</button>').join('')+'</div>':''),
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
  $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));};
+ const plEl=$('#pl');if(plEl)plEl.onclick=e=>{const b=e.target.closest('[data-pl]');if(!b)return;placaSel=placaSel===b.dataset.pl?null:b.dataset.pl;$$('#pl [data-pl]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pl===placaSel)));
+  if(placaSel&&!modal){const vv=plz.find(x=>x.placa===placaSel);modal=vv&&vv.tipo==='Moto'?'Moto':'Carro';$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===modal)));}};
  $('#go').onclick=async()=>{if(needTurno())return;if(precisa&&!modal){toast('Selecione como o colaborador veio hoje.','err');return;}const b=$('#go');b.disabled=true;setMode('busy');
-  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)'},{mat:c.mat});
+  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)',PLACA:placaSel||''},{mat:c.mat});
    if(r.bloq){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span>'+esc(r.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(r.dup){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(r.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
    sucesso(c.nome+' — entrada registrada'+(r.confirmado?' (confirmada)':''));}catch(e){setMode('confirm');b.disabled=false;falha(e);}};

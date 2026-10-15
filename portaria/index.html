@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.18">
+<link rel="stylesheet" href="/core/polystell.css?v=2.19">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -68,8 +68,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.18"></script>
-<script src="comum.js?v=2.18"></script>
+<script src="/core/polystell.js?v=2.19"></script>
+<script src="comum.js?v=2.19"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -82,7 +82,7 @@ const P=PORTARIA;
 const ST={view:'painel',isTI:false,isExp:false,isRH:false,posto:true,log:false,rh:false,r:null,turno:null,busy:false,
  d:{openP:[],openV:[],movVHoje:[],movPHoje:[],agenda:[],agendaRec:[],prev:[],prevR:[],merc:[],ocor:[],trunc:false},
  sync:{at:null,err:null},
- f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true},
+ f:{p:{tipo:'Colaborador',colab:null,modal:null,nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,q:'',ft:'Todos',pext:null,salvarCad:true,placa:'',salvarVeic:false},
     v:{prev:'',placa:'',mot:'',emp:'',fin:'Coleta',nf:'',auto:{}},
     m:{dest:null,setor:'',vol:'1',rem:'',desc:'',modo:'pessoa',setorDest:''},
     o:{tipo:'Segurança',grav:'Baixa',desc:'',env:null,envNome:'',envPlaca:'',aba:'abertas',q:''},
@@ -269,7 +269,7 @@ VIEWS.pessoas={
   page('Pessoas','Entrada e saída de colaboradores, visitantes, prestadores e terceiros.',
    '<div class="cols"><div class="panel"><div class="panel-h">'+icon('in')+'<h2>Registrar entrada</h2></div><div class="seg solid" id="ptipo" role="group" aria-label="Tipo">'+TIPOS_P.map(t=>'<button type="button" data-t="'+t+'" aria-pressed="'+(F.tipo===t)+'">'+t+'</button>').join('')+'</div><div id="pform" style="margin-top:16px"></div></div>'+
    '<div class="panel"><div class="panel-h">'+icon('users')+'<h2>Na planta agora</h2><span class="sp"><span class="count" id="pcount"></span></span></div>'+
-   '<div class="toolbar"><input type="search" data-bind="p.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar nome, empresa, crachá, anfitrião…" aria-label="Buscar na planta"></div>'+
+   '<div class="toolbar"><input type="search" data-bind="p.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar nome, empresa, crachá, placa…" aria-label="Buscar na planta"></div>'+
    '<div class="seg" id="pft" style="margin-bottom:8px"></div><div class="rows" id="plist"></div>'+
    '<div class="panel-h" style="margin-top:18px">'+icon('clock')+'<h2>Fora temporariamente</h2><span class="sp"><span class="count" id="ftcount"></span></span></div><div class="rows" id="ftlist"></div></div></div>');
   bindInputs(()=>this.update());
@@ -280,16 +280,17 @@ VIEWS.pessoas={
    const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);return;}
    const ff=e.target.closest('[data-ftfinal]');if(ff){marcarFinal(ff.dataset.ftfinal);return;}
    const md=e.target.closest('[data-m]');if(md){ST.f.p.modal=md.dataset.m;$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b===md)));return;}
+   const pla=e.target.closest('[data-pla]');if(pla){const F2=ST.f.p;F2.placa=pla.dataset.pla;const pi=$('#cplaca');if(pi)pi.value=F2.placa;if(!F2.modal){F2.modal=pla.dataset.plt==='Moto'?'Moto':'Carro';$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===F2.modal)));}mostraSalvarV();return;}
    if(e.target.closest('#pgo-c'))regColab();if(e.target.closest('#pgo-v'))regVisit();};},
- update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount',{acoes:true});
+ update(){banners();mostraSalvarV();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount',{acoes:true});
   let rows=ST.d.openP.slice().sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));
   const cnt=k=>FILTROS[k]?ST.d.openP.filter(m=>FILTROS[k].includes(val(m.TIPO))).length:ST.d.openP.length;
   $('#pft').innerHTML=Object.keys(FILTROS).map(k=>'<button type="button" data-ft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
   if(FILTROS[F.ft])rows=rows.filter(m=>FILTROS[F.ft].includes(val(m.TIPO)));
-  const q=norm(F.q);if(q)rows=rows.filter(m=>norm([m.NOME,m.EMPRESA,m.CRACHA,m.MATRICULA,m.ANFITRIAO_NOME].join(' ')).includes(q));
+  const q=norm(F.q);if(q)rows=rows.filter(m=>norm([m.NOME,m.EMPRESA,m.CRACHA,m.MATRICULA,m.ANFITRIAO_NOME,m.PLACA].join(' ')).includes(q));
   $('#pcount').textContent=ST.d.openP.length;
   $('#plist').innerHTML=rows.length?rows.map(m=>{const old=pd.has(m.id);
-   return '<div class="row'+(old?' flag':'')+'"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),'entrou '+quando(m.ENTRADA)+' · '+fmt.dur(idade(m.ENTRADA)),m.CRACHA&&'crachá '+m.CRACHA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.SEM_CRACHA===true&&'sem crachá'].filter(Boolean).join(' · '))+'</div>'+
+   return '<div class="row'+(old?' flag':'')+'"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),'entrou '+quando(m.ENTRADA)+' · '+fmt.dur(idade(m.ENTRADA)),m.CRACHA&&'crachá '+m.CRACHA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.PLACA&&'placa '+m.PLACA,m.SEM_CRACHA===true&&'sem crachá'].filter(Boolean).join(' · '))+'</div>'+
     (old?'<div class="tags"><span class="chip warn dot">Conferir: entrada aberta há '+fmt.dur(idade(m.ENTRADA))+'</span></div>':'')+'</div><div class="act"><button class="btn sm" data-saida="'+m.id+'">'+icon('out')+'Saída</button></div></div>';}).join(''):'<div class="empty">'+(ST.d.openP.length?'Nenhum resultado para o filtro.':'Ninguém registrado dentro agora.')+'</div>';}
 };
 function drawPForm(){const F=ST.f.p,box=$('#pform');if(!box)return;
@@ -327,15 +328,28 @@ function drawColab(){const F=ST.f.p,box=$('#colabbox');if(!box)return;const c=F.
  box.innerHTML='<div class="field"><span class="lbl">Colaborador</span><div id="csel"></div></div>'+(ret?'<div class="banner info">'+icon('clock')+'<span><b>Retorno</b> — saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</span></div>':'')+
   (P.desligado(c)?'<div class="banner err">'+icon('lock')+'<span><b>Situação no diretório: '+esc(c.sit||'não informada')+'.</b> Não libere a entrada e comunique a Segurança.'+(dentro?' Consta uma entrada aberta — registre a saída na lista ao lado.':'')+'</span></div>'
   :dentro?'<div class="banner warn">'+icon('alert')+'<span>Já está dentro desde '+quando(dentro.ENTRADA)+'. Para registrar a saída, use a lista ao lado.</span></div>'
-  :'<div class="field"><span class="lbl">Como veio hoje? (ESG)'+(P.on('MODAL_OBRIGATORIO')&&!F.retorno?' *':'')+'</span><div class="seg esg" id="esg">'+MODAIS.map(m=>'<button type="button" data-m="'+esc(m)+'" aria-pressed="'+(F.modal===m)+'">'+esc(m)+'</button>').join('')+'</div></div><button class="btn primary block" id="pgo-c" type="button">'+icon('in')+'Registrar entrada (sem crachá)</button>');
- picker($('#csel'),{value:c,onClear:()=>{F.colab=null;F.modal=null;drawColab();setTimeout(()=>$('#cpick input')?.focus(),0);}});}
+  :'<div class="field"><span class="lbl">Como veio hoje? (ESG)'+(P.on('MODAL_OBRIGATORIO')&&!F.retorno?' *':'')+'</span><div class="seg esg" id="esg">'+MODAIS.map(m=>'<button type="button" data-m="'+esc(m)+'" aria-pressed="'+(F.modal===m)+'">'+esc(m)+'</button>').join('')+'</div></div>'+
+   '<div class="field"><label for="cplaca">Veículo — placa (opcional)</label><input id="cplaca" data-bind="p.placa" data-live="1" maxlength="8" style="text-transform:uppercase" autocomplete="off" value="'+esc(F.placa)+'" placeholder="ABC1D23"><div class="chips" id="cplacas" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"></div></div>'+
+   (P.temVeiculos()?'<label class="lchk" id="csalvarv" style="margin:0 0 12px;display:none"><input type="checkbox" data-bind="p.salvarVeic"'+(F.salvarVeic?' checked':'')+'>Guardar este veículo no cadastro do colaborador</label>':'')+
+   '<button class="btn primary block" id="pgo-c" type="button">'+icon('in')+'Registrar entrada (sem crachá)</button>');
+ picker($('#csel'),{value:c,onClear:()=>{F.colab=null;F.modal=null;F.placa='';F.salvarVeic=false;ST.plsColab=null;drawColab();setTimeout(()=>$('#cpick input')?.focus(),0);}});
+ if(P.temVeiculos()&&!dentro&&!P.desligado(c)){ST.plsColab=null;P.placasDe(c.mat).then(pls=>{if(ST.f.p.colab!==c)return;ST.plsColab=pls;const el=$('#cplacas');
+  if(el)el.innerHTML=pls.map(x=>'<button type="button" class="chip" data-pla="'+esc(x.placa)+'" data-plt="'+esc(x.tipo)+'">'+esc(x.placa)+esc(x.modelo?' · '+x.modelo:(x.tipo==='Moto'?' · moto':''))+'</button>').join('');
+  mostraSalvarV();}).catch(()=>{});}}
+function mostraSalvarV(){const F=ST.f.p,el=$('#csalvarv');if(!el)return;const p=P.normPlaca(F.placa);
+ el.style.display=(p&&P.placaValida(p)&&!(ST.plsColab||[]).some(x=>x.placa===p))?'':'none';}
 async function regColab(){if(needTurno())return;const F=ST.f.p,c=F.colab;if(!c||P.desligado(c))return;
  if(P.on('MODAL_OBRIGATORIO')&&!F.modal&&!F.retorno){toast('Selecione como o colaborador veio hoje (ESG).','err');return;}
+ const placa=F.placa.trim()?P.normPlaca(F.placa):'';
+ if(placa&&!P.placaValida(placa)){const pi=$('#cplaca');if(pi){pi.setAttribute('aria-invalid','true');pi.focus();}toast('Placa inválida. Use o formato ABC1D23 (ou deixe em branco).','err');return;}
+ $('#cplaca')?.removeAttribute('aria-invalid');
  const b=$('#pgo-c');b.disabled=true;
- try{const r=await P.entradaPessoa({TIPO:F.tipo,NOME:c.nome,MATRICULA:c.mat,MODAL:F.modal||'',SEM_CRACHA:true,PORTEIRO_ENT:porteiro(),ORIGEM:'PC'},{mat:c.mat||null,nome:c.mat?null:c.nome});
+ try{const r=await P.entradaPessoa({TIPO:F.tipo,NOME:c.nome,MATRICULA:c.mat,MODAL:F.modal||'',SEM_CRACHA:true,PORTEIRO_ENT:porteiro(),ORIGEM:'PC',PLACA:placa},{mat:c.mat||null,nome:c.mat?null:c.nome});
   if(r.bloq){toast(r.bloq,'err');return;}
   if(r.dup){b.disabled=false;const esc2=await dialog({title:'Entrada já registrada',html:'<p><b>'+esc(r.dup.NOME)+'</b> já está dentro desde '+quando(r.dup.ENTRADA)+' (sem saída registrada).</p>',actions:[{label:'Fechar',value:null},{label:'Registrar a saída',kind:'primary',value:'s'}]});if(esc2==='s')doSaidaPessoa(r.dup);return;}
-  toast(r.confirmado?'Entrada confirmada no servidor: '+c.nome:'Entrada registrada: '+c.nome);F.colab=null;F.modal=null;drawColab();refresh();}
+  let extra='';
+  if(placa&&F.salvarVeic&&P.temVeiculos()&&!(ST.plsColab||[]).some(x=>x.placa===placa)){try{const sv=await P.salvarVeiculoColab({placa,modal:F.modal,mat:c.mat,nome:c.nome});if(sv.novo)extra=' · veículo guardado no cadastro';}catch(e){extra=' · não deu para guardar o veículo ('+(e.message||'erro')+')';}}
+  toast((r.confirmado?'Entrada confirmada no servidor: ':'Entrada registrada: ')+c.nome+extra);F.colab=null;F.modal=null;F.placa='';F.salvarVeic=false;ST.plsColab=null;drawColab();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-c');if(x)x.disabled=false;}}
 async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome.trim();
  const vn=$('#vnome');if(!nome){vn.setAttribute('aria-invalid','true');vn.focus();toast('Informe o nome completo.','err');return;}vn.removeAttribute('aria-invalid');
@@ -853,7 +867,7 @@ VIEWS.presenca={
   $('#rft').innerHTML=Object.keys(TIPO_GRUPO).map(k=>'<button type="button" data-rft="'+k+'" aria-pressed="'+(F.ft===k)+'">'+k+' <span class="count">'+cnt(k)+'</span></button>').join('');
   let rows=all.slice().sort((a,b)=>String(a.NOME).localeCompare(String(b.NOME),'pt-BR'));
   if(TIPO_GRUPO[F.ft])rows=rows.filter(m=>TIPO_GRUPO[F.ft].includes(val(m.TIPO)));
-  const q=norm(F.q);if(q)rows=rows.filter(m=>norm([m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,m.CRACHA].join(' ')).includes(q));
+  const q=norm(F.q);if(q)rows=rows.filter(m=>norm([m.NOME,m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME,m.CRACHA,m.PLACA].join(' ')).includes(q));
   $('#rlist').innerHTML='<div class="detail rprintonly">Portaria Polystell · na planta em '+esc(fmt.dmhm(new Date()))+' · '+rows.length+' pessoa(s)</div>'+(rows.length?rows.map(m=>'<div class="row"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.CRACHA&&'crachá '+m.CRACHA].filter(Boolean).join(' · '))+'</div><div class="detail">Entrou '+quando(m.ENTRADA)+' ('+fmt.dur(idade(m.ENTRADA))+')'+(m.PORTEIRO_ENT?' · '+esc(m.PORTEIRO_ENT):'')+'</div></div></div>').join(''):'<div class="empty">'+(all.length?'Ninguém para o filtro.':'Ninguém registrado dentro agora.')+'</div>');}
 };
 VIEWS.consultas={
