@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.19">
+<link rel="stylesheet" href="/core/polystell.css?v=2.20">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -68,8 +68,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.19"></script>
-<script src="comum.js?v=2.19"></script>
+<script src="/core/polystell.js?v=2.20"></script>
+<script src="comum.js?v=2.20"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -299,7 +299,8 @@ function drawPForm(){const F=ST.f.p,box=$('#pform');if(!box)return;
  box.innerHTML='<div class="grid2"><div class="field"><label for="vnome">Nome completo *</label><div class="pick" id="vnpick"><input id="vnome" data-bind="p.nome" maxlength="80" autocomplete="off" value="'+esc(F.nome)+'"'+(cad?' placeholder="Digite para buscar no cadastro de pessoas…"':'')+'><div class="menu" hidden></div></div>'+(F.pext?'<span class="hint"><span class="chip ok dot">Do cadastro de pessoas</span>'+(F.pext.tipo?' '+esc(F.pext.tipo):'')+'</span>':'')+'</div><div class="field"><label for="vemp">Empresa</label><input id="vemp" data-bind="p.empresa" maxlength="60" value="'+esc(F.empresa)+'"></div></div>'+
   '<div class="grid2"><div class="field"><label for="vdoc">Documento (RG/CPF)</label><input id="vdoc" data-bind="p.doc" maxlength="20" inputmode="numeric" value="'+esc(F.doc)+'"><span class="hint">Gravado mascarado: <b id="vdocprev">'+esc(F.doc?P.maskDoc(F.doc):'—')+'</b></span></div><div class="field"><label for="vcr">Crachá entregue (nº)</label><input id="vcr" data-bind="p.cracha" maxlength="12" placeholder="Ex.: V-012" value="'+esc(F.cracha)+'"></div></div>'+
   '<div class="field"><span class="lbl">Quem recebe (anfitrião)</span><div id="anfbox"></div></div>'+
-  '<div class="field"><label for="vmot">Motivo</label><input id="vmot" data-bind="p.motivo" maxlength="120" placeholder="Reunião, manutenção, entrega…" value="'+esc(F.motivo)+'"></div>'+
+  '<div class="grid2"><div class="field"><label for="vmot">Motivo</label><input id="vmot" data-bind="p.motivo" maxlength="120" placeholder="Reunião, manutenção, entrega…" value="'+esc(F.motivo)+'"></div>'+
+  '<div class="field"><label for="vplaca">Veículo — placa (opcional)</label><input id="vplaca" data-bind="p.placa" maxlength="8" style="text-transform:uppercase" autocomplete="off" value="'+esc(F.placa)+'" placeholder="ABC1D23"></div></div>'+
   (cad&&!F.pext?'<label class="lchk" style="margin:0 0 12px"><input type="checkbox" data-bind="p.salvarCad"'+(F.salvarCad?' checked':'')+'>Salvar no cadastro de pessoas para as próximas visitas</label>':'')+
   '<button class="btn primary block" id="pgo-v" type="button">'+icon('in')+'Registrar entrada</button>';
  $('#vdoc').addEventListener('input',e=>{$('#vdocprev').textContent=e.target.value?P.maskDoc(e.target.value):'—';});
@@ -353,7 +354,10 @@ async function regColab(){if(needTurno())return;const F=ST.f.p,c=F.colab;if(!c||
  catch(e){writeErr(e);}finally{const x=$('#pgo-c');if(x)x.disabled=false;}}
 async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome.trim();
  const vn=$('#vnome');if(!nome){vn.setAttribute('aria-invalid','true');vn.focus();toast('Informe o nome completo.','err');return;}vn.removeAttribute('aria-invalid');
- const fields={TIPO:F.tipo,NOME:nome,EMPRESA:F.empresa.trim(),DOC_MASC:F.doc?P.maskDoc(F.doc):'',MOTIVO:F.motivo.trim(),CRACHA:F.cracha.trim(),SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'PC',ANFITRIAO_NOME:F.anf?.nome||'',ANFITRIAO_MATRICULA:F.anf?.mat||''};
+ const placa=F.placa.trim()?P.normPlaca(F.placa):'';
+ if(placa&&!P.placaValida(placa)){const pi=$('#vplaca');if(pi){pi.setAttribute('aria-invalid','true');pi.focus();}toast('Placa inválida. Use o formato ABC1D23 (ou deixe em branco).','err');return;}
+ $('#vplaca')?.removeAttribute('aria-invalid');
+ const fields={TIPO:F.tipo,NOME:nome,EMPRESA:F.empresa.trim(),DOC_MASC:F.doc?P.maskDoc(F.doc):'',MOTIVO:F.motivo.trim(),CRACHA:F.cracha.trim(),SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'PC',ANFITRIAO_NOME:F.anf?.nome||'',ANFITRIAO_MATRICULA:F.anf?.mat||'',PLACA:placa};
  const b=$('#pgo-v');b.disabled=true;
  try{let r=await P.entradaPessoa(fields,{nome});
   if(r.bloq){toast(r.bloq,'err');return;}
@@ -363,7 +367,7 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
   let msg='Entrada registrada: '+nome,kind='ok';
   if(!F.pext&&F.salvarCad&&P.podeCadastrarPessoa()){try{const c=await P.salvarPessoaExt({nome,tipo:F.tipo,empresa:F.empresa,doc:F.doc});if(c.novo)msg+=' · salvo no cadastro de pessoas';}
    catch(e){msg+='. Não foi possível salvar no cadastro de pessoas'+(e.status===403?' (sem permissão — avise a TI)':'')+'.';kind='warn';}}
-  toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true});drawPForm();refresh();}
+  toast(msg,kind);Object.assign(F,{nome:'',empresa:'',doc:'',cracha:'',motivo:'',anf:null,pext:null,salvarCad:true,placa:''});drawPForm();refresh();}
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
 function desenhaFora(lista,cont,{acoes=false}={}){const el=$(lista);if(!el)return;const ft=P.foraTemporario(ST.d.movPHoje,ST.d.openP);const c=$(cont);if(c)c.textContent=ft.length;const hR=P.param('ALERTA_RETORNO');
  el.innerHTML=ft.length?ft.map(m=>{const atraso=idade(m.SAIDA)>hR*36e5;return '<div class="row'+(atraso?' flag':'')+'"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA].filter(Boolean).join(' · '))+'</div><div class="detail">Saiu às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+')'+(m.PORTEIRO_SAI?' · '+esc(m.PORTEIRO_SAI):'')+'</div>'+(atraso?'<div class="tags"><span class="chip warn dot">Não retornou</span></div>':'')+'</div>'+

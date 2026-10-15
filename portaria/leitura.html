@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.19">
+<link rel="stylesheet" href="/core/polystell.css?v=2.20">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -51,8 +51,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.19"></script>
-<script src="comum.js?v=2.19"></script>
+<script src="/core/polystell.js?v=2.20"></script>
+<script src="comum.js?v=2.20"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -169,10 +169,12 @@ async function convite(cod){
   $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;setMode('busy');
    try{const x=await P.saidaPessoa(aberto,porteiro());if(x.jaSaiu){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>A saída já tinha sido registrada.</span></div>',btnNova);return;}
     sucesso(a.NOME+' — saída registrada',x.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};return;}
- card(head+'<div class="banner ok">'+icon('check')+'<span>'+(r.reentrada?'Reentrada no mesmo dia — convite válido hoje.':'Convite válido para hoje.')+'</span></div><div class="field"><label for="cr">Crachá entregue (nº)</label><input id="cr" maxlength="12" placeholder="Ex.: V-012"></div>',
+ card(head+'<div class="banner ok">'+icon('check')+'<span>'+(r.reentrada?'Reentrada no mesmo dia — convite válido hoje.':'Convite válido para hoje.')+'</span></div><div class="field"><label for="cr">Crachá entregue (nº)</label><input id="cr" maxlength="12" placeholder="Ex.: V-012"></div><div class="field"><label for="cpl">Veículo — placa (opcional)</label><input id="cpl" maxlength="8" style="text-transform:uppercase" autocomplete="off" placeholder="ABC1D23"></div>',
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
- $('#go').onclick=async()=>{if(needTurno())return;const b=$('#go');b.disabled=true;const cr=$('#cr').value.trim();setMode('busy');
-  try{const x=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:cr,SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'Celular (QR)',AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
+ $('#go').onclick=async()=>{if(needTurno())return;const cr=$('#cr').value.trim();const pl=P.normPlaca($('#cpl')?.value||'');
+  if(pl&&!P.placaValida(pl)){toast('Placa inválida. Use o formato ABC1D23 (ou deixe em branco).','err');return;}
+  const b=$('#go');b.disabled=true;setMode('busy');
+  try{const x=await P.entradaPessoa({TIPO:val(a.TIPO)||'Visitante',NOME:a.NOME,EMPRESA:a.EMPRESA||'',DOC_MASC:a.DOC_MASC||'',MOTIVO:a.MOTIVO||'',CRACHA:cr,SEM_CRACHA:false,PORTEIRO_ENT:porteiro(),ORIGEM:'Celular (QR)',PLACA:pl,AGENDAMENTOLookupId:Number(a.id),ANFITRIAO_NOME:a.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:a.ANFITRIAO_MATRICULA||''},{agId:a.id});
    if(x.bloq){setMode('confirm');card(head+'<div class="banner err">'+icon('lock')+'<span>'+esc(x.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(x.dup){setMode('confirm');card(head+'<div class="banner warn">'+icon('alert')+'<span>'+(x.outroCanal?'Já existe entrada aberta com este nome (registro sem o convite) desde '+quando(x.dup.ENTRADA)+'. Se for outra pessoa com o mesmo nome, registre pelo computador.':'Já estava registrado(a) como dentro desde '+quando(x.dup.ENTRADA)+'.')+' Nada foi gravado.</span></div>',btnNova);return;}
    sucesso(a.NOME+' — entrada registrada'+(x.confirmado?' (confirmada)':''),x.parcial);}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
