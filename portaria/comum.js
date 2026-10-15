@@ -457,7 +457,7 @@ const veicProblemas=()=>{if(!L.veic)return ['Lista 00_Cadastro_Veiculos não enc
  if(!COLS.veic)return ['Não foi possível ler as colunas da 00_Cadastro_Veiculos.'];
  return VEIC_COLS.filter(c=>!COLS.veic.has(c)).map(c=>'00_Cadastro_Veiculos: falta a coluna '+c+' (crie com esse nome exato, sem acento)');};
 async function veiculosCadastro(){if(!temVeiculos())return [];const rs=await sp.items(L.veic,'$expand=fields&$top=999');
- return rs.filter(r=>val(r.VINCULO)==='Colaborador').map(r=>({id:r.id,placa:normPlaca(r.PLACA),tipo:val(r.TIPO)||'Carro',modelo:[val(r.MARCA),val(r.MODELO)].filter(Boolean).join(' '),mat:String(r.MATRICULA??'').trim(),nome:String(r.MOTORISTA||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}));}
+ return rs.filter(r=>val(r.VINCULO)==='Colaborador').map(r=>({id:r.id,placa:normPlaca(r.PLACA),tipo:val(r.TIPO)||'Carro',marca:val(r.MARCA)||'',mod:val(r.MODELO)||'',cor:val(r.COR)||'',modelo:[val(r.MARCA),val(r.MODELO)].filter(Boolean).join(' '),mat:String(r.MATRICULA??'').trim(),nome:String(r.MOTORISTA||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}));}
 async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro de veículos indisponível (colunas faltando na 00_Cadastro_Veiculos).');
  const placa=normPlaca(f.placa);if(!placaValida(placa))throw Object.assign(new Error('Placa inválida. Use o formato ABC1D23 ou ABC1234.'),{code:'validacao'});
  const mat=String(f.mat||'').trim(),nome=String(f.nome||'').trim();
@@ -467,15 +467,13 @@ async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro d
  if(outro)throw Object.assign(new Error('A placa '+placa+' já está ativa no cadastro ('+(val(outro.VINCULO)||'sem vínculo')+(outro.MOTORISTA?' · '+outro.MOTORISTA:'')+'). Edite ou desative a linha existente.'),{code:'validacao'});
  const fields={PLACA:placa,VINCULO:'Colaborador',MATRICULA:mat,MOTORISTA:nome};
  if(COLS.veic.has('TIPO'))fields.TIPO=f.tipo==='Moto'?'Moto':'Carro';
+ if(COLS.veic.has('MARCA'))fields.MARCA=String(f.marca||'').trim();
  if(COLS.veic.has('MODELO'))fields.MODELO=String(f.modelo||'').trim();
+ if(COLS.veic.has('COR'))fields.COR=String(f.cor||'').trim();
  if(!id)fields.ATIVO=true;
  VEIC=null;return id?sp.patch(L.veic,id,fields):sp.add(L.veic,fields);}
 const setVeiculoAtivo=(id,ativo)=>{VEIC=null;return sp.patch(L.veic,id,{ATIVO:!!ativo});};
-async function salvarVeiculoColab({placa,modal,mat,nome}){if(!temVeiculos())return {sem:true};const p=normPlaca(placa);
- const v=await veiculos(true);if(v.some(x=>x.placa===p))return {dup:true};
- const f={PLACA:p,VINCULO:'Colaborador',MATRICULA:String(mat||'').trim(),MOTORISTA:String(nome||'').trim(),ATIVO:true};
- if(COLS.veic.has('TIPO'))f.TIPO=modal==='Moto'?'Moto':'Carro';
- await sp.add(L.veic,f);VEIC=null;return {novo:true};}
+const veicOpcoes=c=>{const col=COLS.veic&&COLS.veic.get(c);return (col&&col.choice&&col.choice.choices)||[];};
 const temEmergencia=()=>!!(L.emerg&&L.chamada&&L.brigada);
 /* a emergência confere o próprio contrato na tela dela: lista mal configurada não trava a guarita */
 async function conferirEmergencia(){if(!temEmergencia())return ['Listas 09_Emergencias, 09_Emergencia_Chamada e 09_Brigada não encontradas (ou sem permissão de leitura).'];
@@ -643,7 +641,7 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,ocorrenciasEncerradas,analisarOcorrencia,encerrarOcorrencia,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
- temVeiculos,veiculos,placasDe,donoDaPlaca,salvarVeiculoColab,veicProblemas,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
+ temVeiculos,veiculos,placasDe,donoDaPlaca,veicProblemas,veicOpcoes,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
  entradaPessoa,saidaPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});
