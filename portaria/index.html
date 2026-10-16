@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Portaria · Controle de Acesso | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.22">
+<link rel="stylesheet" href="/core/polystell.css?v=2.23">
 <style>
 .esg button{min-width:118px;justify-content:center}
 .pfoot{display:flex;gap:10px;align-items:center;margin-top:6px}
@@ -68,8 +68,8 @@ pre.resumo{white-space:pre-wrap;font:inherit;font-size:13px;background:#f4f6fa;b
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar a Portaria.</p></div></noscript>
-<script src="/core/polystell.js?v=2.22"></script>
-<script src="comum.js?v=2.22"></script>
+<script src="/core/polystell.js?v=2.23"></script>
+<script src="comum.js?v=2.23"></script>
 <script>
 'use strict';
 /* Portaria · Controle de Acesso — PC da guarita + Logística (v2.4).
@@ -216,7 +216,7 @@ VIEWS.painel={
  update(){banners();if(!$('#kpis'))return;const pd=pend(),D=ST.d;
   const prevAg=D.agenda.filter(a=>['Agendado','Na portaria'].includes(val(a.STATUS))&&!P.abertoDoAgend(D.openP,a.id)).length;
   const npend=pd.p.length+pd.v.length+pd.m.length+pd.t.length;
-  $('#kpis').innerHTML=[['pessoas',D.openP.length,'pessoas na planta'+(P.foraTemporario(D.movPHoje,D.openP).length?' · '+P.foraTemporario(D.movPHoje,D.openP).length+' fora (temporário)':''),pd.p.length],['veiculos',D.openV.length,'veículos no pátio',pd.v.length],['mercadorias',D.merc.length,'mercadorias aguardando',pd.m.length]].map(([g,n,l,a])=>'<button class="kpi'+(a?' alert':'')+'" data-go="'+g+'"><b>'+n+'</b><span>'+l+(a?' · '+a+' pendente(s)':'')+'</span></button>').join('')+
+  $('#kpis').innerHTML=[['pessoas',D.openP.length,'pessoas na planta'+(P.foraTemporario(D.movPHoje,D.openP).length?' · '+P.foraTemporario(D.movPHoje,D.openP).length+' fora (temporário)':''),pd.p.length],['veiculos',D.openV.length+D.openP.filter(m=>m.PLACA).length,'veículos no pátio',pd.v.length],['mercadorias',D.merc.length,'mercadorias aguardando',pd.m.length]].map(([g,n,l,a])=>'<button class="kpi'+(a?' alert':'')+'" data-go="'+g+'"><b>'+n+'</b><span>'+l+(a?' · '+a+' pendente(s)':'')+'</span></button>').join('')+
    '<div class="kpi"><b>'+prevAg+'</b><span>visitas ainda previstas hoje</span></div>';
   $('#pdc').textContent=npend+D.ocor.length;
   const ag=D.agenda.slice().sort((a,b)=>String(a.HORA||'').localeCompare(String(b.HORA||'')));
@@ -280,7 +280,8 @@ VIEWS.pessoas={
    const f=e.target.closest('[data-ft]');if(f){ST.f.p.ft=f.dataset.ft;this.update();return;}
    const s=e.target.closest('[data-saida]');if(s){const m=ST.d.openP.find(x=>x.id===s.dataset.saida);if(m)doSaidaPessoa(m);return;}
    const ff=e.target.closest('[data-ftfinal]');if(ff){marcarFinal(ff.dataset.ftfinal);return;}
-   const md=e.target.closest('[data-m]');if(md){ST.f.p.modal=md.dataset.m;$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b===md)));return;}
+   const fr=e.target.closest('[data-ftret]');if(fr){regRetorno(fr.dataset.ftret);return;}
+   const md=e.target.closest('[data-m]');if(md){ST.f.p.modal=md.dataset.m;$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b===md)));sincPlacaEsg();return;}
    const pla=e.target.closest('[data-pla]');if(pla){const F2=ST.f.p;F2.placa=pla.dataset.pla;const pi=$('#cplaca');if(pi)pi.value=F2.placa;if(!F2.modal){F2.modal=pla.dataset.plt==='Moto'?'Moto':'Carro';$$('#esg [data-m]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===F2.modal)));}return;}
    if(e.target.closest('#pgo-c'))regColab();if(e.target.closest('#pgo-v'))regVisit();};},
  update(){banners();if(!$('#plist'))return;const F=ST.f.p,pd=new Set(pend().p.map(m=>m.id));desenhaFora('#ftlist','#ftcount',{acoes:true});
@@ -336,10 +337,17 @@ function drawColab(){const F=ST.f.p,box=$('#colabbox');if(!box)return;const c=F.
  picker($('#csel'),{value:c,onClear:()=>{F.colab=null;F.modal=null;F.placa='';ST.plsColab=null;drawColab();setTimeout(()=>$('#cpick input')?.focus(),0);}});
  if(P.temVeiculos()&&!dentro&&!P.desligado(c)){ST.plsColab=null;P.placasDe(c.mat).then(pls=>{if(ST.f.p.colab!==c)return;ST.plsColab=pls;const el=$('#cplacas');
   if(el)el.innerHTML=pls.map(x=>'<button type="button" class="chip" data-pla="'+esc(x.placa)+'" data-plt="'+esc(x.tipo)+'">'+esc(x.placa)+esc(x.modelo?' · '+x.modelo:(x.tipo==='Moto'?' · moto':''))+'</button>').join('');
-  }).catch(()=>{});}}
+  sincPlacaEsg();}).catch(()=>{});}
+ sincPlacaEsg();}
+function sincPlacaEsg(){const F=ST.f.p,pi=$('#cplaca');if(!pi)return;
+ const semVeic=!!F.modal&&F.modal!=='Carro'&&F.modal!=='Moto';
+ pi.disabled=semVeic;if(semVeic&&F.placa){F.placa='';pi.value='';}
+ $$('#cplacas [data-pla]').forEach(b=>{const casa=!F.modal?true:F.modal==='Moto'?b.dataset.plt==='Moto':F.modal==='Carro'?b.dataset.plt!=='Moto':false;
+  b.disabled=!casa;b.style.opacity=casa?'':'.45';
+  if(!casa&&P.normPlaca(F.placa)===b.dataset.pla){F.placa='';pi.value='';}});}
 async function regColab(){if(needTurno())return;const F=ST.f.p,c=F.colab;if(!c||P.desligado(c))return;
  if(P.on('MODAL_OBRIGATORIO')&&!F.modal&&!F.retorno){toast('Selecione como o colaborador veio hoje (ESG).','err');return;}
- const placa=F.placa.trim()?P.normPlaca(F.placa):'';
+ const placa=(F.modal&&F.modal!=='Carro'&&F.modal!=='Moto')?'':(F.placa.trim()?P.normPlaca(F.placa):'');
  if(placa&&!P.placaValida(placa)){const pi=$('#cplaca');if(pi){pi.setAttribute('aria-invalid','true');pi.focus();}toast('Placa inválida. Use o formato ABC1D23 (ou deixe em branco).','err');return;}
  $('#cplaca')?.removeAttribute('aria-invalid');
  const b=$('#pgo-c');b.disabled=true;
@@ -367,7 +375,15 @@ async function regVisit(){if(needTurno())return;const F=ST.f.p;const nome=F.nome
  catch(e){writeErr(e);}finally{const x=$('#pgo-v');if(x)x.disabled=false;}}
 function desenhaFora(lista,cont,{acoes=false}={}){const el=$(lista);if(!el)return;const ft=P.foraTemporario(ST.d.movPHoje,ST.d.openP);const c=$(cont);if(c)c.textContent=ft.length;const hR=P.param('ALERTA_RETORNO');
  el.innerHTML=ft.length?ft.map(m=>{const atraso=idade(m.SAIDA)>hR*36e5;return '<div class="row'+(atraso?' flag':'')+'"><div class="main"><div class="t">'+esc(m.NOME)+'</div><div class="meta">'+esc([val(m.TIPO),m.MATRICULA&&'Matr. '+m.MATRICULA,m.EMPRESA].filter(Boolean).join(' · '))+'</div><div class="detail">Saiu às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+')'+(m.PORTEIRO_SAI?' · '+esc(m.PORTEIRO_SAI):'')+'</div>'+(atraso?'<div class="tags"><span class="chip warn dot">Não retornou</span></div>':'')+'</div>'+
-  (acoes?'<div class="act"><button class="btn sm" data-ftfinal="'+m.id+'">Marcar como saída final</button></div>':'')+'</div>';}).join(''):'<div class="empty">Ninguém fora temporariamente.</div>';}
+  (acoes?'<div class="act"><button class="btn sm primary" data-ftret="'+m.id+'">Registrar retorno</button><button class="btn sm" data-ftfinal="'+m.id+'">Marcar como saída final</button></div>':'')+'</div>';}).join(''):'<div class="empty">Ninguém fora temporariamente.</div>';}
+async function regRetorno(id){if(needTurno())return;const m=P.foraTemporario(ST.d.movPHoje,ST.d.openP).find(x=>x.id===id);if(!m)return;
+ const ok=await dialog({title:'Registrar retorno',html:'<p><b>'+esc(m.NOME)+'</b>'+(m.EMPRESA?' · '+esc(m.EMPRESA):'')+' saiu temporariamente às '+esc(fmt.hm(m.SAIDA))+'.</p><p>Registrar a volta agora'+(val(m.MODAL)?' (transporte do dia: '+esc(val(m.MODAL))+')':'')+'?</p>',actions:[{label:'Cancelar',value:null},{label:'Registrar retorno',kind:'primary',value:'s'}]});
+ if(ok!=='s')return;
+ try{const r=await P.retornoPessoa(m,porteiro());
+  if(r.bloq){toast(r.bloq,'err');return;}
+  if(r.dup){toast('Já existe entrada aberta para '+m.NOME+' — nada foi gravado.','warn');refresh();return;}
+  toast('Retorno registrado: '+m.NOME);refresh();}
+ catch(e){writeErr(e);}}
 function marcarFinal(id){if(needTurno())return;const m=P.foraTemporario(ST.d.movPHoje,ST.d.openP).find(x=>x.id===id);if(!m)return;
  dialog({title:'Marcar como saída final',html:'<p><b>'+esc(m.NOME)+'</b> saiu temporariamente às '+esc(fmt.hm(m.SAIDA))+' ('+fmt.dur(idade(m.SAIDA))+').</p><div class="note">Use quando a pessoa avisou que não volta hoje. O horário da saída continua o mesmo ('+esc(fmt.hm(m.SAIDA))+'); só o tipo passa para <b>Final</b>.</div>',
   actions:[{label:'Cancelar',value:null},{label:'Marcar como saída final',kind:'primary',onClick:async()=>{
@@ -748,9 +764,9 @@ function drawVcadForm(){const box=$('#vcadbox');if(!box)return;const F=ST.f.fv;
  if(probs.length){box.innerHTML='<div class="banner warn" style="margin:0">'+icon('alert')+'<span>Para ligar o cadastro: '+esc(probs.join(' · '))+'. Veja o ESTRUTURA-LISTAS.md e recarregue a página (F5) depois de criar as colunas.</span></div>';const cc=$('#vcc');if(cc)cc.textContent='';return;}
  box.innerHTML='<div class="grid3"><div class="field"><label for="vcpl">Placa *</label><input id="vcpl" data-bind="fv.placa" maxlength="8" style="text-transform:uppercase" autocomplete="off" value="'+esc(F.placa)+'" placeholder="ABC1D23"></div>'+
   '<div class="field"><label for="vctp">Tipo</label><select id="vctp" data-bind="fv.tipo">'+['Carro','Moto'].map(t=>'<option'+(F.tipo===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
-  '<div class="field"><label for="vcma">Marca (opcional)</label><input id="vcma" list="vcmal" data-bind="fv.marca" maxlength="30" autocomplete="off" value="'+esc(F.marca)+'" placeholder="Fiat"><datalist id="vcmal">'+P.veicOpcoes('MARCA').map(o=>'<option value="'+esc(o)+'">').join('')+'</datalist></div></div>'+
-  '<div class="grid2"><div class="field"><label for="vcmd">Modelo (opcional)</label><input id="vcmd" data-bind="fv.modelo" maxlength="40" value="'+esc(F.modelo)+'" placeholder="Argo"></div>'+
-  '<div class="field"><label for="vccr">Cor (opcional)</label><input id="vccr" list="vccrl" data-bind="fv.cor" maxlength="20" autocomplete="off" value="'+esc(F.cor)+'" placeholder="Prata"><datalist id="vccrl">'+P.veicOpcoes('COR').map(o=>'<option value="'+esc(o)+'">').join('')+'</datalist></div></div>'+
+  '<div class="field"><label for="vcma">Marca *</label><input id="vcma" list="vcmal" data-bind="fv.marca" maxlength="30" autocomplete="off" value="'+esc(F.marca)+'" placeholder="Fiat"><datalist id="vcmal">'+P.veicOpcoes('MARCA').map(o=>'<option value="'+esc(o)+'">').join('')+'</datalist></div></div>'+
+  '<div class="grid2"><div class="field"><label for="vcmd">Modelo *</label><input id="vcmd" data-bind="fv.modelo" maxlength="40" value="'+esc(F.modelo)+'" placeholder="Argo"></div>'+
+  '<div class="field"><label for="vccr">Cor *</label><input id="vccr" list="vccrl" data-bind="fv.cor" maxlength="20" autocomplete="off" value="'+esc(F.cor)+'" placeholder="Prata"><datalist id="vccrl">'+P.veicOpcoes('COR').map(o=>'<option value="'+esc(o)+'">').join('')+'</datalist></div></div>'+
   '<div class="grid2"><div class="field"><span class="lbl">Colaborador dono *</span><div id="vcdn"></div></div>'+
   '<div class="field"><span class="lbl">&nbsp;</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="vcsave" type="button">'+(F.id?'Salvar alterações':'Cadastrar veículo')+'</button>'+(F.id?'<button class="btn" id="vccanc" type="button">Cancelar edição</button>':'')+'</div></div></div>'+
   '<div class="toolbar" style="margin-top:4px"><input type="search" data-bind="fv.q" data-live="1" value="'+esc(F.q)+'" placeholder="Buscar placa, nome, matrícula…" aria-label="Buscar veículos cadastrados"></div><div class="rows" id="vclist"></div>';
@@ -793,11 +809,11 @@ VIEWS.historico={
   bindInputs(()=>this.update());
   SHELL.page.onclick=e=>{const b=e.target.closest('[data-k]');if(b){ST.f.h.k=b.dataset.k;$$('#hk [data-k]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));this.update();}};},
  update(){banners();if(!$('#hl'))return;const q=norm(ST.f.h.q);const pes=ST.f.h.k==='p';
-  let rows=(pes?ST.d.movPHoje:ST.d.movVHoje).slice().sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));
+  let rows=(pes?ST.d.movPHoje.slice():[...ST.d.movVHoje,...ST.d.movPHoje.filter(m=>m.PLACA).map(m=>Object.assign({},m,{__pcar:true}))]).sort((a,b)=>new Date(b.ENTRADA)-new Date(a.ENTRADA));
   if(q)rows=rows.filter(m=>norm([m.NOME,m.PLACA,m.EMPRESA,m.MOTORISTA,m.PORTEIRO_ENT,m.PORTEIRO_SAI,m.ANFITRIAO_NOME].join(' ')).includes(q));
   $('#hl').innerHTML=rows.length?rows.map(m=>{const aberto=val(m.STATUS_MOV)==='Aberto';
-   const quem=pes?esc(m.NOME):esc(m.PLACA)+' · '+esc(val(m.FINALIDADE)||'');
-   const det=pes?[val(m.TIPO),m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.PLACA&&'placa '+m.PLACA,val(m.ORIGEM),m.SEM_CRACHA===true&&'sem crachá']:[m.MOTORISTA,m.EMPRESA,m.NF&&'NF '+m.NF,val(m.AUT_EXPEDICAO)==='Exceção'&&'saída por exceção'];
+   const quem=pes?esc(m.NOME):esc(m.PLACA)+' · '+(m.__pcar?'com '+esc(m.NOME):esc(val(m.FINALIDADE)||''));
+   const det=pes?[val(m.TIPO),m.EMPRESA,m.ANFITRIAO_NOME&&'recebe: '+m.ANFITRIAO_NOME,m.PLACA&&'placa '+m.PLACA,val(m.ORIGEM),m.SEM_CRACHA===true&&'sem crachá']:(m.__pcar?[val(m.TIPO),m.EMPRESA,'sai com a pessoa']:[m.MOTORISTA,m.EMPRESA,m.NF&&'NF '+m.NF,val(m.AUT_EXPEDICAO)==='Exceção'&&'saída por exceção']);
    return '<div class="row"><div class="main"><div class="t">'+quem+'</div><div class="meta">'+esc(det.filter(Boolean).join(' · '))+'</div><div class="detail">Entrada '+quando(m.ENTRADA)+(m.PORTEIRO_ENT?' ('+esc(m.PORTEIRO_ENT)+')':'')+(m.SAIDA?' · Saída '+quando(m.SAIDA)+(m.PORTEIRO_SAI?' ('+esc(m.PORTEIRO_SAI)+')':''):'')+'</div></div><div class="act"><span class="chip dot '+(aberto?'ok':'')+'">'+(aberto?'Dentro':'Saiu')+'</span></div></div>';}).join(''):'<div class="empty">Nenhum movimento hoje'+(q?' para a busca':'')+'.</div>';}
 };
 /* ================= LOGÍSTICA · COLETAS E ENTREGAS ================= */

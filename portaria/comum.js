@@ -333,6 +333,11 @@ async function entradaPessoa(fields,{agId=null,mat=null,nome=null,permitirHomoni
  if(agId&&!(await statusConvite(agId,'Entrou')))parcial='Entrada registrada. A atualização do convite ficou pendente — o computador da portaria corrige automaticamente.';
  return {ok:true,novo:res.novo,confirmado:!!res.confirmado,parcial};
 }
+async function retornoPessoa(m,porteiro){
+ const mat=String(m.MATRICULA||'').trim();
+ const fields={TIPO:val(m.TIPO)||'Visitante',NOME:m.NOME,MATRICULA:mat,EMPRESA:m.EMPRESA||'',DOC_MASC:m.DOC_MASC||'',MOTIVO:m.MOTIVO||'',CRACHA:m.CRACHA||'',MODAL:val(m.MODAL)||'',SEM_CRACHA:m.SEM_CRACHA===true,PORTEIRO_ENT:porteiro,ORIGEM:'PC',ANFITRIAO_NOME:m.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:m.ANFITRIAO_MATRICULA||'',PLACA:normPlaca(m.PLACA)};
+ return entradaPessoa(fields,{mat:mat||null,nome:mat?null:m.NOME});
+}
 async function saidaPessoa(mov,porteiro,{temporaria=false}={}){
  await conferirTurno(porteiro);
  const atual=await getItem('movP',mov.id);
@@ -462,6 +467,7 @@ async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro d
  const placa=normPlaca(f.placa);if(!placaValida(placa))throw Object.assign(new Error('Placa inválida. Use o formato ABC1D23 ou ABC1234.'),{code:'validacao'});
  const mat=String(f.mat||'').trim(),nome=String(f.nome||'').trim();
  if(!mat||!nome)throw Object.assign(new Error('Escolha o colaborador dono do veículo.'),{code:'validacao'});
+ for(const [c,v,r] of [['MARCA',f.marca,'a marca'],['MODELO',f.modelo,'o modelo'],['COR',f.cor,'a cor']])if(COLS.veic.has(c)&&!String(v||'').trim())throw Object.assign(new Error('Informe '+r+' do veículo.'),{code:'validacao'});
  const todos=await sp.items(L.veic,'$expand=fields&$top=999');
  const outro=todos.find(r=>String(r.id)!==String(id||'')&&normPlaca(r.PLACA)===placa&&r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao');
  if(outro)throw Object.assign(new Error('A placa '+placa+' já está ativa no cadastro ('+(val(outro.VINCULO)||'sem vínculo')+(outro.MOTORISTA?' · '+outro.MOTORISTA:'')+'). Edite ou desative a linha existente.'),{code:'validacao'});
@@ -643,6 +649,6 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
  temVeiculos,veiculos,placasDe,donoDaPlaca,veicProblemas,veicOpcoes,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
- entradaPessoa,saidaPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
+ entradaPessoa,saidaPessoa,retornoPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});
 })();

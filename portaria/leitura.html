@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.22">
+<link rel="stylesheet" href="/core/polystell.css?v=2.23">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -51,8 +51,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.22"></script>
-<script src="comum.js?v=2.22"></script>
+<script src="/core/polystell.js?v=2.23"></script>
+<script src="comum.js?v=2.23"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -152,11 +152,16 @@ async function colab(mat,ver,origem,veic=null){
  const origemTxt=veic?'<span class="chip blue dot">Placa '+esc(veic.placa)+'</span><div class="detail">Identificado pelo veículo cadastrado'+(veic.tipo||veic.modelo?' ('+esc([veic.tipo,veic.modelo].filter(Boolean).join(' '))+')':'')+'. Sem leitura do crachá — confira quem está dirigindo.</div>':origem==='digitado'?'<span class="chip warn dot">Matrícula digitada</span><div class="detail">Colaborador localizado no diretório, sem leitura do crachá. Confira um documento com foto.</div>':ver?'<span class="chip ok dot">QR conferido</span>':'<span class="chip blue dot">QR sem verificador</span><div class="detail">Crachá lido, mas sem o código de conferência. Confira o crachá.</div>';
  card('<h2>'+esc(c.nome)+'</h2><div class="meta">Matr. '+esc(c.mat)+(c.dep?' · '+esc(c.dep):'')+'</div><div style="margin-top:8px">'+origemTxt+(ret?' <span class="chip blue dot">Retorno</span><div class="detail">Saída temporária às '+esc(fmt.hm(ret.SAIDA))+'. O transporte do dia já foi informado.</div>':'')+'</div><span class="lt-lbl">Como veio hoje?'+(precisa?' *':'')+'</span><div class="lt-modais" id="md">'+MODAIS.map(x=>'<button type="button" data-m="'+esc(x)+'" aria-pressed="'+(modal===x)+'">'+esc(x)+'</button>').join('')+'</div>'+(plz.length?'<span class="lt-lbl">Veículo (opcional)</span><div class="lt-modais" id="pl">'+plz.map(x=>'<button type="button" data-pl="'+esc(x.placa)+'" aria-pressed="'+(placaSel===x.placa)+'">'+esc(x.placa)+(x.tipo==='Moto'?' (moto)':'')+'</button>').join('')+'</div>':''),
   '<button class="btn ok" type="button" id="go">'+icon('in')+'Registrar ENTRADA</button>'+btnNova);
- $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));};
+ const sincPl=()=>{$$('#pl [data-pl]').forEach(b=>{const x=plz.find(y=>y.placa===b.dataset.pl);
+  const casa=!modal?true:modal==='Moto'?(x&&x.tipo==='Moto'):modal==='Carro'?!(x&&x.tipo==='Moto'):false;
+  b.disabled=!casa;b.style.opacity=casa?'':'.45';
+  if(!casa&&placaSel===b.dataset.pl){placaSel=null;b.setAttribute('aria-pressed','false');}});};
+ $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));sincPl();};
+ sincPl();
  const plEl=$('#pl');if(plEl)plEl.onclick=e=>{const b=e.target.closest('[data-pl]');if(!b)return;placaSel=placaSel===b.dataset.pl?null:b.dataset.pl;$$('#pl [data-pl]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pl===placaSel)));
   if(placaSel&&!modal){const vv=plz.find(x=>x.placa===placaSel);modal=vv&&vv.tipo==='Moto'?'Moto':'Carro';$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===modal)));}};
  $('#go').onclick=async()=>{if(needTurno())return;if(precisa&&!modal){toast('Selecione como o colaborador veio hoje.','err');return;}const b=$('#go');b.disabled=true;setMode('busy');
-  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)',PLACA:placaSel||''},{mat:c.mat});
+  try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)',PLACA:(modal==='Carro'||modal==='Moto')&&placaSel?placaSel:''},{mat:c.mat});
    if(r.bloq){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span>'+esc(r.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(r.dup){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(r.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
    sucesso(c.nome+' — entrada registrada'+(r.confirmado?' (confirmada)':''));}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
