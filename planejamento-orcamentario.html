@@ -942,7 +942,7 @@ function renderComp(){
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
   const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
   let h=`<div class="row"><div class="seg" role="group" aria-label="Grupo">${gs.map(g=>`<button data-grp="${g.ctrl}" aria-pressed="${S.grp===g.ctrl}">${esc(g.label)}</button>`).join('')}</div>${yearSeg(S.ano,'data-ano')}</div>`;
-  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div><div class="seg" role="group" aria-label="Per\u00edodo">${['ANO',0,1,2,3].map(sc=>`<button data-cscope="${sc}" aria-pressed="${String(S.cScope)===String(sc)}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div></div>`;
+  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div><div class="seg" role="group" aria-label="Per\u00edodo">${['ANO',0,1,2,3].map(sc=>`<button data-cscope="${sc}" aria-pressed="${String(S.cScope)===String(sc)}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div>${S.cMode==='acomp'?'<button class="btn ghost" id="xlsComp">Baixar Excel</button>':''}</div>`;
   if(S.cMode==='acomp'){renderCompAcomp(h,G,set,its);return;}
   h+=`<div class="stats"><div class="stat"><span>Previsto no ano</span><b>${money(its.reduce((a,i)=>a+i.prev.reduce((x,y)=>x+y,0),0))}</b></div><div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div><div class="stat"><span>Aguardando diretoria</span><b>${money(sumIf((i,m)=>i.st[m]==='Pendente'))}</b></div><div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div><div class="stat"><span>Departamentos</span><b>${new Set(its.map(i=>i.dept)).size} de ${DB.depts.length}</b></div></div>`;
   let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
@@ -988,7 +988,39 @@ function bindComp(v){
   v.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{S.grp=b.dataset.grp;render();});
   v.querySelectorAll('[data-cmode]').forEach(b=>b.onclick=()=>{S.cMode=b.dataset.cmode;render();});
   v.querySelectorAll('[data-cscope]').forEach(b=>b.onclick=()=>{const x=b.dataset.cscope;S.cScope=x==='ANO'?'ANO':Number(x);render();});
+  const xg=document.getElementById('xlsComp');if(xg)xg.onclick=baixarRealizadoGrupo;
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
+}
+function baixarRealizadoGrupo(){
+  const gs=myGrupos();const G=gs.find(g=>g.ctrl===S.grp)||gs[0];if(!G)return;
+  const set=new Set(G.ccs);
+  const allDeps=[...new Set([...DB.depts.map(x=>x.COD_DPTO),...Object.keys(DB.real[S.ano]||{})])];
+  if(allDeps.some(d=>((DB.real[S.ano]||{})[d])===undefined)){toast('Aguarde o realizado terminar de carregar.','warn');return;}
+  const raw=[];
+  Object.entries(DB.real[S.ano]||{}).forEach(([d,rows])=>{(rows||[]).forEach(r=>{if(set.has(r.cc))raw.push([d,r]);});});
+  if(!raw.length){toast('Nada para exportar neste grupo.','warn');return;}
+  raw.sort((a,b)=>a[0].localeCompare(b[0])||Number(a[1].mes)-Number(b[1].mes)||String(a[1].data||'').localeCompare(String(b[1].data||'')));
+  const data=raw.map(([d,r])=>({
+    'Departamento':deptName(d)||d,
+    'Compet\u00eancia':fmtD(String(r.data||'')),
+    'M\u00eas':MES[Number(r.mes)-1]||r.mes,
+    'Cod. centro de custo':r.cc,
+    'Centro de custo':ccDesc(r.cc)||'',
+    'Cod. categoria':r.cat,
+    'Categoria':catDesc(r.cat)||'',
+    'Tipo':r.tipo||'',
+    'Documento':r.doc||'',
+    'NF':r.nf||'',
+    'Fornecedor':r.forn||'',
+    'Observa\u00e7\u00e3o':r.obs||'',
+    'Valor (R$)':Number(r.valor)||0
+  }));
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:26},{wch:12},{wch:5},{wch:14},{wch:32},{wch:10},{wch:32},{wch:6},{wch:12},{wch:10},{wch:34},{wch:28},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Realizado');
+  XLSX.writeFile(wb,`Realizado_${S.ano}_Compartilhado.xlsx`);
+  toast('Excel do grupo gerado.');
 }
 function renderCompAcomp(h,G,set,its){
   const vEl=document.getElementById('view');
@@ -1046,12 +1078,37 @@ function renderCompAcomp(h,G,set,its){
 const revLimite=(a,m)=>new Date(a,m+1,10,23,59,59);
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
 const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
+function baixarRealizado(){
+  const rows=((DB.real[S.ano]||{})[S.dept])||[];
+  if(!rows.length){toast('Nada para exportar.','warn');return;}
+  const data=rows.slice().sort((a,b)=>Number(a.mes)-Number(b.mes)||String(a.data||'').localeCompare(String(b.data||''))).map(r=>({
+    'Compet\u00eancia':fmtD(String(r.data||'')),
+    'M\u00eas':MES[Number(r.mes)-1]||r.mes,
+    'Cod. centro de custo':r.cc,
+    'Centro de custo':ccDesc(r.cc)||'',
+    'Cod. categoria':r.cat,
+    'Categoria':catDesc(r.cat)||'',
+    'Tipo':r.tipo||'',
+    'Documento':r.doc||'',
+    'NF':r.nf||'',
+    'Fornecedor':r.forn||'',
+    'Observa\u00e7\u00e3o':r.obs||'',
+    'Valor (R$)':Number(r.valor)||0
+  }));
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:12},{wch:5},{wch:14},{wch:32},{wch:10},{wch:32},{wch:6},{wch:12},{wch:10},{wch:34},{wch:28},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Realizado');
+  XLSX.writeFile(wb,`Realizado_${S.ano}_${(deptName(S.dept)||S.dept).replace(/[\\/:*?"<>|]/g,'')}.xlsx`);
+  toast('Excel do realizado gerado.');
+}
 function renderAcomp(){
   const deps=allowedDepts();
   if(!ANOS().length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=noExPanel();return;}
   if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
   const cache=(DB.real[S.ano]||{})[S.dept];
-  let h=`<div class="row">${deptTabs(deps)}${yearSeg(S.ano,'data-ano')}</div>`;
+  const temReal=Array.isArray(cache)&&cache.length>0;
+  let h=`<div class="row">${deptTabs(deps)}<span style="display:flex;gap:10px;align-items:center">${temReal?'<button class="btn ghost" id="xlsReal">Baixar Excel</button>':''}${yearSeg(S.ano,'data-ano')}</span></div>`;
   if(cache===undefined){
     setHead(`Acompanhamento ${S.ano}`,'');
     loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
@@ -1104,6 +1161,7 @@ function renderAcomp(){
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;bindDeptTabs(v);
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-ext]').forEach(td=>td.onclick=()=>{const x=td.dataset.ext,i1=x.indexOf('|'),i2=x.lastIndexOf('|');openExtrato(x.slice(0,i1),x.slice(i1+1,i2),+x.slice(i2+1));});
+  const xb=document.getElementById('xlsReal');if(xb)xb.onclick=baixarRealizado;
 }
 function openExtrato(cc,cat,m,dep){
   const dp=dep||S.dept;
