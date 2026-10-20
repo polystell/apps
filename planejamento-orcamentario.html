@@ -23,12 +23,12 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);padding:16px}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
 button,input,select,textarea{font:inherit;color:inherit}
 .code{font-family:var(--mono);font-size:12px;color:var(--mute);white-space:nowrap}
 
-.app{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
-.side{background:var(--side);color:var(--side-ink);border-radius:14px;padding:18px 12px;box-shadow:0 8px 24px rgba(13,26,65,.18);display:flex;flex-direction:column;gap:6px;position:sticky;top:16px}
+.app{display:block}
+.side{position:fixed;left:14px;top:14px;bottom:14px;width:248px;background:var(--side);color:var(--side-ink);border-radius:16px;padding:20px 12px 14px;box-shadow:0 10px 30px rgba(13,26,65,.22);display:flex;flex-direction:column;gap:6px;z-index:45;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#31415d transparent}
 .brand{padding:6px 8px 16px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px;text-align:center}
 .brand b{display:block;font-size:17px;letter-spacing:.02em}
 .brand span{font-size:12px;color:var(--side-mute)}
@@ -49,9 +49,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ver{margin-top:auto;padding:14px 8px 0;font-size:11px;color:var(--side-mute);display:flex;justify-content:space-between;align-items:center}
 .ver button{background:none;border:1px solid rgba(255,255,255,.25);border-radius:6px;color:var(--side-ink);padding:3px 10px;font-size:11px;cursor:pointer}
 
-.main{display:flex;flex-direction:column;gap:14px;min-width:0}
-.top{background:var(--panel);border-radius:14px;padding:14px 20px;box-shadow:0 2px 10px rgba(15,23,42,.05);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
-.top h1{margin:0;font-size:18px;font-weight:700;text-wrap:balance}
+.main{margin-left:276px;min-height:100vh;display:flex;flex-direction:column;gap:14px;min-width:0;padding:14px clamp(16px,2.2vw,36px) 18px 0}
+.top{position:sticky;top:0;z-index:35;background:var(--panel);border-radius:14px;padding:14px 20px;box-shadow:0 2px 10px rgba(15,23,42,.08);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.top h1{margin:0;font-size:20px;font-weight:700;text-wrap:balance}
 .meta{font-size:12px;color:var(--mute)}
 .panel{background:var(--panel);border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(15,23,42,.05);display:flex;flex-direction:column;gap:14px;min-width:0}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
@@ -101,13 +101,15 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
 .hint{font-size:12px;color:var(--mute);margin:0}
 .additem .hint,.additem .wide{grid-column:1/-1}
 
-.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.gridwrap{overflow:auto;max-height:calc(100vh - 150px);border:1px solid var(--line);border-radius:12px}
 table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
 .grid th,.grid td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-.grid thead th{background:var(--panel);font-size:10.5px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid var(--line)}
+.grid thead th{position:sticky;top:0;z-index:3;background:var(--panel);font-size:10.5px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid var(--line)}
+.grid thead tr:first-child th{height:38px}
+.grid thead tr:nth-child(2) th{top:38px}
 .grid tbody tr:not(.grp):hover td.item{background:var(--soft)}
 .grid .item{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;min-width:240px;max-width:280px;white-space:normal;border-right:1px solid var(--line)}
-.grid thead .item{background:var(--panel);z-index:2}
+.grid thead .item{background:var(--panel);z-index:5}
 .catline{display:block;font-weight:600;font-size:12.5px;color:var(--ink);line-height:1.35}
 .catline .code{color:var(--ink);opacity:.65}
 .detline{display:block;font-size:12.5px;color:var(--mute);margin-top:1px}
@@ -182,8 +184,8 @@ table.simple{border-collapse:collapse;width:100%;font-size:13px}
 .muted{color:var(--mute)}
 .warnline{color:var(--bad);font-weight:600}
 
-tr.mesrow td{background:var(--soft);padding:10px 8px}
-.mgrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+tr.mesrow td{background:var(--soft);padding:14px 10px;border-bottom:2px solid var(--line)}
+.mgrid{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px}
 .mcell{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;background:var(--panel);min-width:160px;max-width:200px}
 .mcell b{font-size:12px}
 .mcell.ok{background:var(--ok-soft);border-color:var(--ok)}
@@ -192,14 +194,14 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 .mcell .dec button{padding:4px 10px}
 .mcell .mmot{text-align:left;font-size:12px}
 .mcell .mmot.req{border-color:var(--bad);background:#fff5f5}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(600px,calc(100% - 32px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+#toast{position:fixed;left:calc(50% + 124px);bottom:20px;transform:translateX(-50%);max-width:min(600px,calc(100% - 32px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
 #toast.show{opacity:1}
 #toast.warn{background:var(--warn);color:#fff}
 #toast.err{background:var(--bad);color:#fff}
 #busy{position:fixed;top:14px;right:14px;background:var(--primary);color:var(--primary-ink);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:40}
 #busy[hidden]{display:none}
 
-#pfoot{padding:6px 8px 2px;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:7px}
+#pfoot{margin-top:auto;padding:10px 8px 2px;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:7px}
 #pfoot svg{width:13px;height:13px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 #gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:30;padding:16px}
 .gcard{background:var(--panel);border-radius:14px;padding:32px 28px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.15)}
@@ -207,9 +209,16 @@ tr.mesrow td{background:var(--soft);padding:10px 8px}
 .gcard p{margin:0;font-size:13px;color:var(--mute)}
 .gerr{font-size:12px;color:var(--bad);word-break:break-word;text-align:left;background:var(--bad-soft);border-radius:8px;padding:10px;max-height:180px;overflow:auto}
 
+@media (min-width:821px) and (max-width:1100px){
+  .side{width:200px;left:10px;top:10px;bottom:10px;padding:16px 10px 12px}
+  .main{margin-left:222px}
+  .ini{width:46px;height:46px}
+  .brand img{height:34px!important}
+}
 @media (max-width:820px){
-  .app{grid-template-columns:1fr}
-  .side{position:static;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px}
+  .side{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;overflow:visible}
+  .main{margin-left:0;min-height:0;padding:12px}
+  #toast{left:50%}
   .brand,.who{border:0;padding:4px 8px;margin:0}
   .grp,.ver,.back{display:none}
   .nav{width:auto}
@@ -243,13 +252,13 @@ td.r.click:hover .rv{text-decoration:underline}
     <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:42px;object-fit:contain;margin:0 auto 8px;display:block"><span>Planejamento Orçamentário</span></div>
     <a class="back" href="https://app.polystell.com.br/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar ao hub</a>
     <div class="who"><div class="ini" id="uIni"></div><div><b id="uName"></b><span id="uRole"></span></div></div>
-    <nav id="nav"></nav>
+    <nav id="nav" style="flex:1;overflow-y:auto"></nav>
     <div class="ver"><span>v1.0</span><button id="btnSair">Sair</button></div>
   </aside>
   <main class="main">
     <header class="top"><h1 id="vTitle"></h1><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="meta" id="vMeta"></span><span id="hActions" style="display:flex;gap:10px"></span><button class="btn ghost" id="btnRefresh" title="Recarregar os dados do SharePoint" style="padding:5px 12px;font-size:12px">↻ Atualizar</button></span></header>
     <section id="view"></section>
-    <footer id="pfoot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Você vê apenas os departamentos liberados para o seu perfil. Precisa de acesso ou de um ajuste? Fale com a TI.</footer>
+    <footer id="pfoot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Neste aplicativo, você vê apenas os departamentos liberados para o seu perfil. Precisa de acesso ou de um ajuste? Fale com a TI.</footer>
   </main>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
