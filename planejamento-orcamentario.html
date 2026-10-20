@@ -1121,9 +1121,7 @@ function renderAcomp(){
   if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
   const cache=(DB.real[S.ano]||{})[S.dept];
   const temReal=Array.isArray(cache)&&cache.length>0;
-  const _ha2=document.getElementById('hActions');
-  if(_ha2&&temReal){_ha2.innerHTML='<button class="btn ghost" id="xlsReal" style="padding:5px 12px;font-size:12px">\u2b73 Baixar Excel</button>';document.getElementById('xlsReal').onclick=baixarRealizado;}
-  let h=`<div class="row">${deptTabs(deps)}${yearSeg(S.ano,'data-ano')}</div>`;
+  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}${temReal?'<button class="btn ghost" id="xlsReal" style="margin-left:auto">\u2b73 Baixar Excel</button>':''}</div>`;
   if(cache===undefined){
     setHead(`Acompanhamento ${S.ano}`,'');
     loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
@@ -1176,6 +1174,7 @@ function renderAcomp(){
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;bindDeptTabs(v);
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-ext]').forEach(td=>td.onclick=()=>{const x=td.dataset.ext,i1=x.indexOf('|'),i2=x.lastIndexOf('|');openExtrato(x.slice(0,i1),x.slice(i1+1,i2),+x.slice(i2+1));});
+  const xr=document.getElementById('xlsReal');if(xr)xr.onclick=baixarRealizado;
 }
 function openExtrato(cc,cat,m,dep){
   const dp=dep||S.dept;
@@ -1445,6 +1444,7 @@ function renderPrazos(){
   });
   const ax=document.getElementById('abrirEx');
   if(ax)ax.onclick=async()=>{
+    if(escrevendo())return;
     busy(true);
     try{
       const prazos=[`${next-1}-12-15`,`${next}-03-15`,`${next}-06-15`,`${next}-09-15`];
