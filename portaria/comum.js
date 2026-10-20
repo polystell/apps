@@ -283,7 +283,8 @@ function situacaoPrev(p,movsHoje){const ms=movsHoje.filter(m=>lid(m.PREVISAOLook
 function resumoTurno(d){
  const p=d.openP||[],v=d.openV||[],m=d.merc||[],o=d.ocor||[];const ft=foraTemporario(d.movPHoje,d.openP);
  const nomes=p.slice(0,12).map(x=>x.NOME).join(', ')+(p.length>12?'…':'');
- return ['Na planta: '+p.length+(p.length?' ('+nomes+')':''),'Veículos no pátio: '+v.length+(v.length?' ('+v.map(x=>x.PLACA).join(', ')+')':''),...(ft.length?['Fora temporariamente: '+ft.length+' ('+ft.slice(0,12).map(x=>x.NOME).join(', ')+')']:[]),'Mercadorias aguardando: '+m.length,'Ocorrências abertas: '+o.length].join('\n');}
+ return ['Na planta: '+p.length+(p.length?' ('+nomes+')':''),(()=>{const cp=p.filter(x=>x.PLACA);const todas=[...new Set([...v.map(x=>normPlaca(x.PLACA)),...cp.map(x=>normPlaca(x.PLACA))])];
+  return 'Veículos no pátio: '+todas.length+(todas.length?' ('+[...v.map(x=>x.PLACA),...cp.map(x=>x.PLACA+' com '+x.NOME)].join(', ')+')':'');})(),...(ft.length?['Fora temporariamente: '+ft.length+' ('+ft.slice(0,12).map(x=>x.NOME).join(', ')+')']:[]),'Mercadorias aguardando: '+m.length,'Ocorrências abertas: '+o.length].join('\n');}
 /* ---------- gravações ---------- */
 const isDupErr=e=>e&&(e.status===409||/duplica|unique|exclusiv|already exists|valores duplicados/i.test(String(e.detail||'')+' '+String(e.message||'')));
 /* cria o movimento; se o servidor recusar ou não confirmar, relê pela chave:
@@ -334,9 +335,10 @@ async function entradaPessoa(fields,{agId=null,mat=null,nome=null,permitirHomoni
  return {ok:true,novo:res.novo,confirmado:!!res.confirmado,parcial};
 }
 async function retornoPessoa(m,porteiro){
- const mat=String(m.MATRICULA||'').trim();
+ const mat=String(m.MATRICULA||'').trim();const ag=lid(m.AGENDAMENTOLookupId);
  const fields={TIPO:val(m.TIPO)||'Visitante',NOME:m.NOME,MATRICULA:mat,EMPRESA:m.EMPRESA||'',DOC_MASC:m.DOC_MASC||'',MOTIVO:m.MOTIVO||'',CRACHA:m.CRACHA||'',MODAL:val(m.MODAL)||'',SEM_CRACHA:m.SEM_CRACHA===true,PORTEIRO_ENT:porteiro,ORIGEM:'PC',ANFITRIAO_NOME:m.ANFITRIAO_NOME||'',ANFITRIAO_MATRICULA:m.ANFITRIAO_MATRICULA||'',PLACA:normPlaca(m.PLACA)};
- return entradaPessoa(fields,{mat:mat||null,nome:mat?null:m.NOME});
+ if(ag)fields.AGENDAMENTOLookupId=Number(ag);
+ return entradaPessoa(fields,ag?{agId:ag}:{mat:mat||null,nome:mat?null:m.NOME});
 }
 async function saidaPessoa(mov,porteiro,{temporaria=false}={}){
  await conferirTurno(porteiro);
@@ -448,7 +450,7 @@ async function saidaTempHoje(mat){const m=String(mat||'').trim();if(!m)return nu
  return meus[0]&&val(meus[0].SAIDA_TIPO)==='Temporária'?meus[0]:null;}
 /* ---------- emergência: acionamento, lista de evacuação, chamada no ponto de encontro ---------- */
 /* ---------- veículos de colaboradores (00_Cadastro_Veiculos, opcional) ---------- */
-const VEIC_COLS=['PLACA','VINCULO','MATRICULA','ATIVO'];
+const VEIC_COLS=['PLACA','VINCULO','MATRICULA','ATIVO','MARCA','MODELO','COR'];
 const temVeiculos=()=>!!(L.veic&&COLS.veic&&VEIC_COLS.every(c=>COLS.veic.has(c)));
 let VEIC=null,VEIC_AT=0;
 async function veiculos(force){if(!temVeiculos())return null;
@@ -463,7 +465,7 @@ const veicProblemas=()=>{if(!L.veic)return ['Lista 00_Cadastro_Veiculos não enc
  return VEIC_COLS.filter(c=>!COLS.veic.has(c)).map(c=>'00_Cadastro_Veiculos: falta a coluna '+c+' (crie com esse nome exato, sem acento)');};
 async function veiculosCadastro(){if(!temVeiculos())return [];const rs=await sp.items(L.veic,'$expand=fields&$top=999');
  return rs.filter(r=>val(r.VINCULO)==='Colaborador').map(r=>({id:r.id,placa:normPlaca(r.PLACA),tipo:val(r.TIPO)||'Carro',marca:val(r.MARCA)||'',mod:val(r.MODELO)||'',cor:val(r.COR)||'',modelo:[val(r.MARCA),val(r.MODELO)].filter(Boolean).join(' '),mat:String(r.MATRICULA??'').trim(),nome:String(r.MOTORISTA||'').trim(),ativo:r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao',_etag:r._etag}));}
-async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro de veículos indisponível (colunas faltando na 00_Cadastro_Veiculos).');
+async function salvarVeiculo(f,id,etag){if(!temVeiculos())throw new Error('Cadastro de veículos indisponível (colunas faltando na 00_Cadastro_Veiculos).');
  const placa=normPlaca(f.placa);if(!placaValida(placa))throw Object.assign(new Error('Placa inválida. Use o formato ABC1D23 ou ABC1234.'),{code:'validacao'});
  const mat=String(f.mat||'').trim(),nome=String(f.nome||'').trim();
  if(!mat||!nome)throw Object.assign(new Error('Escolha o colaborador dono do veículo.'),{code:'validacao'});
@@ -476,10 +478,24 @@ async function salvarVeiculo(f,id){if(!temVeiculos())throw new Error('Cadastro d
  if(COLS.veic.has('MARCA'))fields.MARCA=String(f.marca||'').trim();
  if(COLS.veic.has('MODELO'))fields.MODELO=String(f.modelo||'').trim();
  if(COLS.veic.has('COR'))fields.COR=String(f.cor||'').trim();
- if(!id)fields.ATIVO=true;
- VEIC=null;return id?sp.patch(L.veic,id,fields):sp.add(L.veic,fields);}
-const setVeiculoAtivo=(id,ativo)=>{VEIC=null;return sp.patch(L.veic,id,{ATIVO:!!ativo});};
+ VEIC=null;
+ if(id){const at=await getItem('veic',id);
+  if(val(at.VINCULO)&&val(at.VINCULO)!=='Colaborador')throw Object.assign(new Error('Esta linha agora é de '+val(at.VINCULO)+' — edição cancelada para não sobrescrever. A lista foi atualizada; confira.'),{code:'validacao'});
+  try{return await sp.patch(L.veic,id,fields,{etag:etag||at._etag});}
+  catch(e){if(e.status===412)throw Object.assign(new Error('Este veículo foi alterado em outro computador depois que a edição foi aberta. Nada foi sobrescrito — atualize a lista e repita.'),{code:'validacao'});throw e;}}
+ fields.ATIVO=true;
+ const novo=await sp.add(L.veic,fields);
+ try{const chk=await sp.items(L.veic,'$expand=fields&$top=999');
+  if(chk.filter(r=>normPlaca(r.PLACA)===placa&&r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao').length>1)return {item:novo,duplicada:true};}catch{}
+ return {item:novo};}
+async function setVeiculoAtivo(id,ativo,etag){VEIC=null;const at=await getItem('veic',id);
+ if(ativo){const p=normPlaca(at.PLACA);const rs=await sp.items(L.veic,'$expand=fields&$top=999');
+  if(rs.some(r=>String(r.id)!==String(id)&&normPlaca(r.PLACA)===p&&r.ATIVO!==false&&norm(val(r.ATIVO))!=='nao'))throw Object.assign(new Error('A placa '+p+' já está ativa em outra linha do cadastro. Desative a outra antes de reativar esta.'),{code:'validacao'});}
+ try{return await sp.patch(L.veic,id,{ATIVO:!!ativo},{etag:etag||at._etag});}
+ catch(e){if(e.status===412)throw Object.assign(new Error('Este veículo foi alterado em outro computador. A lista foi atualizada — confira e repita.'),{code:'validacao'});throw e;}}
 const veicOpcoes=c=>{const col=COLS.veic&&COLS.veic.get(c);return (col&&col.choice&&col.choice.choices)||[];};
+async function tipoDaPlaca(placa){const p=normPlaca(placa);if(!p)return '';const v=await veiculos();const x=v&&v.find(y=>y.placa===p);return x?x.tipo:'';}
+const placaCombina=(modal,tipo)=>!modal||!tipo?true:modal==='Moto'?tipo==='Moto':modal==='Carro'?tipo!=='Moto':false;
 const temEmergencia=()=>!!(L.emerg&&L.chamada&&L.brigada);
 /* a emergência confere o próprio contrato na tela dela: lista mal configurada não trava a guarita */
 async function conferirEmergencia(){if(!temEmergencia())return ['Listas 09_Emergencias, 09_Emergencia_Chamada e 09_Brigada não encontradas (ou sem permissão de leitura).'];
@@ -530,7 +546,10 @@ async function marcarNoPonto(emId,pessoa,nome,quem){
  const cur=await getItem('emerg',emId);if(val(cur.STATUS)!=='Ativa')return {encerrada:true};
  try{return {ok:true,item:await sp.add(L.chamada,{Title:nome,EMERG_ID:String(emId),PESSOA:pessoa,NOME:nome,STATUS:'No ponto',MARCADO_POR:quem,HORA:now(),MARCA_CHAVE:emId+'|'+pessoa})};}
  catch(e){if(isDupErr(e))return {ja:true};throw e;}}
-async function desmarcar(item){try{await sp.del(L.chamada,item.id);}catch(e){if(e.status!==404)throw e;}return {ok:true};}
+async function desmarcar(item,emId){
+ if(emId){let cur=null;try{cur=await getItem('emerg',String(emId));}catch{}
+  if(cur&&val(cur.STATUS)!=='Ativa')return {encerrada:true};}
+ try{await sp.del(L.chamada,item.id);}catch(e){if(e.status!==404)throw e;}return {ok:true};}
 async function encerrarEmergencia(em,quem){const cur=await getItem('emerg',em.id);if(val(cur.STATUS)!=='Ativa')return {ja:true};
  const lista=listaDe(cur),marcas=await chamadaDe(em.id);const ok=new Set(marcas.map(m=>m.PESSOA));
  const tot=lista?lista.p.length:0,noPonto=lista?lista.p.filter(x=>ok.has('P:'+x.i)).length:0;
@@ -647,7 +666,7 @@ window.PORTARIA=Object.freeze({LISTAS,PARAM_DEF,TURNO_EXPIRA_H,boot,loadParams,p
  abertosP,abertosV,pessoasHoje,veicHoje,agendaHoje,agendaRecente,agendaPorCodigo,prevHoje,prevEntre,mercAguardando,ocorAbertas,ocorrenciasEncerradas,analisarOcorrencia,encerrarOcorrencia,
  get transportadoras(){return TRANSP_L;},diaMais:keyShift,
  meuCadastro,minhasVisitas,tiposConvite,temColuna,validarConvite,criarConvite,alterarConvite,cancelarConvite,opcoes,validarPrev,salvarPrev,cancelarPrev,autorizarPelaExpedicao,
- temVeiculos,veiculos,placasDe,donoDaPlaca,veicProblemas,veicOpcoes,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
+ temVeiculos,veiculos,placasDe,donoDaPlaca,tipoDaPlaca,placaCombina,veicProblemas,veicOpcoes,veiculosCadastro,salvarVeiculo,setVeiculoAtivo,
  abertoDoAgend,abertoDaMatricula,abertoDoNome,abertoDaPlaca,regraConvite,situacaoPrev,
  entradaPessoa,saidaPessoa,retornoPessoa,entradaVeiculo,autorizarVeiculo,saidaVeiculo,reconciliar,
  add:(k,f)=>sp.add(L[k],f),get:getItem,patch:(k,id,f,o)=>sp.patch(L[k],id,f,o),maskDoc,normPlaca,placaValida,lid});
