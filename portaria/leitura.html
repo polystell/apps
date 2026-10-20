@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#101e36">
 <title>Portaria · Leitura | Polystell Apps</title>
-<link rel="stylesheet" href="/core/polystell.css?v=2.23">
+<link rel="stylesheet" href="/core/polystell.css?v=2.24">
 <style>
 .lt-top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
 .lt-top img{height:26px}
@@ -51,8 +51,8 @@
 </head>
 <body>
 <noscript><div class="ps-screen"><p>Ative o JavaScript para usar o leitor.</p></div></noscript>
-<script src="/core/polystell.js?v=2.23"></script>
-<script src="comum.js?v=2.23"></script>
+<script src="/core/polystell.js?v=2.24"></script>
+<script src="comum.js?v=2.24"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" defer></script>
 <script>
 'use strict';
@@ -118,10 +118,12 @@ async function handle(raw,origem){
   if(m&&m[1].toUpperCase()==='C')await colab(m[2].trim(),(m[3]||'').trim().toUpperCase(),origem);
   else if(m)await convite(m[2].trim());
   else if(/^\d{1,10}$/.test(t))await colab(t,'',origem);
-  else{let dono=null;const pNorm=P.normPlaca(t);
-   if(P.temVeiculos()&&P.placaValida(t)){try{dono=await P.donoDaPlaca(t);}catch{}}
-   if(dono&&dono.vinc==='Colaborador'&&dono.mat)await colab(dono.mat,'',origem,dono);
-   else if(!dono&&P.placaValida(t)&&(await (async()=>{const ab=(await abertosOk()).find(m=>P.normPlaca(m.PLACA)===pNorm);if(ab){saidaPorPlaca(ab,pNorm);return true;}return false;})()));
+  else{const pNorm=P.normPlaca(t);let tratado=false;
+   if(P.placaValida(t)){const ab=(await abertosOk()).find(m=>P.normPlaca(m.PLACA)===pNorm);if(ab){saidaPorPlaca(ab,pNorm);tratado=true;}}
+   let dono=null;
+   if(!tratado&&P.temVeiculos()&&P.placaValida(t)){try{dono=await P.donoDaPlaca(t);}catch{}}
+   if(tratado);
+   else if(dono&&dono.vinc==='Colaborador'&&dono.mat)await colab(dono.mat,'',origem,dono);
    else if(dono){setMode('confirm');
     const tx=dono.vinc==='Colaborador'?'Veículo de <b>colaborador</b>'+(dono.nome?' · '+esc(dono.nome):'')+', mas o cadastro está sem a matrícula. Complete a coluna MATRICULA na lista 00_Cadastro_Veiculos para liberar a entrada pela placa.':'Veículo de <b>'+esc(dono.vinc||'transportadora/terceiro')+'</b>'+(dono.nome?' · motorista: <b>'+esc(dono.nome)+'</b>':'')+'. Registre a entrada do veículo no computador da portaria (tela Veículos).';
     card('<h2>Placa '+esc(dono.placa)+'</h2><div class="meta">'+esc([dono.tipo,dono.modelo,dono.cor].filter(Boolean).join(' · ')||'Veículo cadastrado')+'</div><div class="banner info" style="margin-top:8px">'+icon('car')+'<span>'+tx+'</span></div>',btnNova);}
@@ -158,13 +160,14 @@ async function colab(mat,ver,origem,veic=null){
   if(!casa&&placaSel===b.dataset.pl){placaSel=null;b.setAttribute('aria-pressed','false');}});};
  $('#md').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;modal=b.dataset.m;$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));sincPl();};
  sincPl();
- const plEl=$('#pl');if(plEl)plEl.onclick=e=>{const b=e.target.closest('[data-pl]');if(!b)return;placaSel=placaSel===b.dataset.pl?null:b.dataset.pl;$$('#pl [data-pl]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pl===placaSel)));
-  if(placaSel&&!modal){const vv=plz.find(x=>x.placa===placaSel);modal=vv&&vv.tipo==='Moto'?'Moto':'Carro';$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===modal)));}};
+ const plEl=$('#pl');if(plEl)plEl.onclick=e=>{const b=e.target.closest('[data-pl]');if(!b||b.disabled)return;placaSel=placaSel===b.dataset.pl?null:b.dataset.pl;$$('#pl [data-pl]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pl===placaSel)));
+  if(placaSel&&!modal){const vv=plz.find(x=>x.placa===placaSel);modal=vv&&vv.tipo==='Moto'?'Moto':'Carro';$$('#md [data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===modal)));}
+  sincPl();};
  $('#go').onclick=async()=>{if(needTurno())return;if(precisa&&!modal){toast('Selecione como o colaborador veio hoje.','err');return;}const b=$('#go');b.disabled=true;setMode('busy');
   try{const r=await P.entradaPessoa({TIPO:'Colaborador',NOME:c.nome,MATRICULA:c.mat,MODAL:modal||'',SEM_CRACHA:origem==='digitado',PORTEIRO_ENT:porteiro(),ORIGEM:origem==='digitado'?'Celular (digitado)':'Celular (QR)',PLACA:(modal==='Carro'||modal==='Moto')&&placaSel?placaSel:''},{mat:c.mat});
    if(r.bloq){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner err">'+icon('lock')+'<span>'+esc(r.bloq)+' Nada foi gravado.</span></div>',btnNova);return;}
    if(r.dup){setMode('confirm');card('<h2>'+esc(c.nome)+'</h2><div class="banner warn">'+icon('alert')+'<span>Já estava registrado(a) como dentro desde '+quando(r.dup.ENTRADA)+'. Nada foi gravado.</span></div>',btnNova);return;}
-   sucesso(c.nome+' — entrada registrada'+(r.confirmado?' (confirmada)':''));}catch(e){setMode('confirm');b.disabled=false;falha(e);}};
+   sucesso(c.nome+' — entrada registrada'+(r.confirmado?' (confirmada)':''));}catch(e){setMode('confirm');b.disabled=false;if($('#pl'))sincPl();falha(e);}};
 }
 function saidaPorPlaca(m,p){setMode('confirm');
  card('<h2>'+esc(m.NOME)+'</h2><div class="meta">'+esc([val(m.TIPO),m.EMPRESA].filter(Boolean).join(' · '))+' · <b style="color:var(--ok)">dentro desde '+quando(m.ENTRADA)+'</b><br>Placa '+esc(p)+(m.CRACHA?' · recolha o crachá <b>'+esc(m.CRACHA)+'</b>':'')+'</div>',
