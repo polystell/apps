@@ -263,8 +263,6 @@ const CFG={
   spHost:'https://polystellcombr.sharepoint.com',
   sitePath:'/sites/Apps',
   realLib:'08_Realizado',                       // biblioteca: 1 arquivo JSON por departamento/ano
-  deptDiretoria:'00004',                        // vínculo a este depto = aprova
-  deptTI:'00008',                               // vínculo a este depto = admin
   lists:{
     plan:'08_Planejamento',
     vinc:'08_Gestor_Departamento',
@@ -317,7 +315,6 @@ async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST
 // criação de item DENTRO da pasta do departamento (formato "como digitado na tela": pt-BR)
 const locNum=v=>String(Math.round(v*100)/100).replace('.',',');
 const locDate=(a,m)=>`01/${String(m+1).padStart(2,'0')}/${a}`;
-const personJson=email=>JSON.stringify([{Key:'i:0#.f|membership|'+email}]);
 async function createPlanRow(dept,fv){
   const body={
     listItemCreateInfo:{__metadata:{type:'SP.ListItemCreationInformationUsingPath'},
@@ -734,6 +731,7 @@ function editCell(key,m,v,keepPend){
   rerenderKeepFocus();
 }
 function applyFill(val){
+  if(escrevendo())return;
   if(!val){toast('Informe um valor maior que zero.','warn');return;}
   const it=findItem(S.tool.key);if(!it)return;
   const ano=S.ano;
@@ -783,6 +781,7 @@ function addNewItem(){
   toast(`“${det}” adicionado como rascunho. Preencha os meses (nada é gravado até ter valor).`);
 }
 function saveObs(){
+  if(escrevendo())return;
   const it=findItem(S.tool.key);if(!it)return;
   it.obs=document.getElementById('tObs').value.trim();
   const tasks=[];const ano=S.ano;
@@ -799,6 +798,7 @@ function doDelete(){
   runQueue(ids.map(id=>()=>delItem(CFG.lists.plan,id)),'Excluindo').then(()=>toast(`“${it.det}” excluído${ids.length?` (${ids.length} linha(s) removida(s))`:''}.`)).catch(fail);
 }
 function copyFrom(src){
+  if(escrevendo())return;
   const list=(DB.plan[src]||[]).filter(i=>i.dept===S.dept);
   const ano=S.ano;const tasks=[];let n=0;
   list.forEach(i=>{
@@ -813,6 +813,7 @@ function copyFrom(src){
   runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho, com os valores aprovados lá.`)).catch(fail);
 }
 function setMonthsStatus(key,fromSt){
+  if(escrevendo())return;
   const it=findItem(key);if(!it)return;
   const ms=monthsOf(S.scope).filter(m=>mOpen(S.ano,m)&&it.prev[m]>0&&it.st[m]===fromSt);
   if(!ms.length)return;
@@ -1001,10 +1002,13 @@ function bindComp(v){
 function baixarRealizadoGrupo(){
   const gs=myGrupos();const G=gs.find(g=>g.ctrl===S.grp)||gs[0];if(!G)return;
   const set=new Set(G.ccs);
-  const allDeps=[...new Set([...DB.depts.map(x=>x.COD_DPTO),...Object.keys(DB.real[S.ano]||{})])];
+  const its=(DB.plan[S.ano]||[]).filter(i=>set.has(i.cc));
+  const allDeps=[...new Set([...DB.ccs.filter(c=>set.has(c.COD_CC)).map(c=>c.COD_DPTO),...its.map(i=>i.dept)])].filter(Boolean).sort();
   if(allDeps.some(d=>((DB.real[S.ano]||{})[d])===undefined)){toast('Aguarde o realizado terminar de carregar.','warn');return;}
+  const falhos=allDeps.filter(d=>((DB.real[S.ano]||{})[d])===null);
+  if(falhos.length){toast('Realizado indispon\u00edvel para: '+falhos.map(d=>deptName(d)||d).join(', ')+' \u2014 clique em Atualizar e tente novamente.','err');return;}
   const raw=[];
-  Object.entries(DB.real[S.ano]||{}).forEach(([d,rows])=>{(rows||[]).forEach(r=>{if(set.has(r.cc))raw.push([d,r]);});});
+  allDeps.forEach(d=>{(((DB.real[S.ano]||{})[d])||[]).forEach(r=>{if(set.has(r.cc))raw.push([d,r]);});});
   if(!raw.length){toast('Nada para exportar neste grupo.','warn');return;}
   raw.sort((a,b)=>a[0].localeCompare(b[0])||Number(a[1].mes)-Number(b[1].mes)||String(a[1].data||'').localeCompare(String(b[1].data||'')));
   const data=raw.map(([d,r])=>({
@@ -1339,6 +1343,7 @@ function renderGest(){
   v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>rmVinc(Number(b.dataset.rm)));
 }
 async function addVinc(){
+  if(escrevendo())return;
   const cod=document.getElementById('gDept').value;
   const email=document.getElementById('gEmail').value.trim().toLowerCase();
   if(!email||!email.includes('@')){toast('Informe o e-mail do gestor.','warn');return;}
@@ -1365,6 +1370,7 @@ async function addVinc(){
   }catch(e){fail(e);}finally{busy(false);}
 }
 async function rmVinc(id){
+  if(escrevendo())return;
   const v=DB.vincs.find(x=>x.Id===id);if(!v)return;
   busy(true);
   try{
@@ -1419,6 +1425,7 @@ function renderPrazos(){
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
   v.querySelectorAll('[data-pano]').forEach(b=>b.onclick=()=>{S.pAno=Number(b.dataset.pano);S.rbAdd=false;S.rbHist=false;render();});
   v.querySelectorAll('input[type="date"]').forEach(inp=>inp.onchange=async()=>{
+    if(escrevendo())return;
     if(!inp.value)return;
     const q=Number(inp.dataset.q);const ex=DB.ex[S.pAno];
     ex.prazos[q]=inp.value;
@@ -1470,6 +1477,7 @@ function renderPrazos(){
   if(rbc)rbc.onclick=()=>{S.rbAdd=false;render();};
   const rbo=document.getElementById('rbOk');
   if(rbo)rbo.onclick=async()=>{
+    if(escrevendo())return;
     const cod=document.getElementById('rbDept').value;
     const q=Number(document.getElementById('rbQ').value);
     const mot=document.getElementById('rbMot').value.trim();
@@ -1485,6 +1493,7 @@ function renderPrazos(){
     }catch(e){fail(e);}finally{busy(false);}
   };
   v.querySelectorAll('[data-rbend]').forEach(b=>b.onclick=async()=>{
+    if(escrevendo())return;
     const id=Number(b.dataset.rbend);const r=(DB.reabs||[]).find(x=>x.Id===id);if(!r)return;
     busy(true);
     try{await mergeItem(CFG.lists.reab,id,{ATIVO:false});r.ativo=false;render();
