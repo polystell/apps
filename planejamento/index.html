@@ -248,22 +248,26 @@ const ETAGS={};
 const tagKey=(list,id)=>list+'|'+id;
 const bumpTag=(list,id)=>{const k=tagKey(list,id);const m=/(\d+)/.exec(ETAGS[k]||'');if(m)ETAGS[k]='"'+(Number(m[1])+1)+'"';else delete ETAGS[k];};
 async function sp(path,opt={}){
+  /* gravar sem versão conhecida NUNCA cai para "*": recarrega e tenta de novo (fail closed) */
+  if((opt.merge||opt.del)&&!opt.etag)throw Object.assign(new Error('A versão deste registro não está disponível — recarregando os dados; tente novamente.'),{status:412});
   const t=await tok();
   const headers={Authorization:'Bearer '+t,Accept:'application/json;odata=minimalmetadata','Content-Type':opt.ctype||'application/json;odata=nometadata'};
-  if(opt.merge){headers['IF-MATCH']=opt.etag||'*';headers['X-HTTP-Method']='MERGE';}
-  if(opt.del){headers['IF-MATCH']=opt.etag||'*';headers['X-HTTP-Method']='DELETE';}
+  if(opt.merge){headers['IF-MATCH']=opt.etag;headers['X-HTTP-Method']='MERGE';}
+  if(opt.del){headers['IF-MATCH']=opt.etag;headers['X-HTTP-Method']='DELETE';}
   const res=await fetch(path.startsWith('http')?path:API+path,{method:opt.method||'GET',headers,body:opt.body!==undefined?JSON.stringify(opt.body):undefined});
   if(res.status===412)throw Object.assign(new Error('O registro foi alterado por outra pessoa enquanto você editava (412).'),{status:412});
   if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}throw new Error(`HTTP ${res.status} em ${path}\n${d}`);}
-  if(res.status===204)return null;
+  if(res.status===204)return {ETag:res.headers.get('ETag')||null};
   const txt=await res.text();return txt?JSON.parse(txt):null;
 }
+const readTag=r=>r['odata.etag']||r['@odata.etag']||(r.__metadata&&r.__metadata.etag)||null;
 async function getAll(list,query){
   let url=`web/lists/getbytitle('${encodeURIComponent(list)}')/items?${query}`;const out=[];
-  while(url){const j=await sp(url);(j.value||[]).forEach(r=>{if(r['odata.etag']&&r.Id!=null)ETAGS[tagKey(list,r.Id)]=r['odata.etag'];});out.push(...(j.value||[]));url=j['odata.nextLink']||null;}
+  while(url){const j=await sp(url);(j.value||[]).forEach(r=>{const et=readTag(r);if(et&&r.Id!=null)ETAGS[tagKey(list,r.Id)]=et;});out.push(...(j.value||[]));url=j['odata.nextLink']||null;}
   return out;
 }
-const mergeItem=async(list,id,fields)=>{const r=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,etag:ETAGS[tagKey(list,id)],body:fields});bumpTag(list,id);return r;};
+const mergeItem=async(list,id,fields)=>{const r=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,etag:ETAGS[tagKey(list,id)],body:fields});
+  if(r&&r.ETag)ETAGS[tagKey(list,id)]=r.ETag;else bumpTag(list,id);return r;};
 const delItem=async(list,id)=>{const r=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',del:true,etag:ETAGS[tagKey(list,id)]});delete ETAGS[tagKey(list,id)];return r;};
 const addItem=async(list,fields)=>{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items`,{method:'POST',body:fields});if(j&&j.Id!=null)ETAGS[tagKey(list,j.Id)]=j['odata.etag']||'"1"';return j;};
 async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST',body:{logonName:'i:0#.f|membership|'+email}});return j.Id;}
@@ -307,8 +311,13 @@ async function runQueue(tasks,label){
 }
 function fail(e){
   console.error(e);
-  toast(e&&e.status===412?'Alguém alterou este registro ao mesmo tempo que você — recarregando o que está gravado no SharePoint. Confira e repita o seu lançamento.':'Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
-  (async()=>{try{if(S.ano)await loadYear(S.ano,true);if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);}catch(_){}render();})();
+  const is412=e&&e.status===412;
+  toast(is412?'Alguém alterou este registro ao mesmo tempo que você — recarregando o que está gravado no SharePoint. Confira e repita o seu lançamento.':'Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
+  (async()=>{try{
+    if(is412){await loadBase();setRoleLine();}   // o conflito pode ser em exercícios, vínculos ou reaberturas
+    if(S.ano)await loadYear(S.ano,true);
+    if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
+  }catch(_){console.warn(_);}render();})();
 }
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
@@ -1527,17 +1536,7 @@ async function refreshData(){
   if(escrevendo())return;
   busy(true,'Atualizando…');
   try{
-    const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
-      getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
-      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
-      getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
-      getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
-      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
-      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
-    ]);
-    setCadastros(depts,ccs,cats);
-    setVincs(vincRows);setEx(exRows);setReabs(reabRows);setPerfis(perfRows);recalcRole();
+    await loadBase();
     S.dec={};
     setRoleLine();
     DB.real={};
@@ -1554,24 +1553,28 @@ async function refreshData(){
 
 /* ================================ BOOT ================================ */
 function setRoleLine(){const s=document.querySelector('#ps-um small');if(s)s.textContent=roleLabel(myDepts())+(DB.me&&DB.me.email?' · '+DB.me.email:'');}
+/* carrega cadastros, vínculos, exercícios, perfis e reaberturas (com os ETags) */
+async function loadBase(){
+  const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
+    getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
+    getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
+    getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
+    getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
+    getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
+    getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
+    getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
+  ]);
+  setPerfis(perfRows);
+  setCadastros(depts,ccs,cats);
+  setVincs(vincRows);setEx(exRows);setReabs(reabRows);
+  recalcRole();
+}
 async function start(){
   PS.screens.loading('Carregando cadastros…');
   try{
     DB.me={email:acct.username.toLowerCase(),name:acct.name||acct.username};
     DB.me.uid=await ensureUser(DB.me.email);
-    const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
-      getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
-      getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
-      getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
-      getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
-      getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
-      getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
-      getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
-    ]);
-    setPerfis(perfRows);
-    setCadastros(depts,ccs,cats);
-    setVincs(vincRows);setEx(exRows);setReabs(reabRows);
-    recalcRole();
+    await loadBase();
     const mine=myDepts();
 
     const anos=ANOS();const nowY=new Date().getFullYear();
