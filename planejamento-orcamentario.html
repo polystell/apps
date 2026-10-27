@@ -223,11 +223,42 @@ tr.mesrow td{background:var(--soft);padding:14px 10px;border-bottom:2px solid va
 
 #pfoot{margin-top:auto;padding:18px 2px 0;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:7px}
 #pfoot svg{width:13px;height:13px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-#gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:30;padding:16px}
-.gcard{background:var(--panel);border-radius:14px;padding:32px 28px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.15)}
-.gcard h1{margin:0;font-size:19px}
-.gcard p{margin:0;font-size:13px;color:var(--mute)}
-.gerr{font-size:12px;color:var(--bad);word-break:break-word;text-align:left;background:var(--bad-soft);border-radius:8px;padding:10px;max-height:180px;overflow:auto}
+#gate{position:fixed;inset:0;z-index:60;background:#fff;display:grid;grid-template-columns:1.05fr 1fr}
+#gload{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center}
+#gload .box{max-width:460px;padding:28px}
+.gplate{width:118px;height:118px;border-radius:50%;background:#fff;box-shadow:0 12px 34px rgba(13,26,65,.14);display:grid;place-items:center;margin:0 auto 22px;animation:gpulse 1.8s ease-in-out infinite}
+.gstar{width:62px;height:62px;object-fit:contain;display:block}
+@keyframes gpulse{50%{transform:scale(.94);box-shadow:0 6px 18px rgba(13,26,65,.10)}}
+.gspin{width:32px;height:32px;border:3px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:gspin .8s linear infinite;margin:0 auto 18px}
+@keyframes gspin{to{transform:rotate(360deg)}}
+#gLoadMsg{font-size:14px;line-height:1.8;color:var(--mute);margin:0}
+.gtrack{width:190px;height:4px;border-radius:999px;background:var(--line);overflow:hidden;position:relative;margin:16px auto 0}
+.gtrack i{position:absolute;left:0;top:0;bottom:0;width:42%;border-radius:999px;background:linear-gradient(90deg,#2141A2,#2D5BD1);animation:gslide 1.4s ease-in-out infinite}
+@keyframes gslide{0%{left:-42%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.gplate,.gtrack i{animation:none}}
+.gstory{background:linear-gradient(145deg,#0D1A41 0%,#122254 55%,#1a2a5e 100%);color:#fff;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden;isolation:isolate}
+.gstory::before{content:"";position:absolute;width:640px;height:640px;border-radius:50%;right:-220px;top:-260px;background:radial-gradient(circle,rgba(45,91,209,.38),transparent 65%);z-index:-1}
+.gstory::after{content:"";position:absolute;width:560px;height:560px;border-radius:50%;left:-200px;bottom:-240px;background:radial-gradient(circle,rgba(0,166,118,.16),transparent 65%);z-index:-1}
+.gwm{position:absolute;right:-130px;bottom:-110px;width:520px;opacity:.07;transform:rotate(-12deg);pointer-events:none;z-index:-1}
+.gbrand{display:flex;min-height:52px;align-items:center;gap:10px}
+.gbrand img{max-width:160px;max-height:46px;object-fit:contain}
+.gbrand .gmk{width:34px;height:34px}
+.gbrand .gwd{font-size:19px;font-weight:650;letter-spacing:.01em}
+.gbrand .gwd i{font-style:normal;color:#5b8def}
+.gmsg{margin:auto 0;padding:60px 0;max-width:460px}
+.geyebrow{display:block;font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:#8fa7e8}
+.gmsg h2{font-size:46px;letter-spacing:-1.2px;font-weight:650;line-height:1.16;margin:18px 0}
+.gmsg p{font-size:16px;color:#c2cfe2;line-height:1.7;max-width:380px;margin:0}
+.gfoot{color:#aebed6;font-size:12px;line-height:1.8}
+.gpanel{display:flex;align-items:center;justify-content:center;padding:48px 32px;overflow-y:auto}
+.gform{width:100%;max-width:370px}
+.gform .geyebrow{color:#5b73b8}
+.gform h1{font-size:28px;letter-spacing:-.8px;margin:14px 0 10px;font-weight:650}
+.gform p{font-size:14px;line-height:1.8;color:var(--mute);margin:0 0 26px}
+.gform .btn{width:100%;min-height:50px;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:12px;border-radius:12px;box-shadow:0 10px 24px rgba(33,65,162,.28)}
+.gsec{display:flex;gap:8px;font-size:12px;line-height:1.8;color:#73849d;margin-top:18px}
+.gsec svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.gerr{font-size:12px;color:var(--bad);word-break:break-word;text-align:left;background:var(--bad-soft);border-radius:8px;padding:10px;max-height:180px;overflow:auto;margin-bottom:14px}
 
 @media (min-width:821px) and (max-width:1100px){
   .side{width:200px;left:10px;top:10px;bottom:10px;padding:16px 10px 12px}
@@ -249,6 +280,12 @@ tr.mesrow td{background:var(--soft);padding:14px 10px;border-bottom:2px solid va
   .app.menucol .nav span{display:inline}
   .app.menucol #logoFull{display:block}
   .app.menucol #logoMini{display:none}
+  #gate{display:flex;flex-direction:column}
+  .gstory{padding:28px;min-height:220px}
+  .gmsg{padding:24px 0 0;margin:0}
+  .gmsg h2{font-size:28px;margin:10px 0}
+  .gfoot{display:none}
+  .gpanel{padding:28px 20px}
   .nav{width:auto;min-height:38px;margin:0}
   #nav{display:flex;flex-wrap:wrap;flex:1 1 auto;overflow:visible;padding:0}
   .split{grid-template-columns:1fr}
@@ -285,12 +322,21 @@ td.r.click:hover .rv{text-decoration:underline}
 <body>
 
 <div id="gate">
-  <div class="gcard">
-    <img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true" style="height:38px;object-fit:contain;align-self:center"><h1>Planejamento Orçamentário</h1>
-    <p id="gMsg">Entre com a sua conta Polystell para continuar.</p>
-    <div id="gErr" class="gerr" hidden></div>
-    <button class="btn" id="gBtn">Entrar com a conta Polystell</button>
+  <div class="gstory">
+    <img class="gwm" src="logo-polystell-icone.png" alt="" aria-hidden="true" onerror="this.hidden=true">
+    <div class="gbrand"><img class="gmk" src="logo-polystell-icone.png" alt="" onerror="this.hidden=true"><b class="gwd">polystell<i>.</i></b></div>
+    <div class="gmsg"><span class="geyebrow">Planejamento Orçamentário</span><h2>Um ambiente.<br>Mais possibilidades.</h2><p>Seus aplicativos e processos reunidos para um dia a dia mais simples e conectado.</p></div>
+    <div class="gfoot">Polystell Apps<br>Tecnologia a serviço das pessoas.</div>
   </div>
+  <div class="gpanel"><div class="gform">
+    <span class="geyebrow">Planejamento Orçamentário</span>
+    <h1>Bom ter você aqui.</h1>
+    <p id="gMsg">Entre com a sua conta corporativa Microsoft.</p>
+    <div id="gErr" class="gerr" hidden></div>
+    <button class="btn" id="gBtn"><svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Entrar com Microsoft</button>
+    <div class="gsec"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><span>Use a mesma identidade do Microsoft 365.<br>O portal não solicita nem armazena sua senha.</span></div>
+  </div></div>
+  <div id="gload" hidden><div class="box"><div class="gplate"><img class="gstar" src="logo-polystell-icone.png" alt="" onerror="this.parentElement.hidden=true;this.parentElement.nextElementSibling.hidden=false"></div><div class="gspin" hidden></div><p id="gLoadMsg">Carregando…</p><div class="gtrack"><i></i></div></div></div>
 </div>
 
 <div class="app" id="appRoot" hidden>
@@ -1672,12 +1718,14 @@ async function refreshData(){
 /* ================================ BOOT ================================ */
 function gate(msg,err){
   document.getElementById('gMsg').textContent=msg;
+  const gl=document.getElementById('gLoadMsg');if(gl)gl.textContent=msg;
   const e=document.getElementById('gErr');
   if(err){e.hidden=false;e.textContent=String(err.message||err);}else e.hidden=true;
 }
 async function start(){
   gate('Carregando cadastros…');
   document.getElementById('gBtn').hidden=true;
+  document.getElementById('gload').hidden=false;
   try{
     DB.me={email:acct.username.toLowerCase(),name:acct.name||acct.username};
     DB.me.uid=await ensureUser(DB.me.email);
@@ -1730,20 +1778,22 @@ async function start(){
     render();
   }catch(e){
     console.error(e);
+    document.getElementById('gload').hidden=true;
     document.getElementById('gBtn').hidden=false;
     document.getElementById('gBtn').textContent='Tentar novamente';
     gate('Não foi possível carregar. Confira se as listas e permissões da Etapa 1 foram criadas.',e);
   }
 }
 (async function boot(){
+  document.getElementById('gload').hidden=false;
   try{
     await msalApp.initialize();
     const r=await msalApp.handleRedirectPromise();
     acct=(r&&r.account)||msalApp.getAllAccounts()[0]||null;
     const btn=document.getElementById('gBtn');
     if(acct){msalApp.setActiveAccount(acct);start();}
-    else btn.onclick=()=>msalApp.loginRedirect({scopes:SCOPE_SP});
-  }catch(e){gate('Falha na autenticação.',e);}
+    else{document.getElementById('gload').hidden=true;btn.onclick=()=>msalApp.loginRedirect({scopes:SCOPE_SP});}
+  }catch(e){document.getElementById('gload').hidden=true;gate('Falha na autenticação.',e);}
 })();
 </script>
 </body>
