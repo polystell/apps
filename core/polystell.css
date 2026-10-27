@@ -194,22 +194,35 @@ dialog.ps-dlg::backdrop{background:#0f1d355c;backdrop-filter:blur(3px)}
 .ps-screen p{font-size:14px;line-height:1.8;color:var(--muted);margin:0 0 16px}
 .ps-screen ul{text-align:left;font-size:13px;color:var(--ink);line-height:1.8;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px 12px 30px;margin:0 0 16px}
 .ps-spin{width:32px;height:32px;border:3px solid #dfe7f5;border-top-color:var(--blue);border-radius:50%;animation:ps-spin .8s linear infinite;margin:0 auto 18px}
+.ps-splash{background:var(--bg)}
+.splash-plate{width:118px;height:118px;border-radius:50%;background:#fff;box-shadow:0 12px 34px rgba(13,26,65,.14);display:grid;place-items:center;margin:0 auto 22px;animation:ps-pulse 1.8s ease-in-out infinite}
+.splash-star{width:62px;height:62px;object-fit:contain;display:block}
+@keyframes ps-pulse{50%{transform:scale(.94);box-shadow:0 6px 18px rgba(13,26,65,.10)}}
+.splash-track{width:190px;height:4px;border-radius:999px;background:var(--line);overflow:hidden;position:relative;margin:16px auto 0}
+.splash-track i{position:absolute;left:0;top:0;bottom:0;width:42%;border-radius:999px;background:linear-gradient(90deg,#2141A2,#2D5BD1);animation:ps-slide 1.4s ease-in-out infinite}
+@keyframes ps-slide{0%{left:-42%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.splash-plate,.splash-track i{animation:none}}
 @keyframes ps-spin{to{transform:rotate(360deg)}}
 .ps-login{min-height:100dvh;display:grid;grid-template-columns:1.05fr 1fr;background:#fff}
-.ps-login .story{background:var(--navy);color:#fff;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden;isolation:isolate}
-.ps-login .story:after{content:"";position:absolute;width:620px;height:620px;bottom:-350px;right:-190px;border:1px solid #ffffff0c;border-radius:50%;box-shadow:0 0 0 80px #ffffff03,0 0 0 160px #ffffff02;z-index:-1}
-.ps-login .story .ps-brand{justify-content:flex-start;border:0;padding:0}
+.ps-login .story{background:linear-gradient(145deg,#0D1A41 0%,#122254 55%,#1a2a5e 100%);color:#fff;padding:56px 60px;display:flex;flex-direction:column;position:relative;overflow:hidden;isolation:isolate}
+.ps-login .story:before{content:"";position:absolute;width:640px;height:640px;border-radius:50%;right:-220px;top:-260px;background:radial-gradient(circle,rgba(45,91,209,.38),transparent 65%);z-index:-1}
+.ps-login .story:after{content:"";position:absolute;width:560px;height:560px;border-radius:50%;left:-200px;bottom:-240px;background:radial-gradient(circle,rgba(0,166,118,.16),transparent 65%);z-index:-1}
+.ps-login .wm{position:absolute;right:-130px;bottom:-110px;width:520px;opacity:.07;transform:rotate(-12deg);pointer-events:none;z-index:-1}
+.ps-login .gmark{display:flex;align-items:center;gap:10px;min-height:52px}
+.ps-login .gmark img{width:34px;height:34px;object-fit:contain}
+.ps-login .gmark .wd{font-size:19px;font-weight:650;letter-spacing:.01em}
+.ps-login .gmark .wd i{font-style:normal;color:#5b8def}
 .ps-login .msg{margin:auto 0;padding:60px 0;max-width:460px}
-.ps-login .eyebrow{font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:#9bb9f9}
-.ps-login .msg h2{font-size:40px;letter-spacing:-1.6px;font-weight:600;line-height:1.2;margin:18px 0}
-.ps-login .msg p{font-size:15px;color:#c2cfe2;line-height:1.8;max-width:360px;margin:0}
+.ps-login .eyebrow{font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:#8fa7e8}
+.ps-login .msg h2{font-size:46px;letter-spacing:-1.2px;font-weight:650;line-height:1.16;margin:18px 0}
+.ps-login .msg p{font-size:16px;color:#c2cfe2;line-height:1.7;max-width:380px;margin:0}
 .ps-login .foot{color:#aebed6;font-size:12px;line-height:1.8}
 .ps-login .panel2{display:flex;align-items:center;justify-content:center;padding:48px 32px}
 .ps-login .form{width:100%;max-width:370px}
-.ps-login .form .eyebrow{color:#647b9d}
+.ps-login .form .eyebrow{color:#5b73b8}
 .ps-login .form h1{font-size:28px;letter-spacing:-.8px;margin:14px 0 10px;font-weight:650}
 .ps-login .form p{font-size:14px;line-height:1.8;color:var(--muted);margin:0 0 26px}
-.ps-login .ms{width:100%;height:50px;font-size:15px;gap:12px}
+.ps-login .ms{width:100%;height:50px;font-size:15px;gap:12px;border-radius:12px;box-shadow:0 10px 24px rgba(33,65,162,.28)}
 .ps-login .sec{display:flex;gap:8px;font-size:12px;line-height:1.8;color:#73849d;margin-top:18px}
 .ps-login .help{border-top:1px solid var(--line);margin-top:28px;padding-top:18px;font-size:13px;color:var(--muted)}
 
