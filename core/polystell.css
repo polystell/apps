@@ -208,10 +208,7 @@ dialog.ps-dlg::backdrop{background:#0f1d355c;backdrop-filter:blur(3px)}
 .ps-login .story:before{content:"";position:absolute;width:640px;height:640px;border-radius:50%;right:-220px;top:-260px;background:radial-gradient(circle,rgba(45,91,209,.38),transparent 65%);z-index:-1}
 .ps-login .story:after{content:"";position:absolute;width:560px;height:560px;border-radius:50%;left:-200px;bottom:-240px;background:radial-gradient(circle,rgba(0,166,118,.16),transparent 65%);z-index:-1}
 .ps-login .wm{position:absolute;right:-130px;bottom:-110px;width:520px;opacity:.07;transform:rotate(-12deg);pointer-events:none;z-index:-1}
-.ps-login .gmark{display:flex;align-items:center;gap:10px;min-height:52px}
-.ps-login .gmark img{width:34px;height:34px;object-fit:contain}
-.ps-login .gmark .wd{font-size:19px;font-weight:650;letter-spacing:.01em}
-.ps-login .gmark .wd i{font-style:normal;color:#5b8def}
+.ps-login .story .ps-brand{justify-content:flex-start;border:0;padding:0}
 .ps-login .msg{margin:auto 0;padding:60px 0;max-width:460px}
 .ps-login .eyebrow{font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:#8fa7e8}
 .ps-login .msg h2{font-size:46px;letter-spacing:-1.2px;font-weight:650;line-height:1.16;margin:18px 0}
