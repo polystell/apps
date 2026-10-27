@@ -15,7 +15,7 @@ const CFG=Object.freeze({
  tenantId:'fdb7cb21-cc9d-4f32-bb70-e71cad1eb164',
  siteHost:'polystellcombr.sharepoint.com', sitePath:'/sites/Apps',
  msalUrl:'https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js',
- hubUrl:'/', logo:'/logo-polystell.png',
+ hubUrl:'/', logo:'/logo-polystell.png', logoMini:'/logo-polystell-icone.png',
  supportUrl:'https://suporte.polystell.com.br/portal/pt-br/home',
  baseScopes:['Sites.ReadWrite.All','User.Read'],
  groupScopes:['GroupMember.Read.All']
@@ -196,7 +196,7 @@ async function groups(){try{let next='/me/transitiveMemberOf/microsoft.graph.gro
  return out;}catch(e){console.warn('Grupos indisponíveis:',e.message);return null;}}
 async function photo(){try{const t=await auth.token(['User.Read'],{optional:true});const r=await fetch('https://graph.microsoft.com/v1.0/me/photos/96x96/$value',{headers:{Authorization:'Bearer '+t}});if(!r.ok)return null;return URL.createObjectURL(await r.blob());}catch{return null;}}
 /* ---------------- telas padrão ---------------- */
-function brandHtml(){return '<div class="ps-brand"><img src="'+CFG.logo+'" alt="Polystell" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="fb" hidden>polystell<i>.</i></span></div>';}
+function brandHtml(){return '<div class="ps-brand"><img src="'+CFG.logo+'" alt="Polystell" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="fb" hidden>polystell<i>.</i></span><img class="mini" src="'+CFG.logoMini+'" alt="Polystell" onerror="this.style.visibility=\'hidden\'"></div>';}
 const screens={
  loading(text){document.body.innerHTML='<div class="ps-screen" aria-live="polite"><div class="box"><div class="ps-spin"></div><p>'+esc(text||'Carregando…')+'</p></div></div>';},
  error(title,msg,{retry=true,details=null,action=null}={}){
@@ -217,8 +217,8 @@ function mount({app,nav,current,onNav,account:acc}){
  const ini=(parts[0]?.[0]||'')+(parts.length>1?parts[parts.length-1][0]:'');
  document.body.innerHTML='<button class="ps-backdrop" id="ps-bd" hidden aria-label="Fechar menu"></button>'+
  '<aside class="ps-side" id="ps-side" aria-label="Navegação">'+brandHtml()+
- '<a class="ps-back" href="'+CFG.hubUrl+'">'+icon('back')+'Todos os aplicativos</a>'+
- '<nav class="ps-nav" id="ps-nav"></nav><div class="ps-sidefoot"><div id="ps-ctx"></div><span style="display:flex;gap:7px;align-items:center;padding:0 4px">'+icon('shield')+'Identidade Microsoft 365</span></div></aside>'+
+ '<a class="ps-back" href="'+CFG.hubUrl+'" title="Todos os aplicativos">'+icon('back')+'<span class="t">Todos os aplicativos</span></a>'+
+ '<nav class="ps-nav" id="ps-nav"></nav><div class="ps-sidefoot"><div id="ps-ctx"></div><button type="button" class="ps-mt" id="ps-mt" title="Recolher menu" aria-label="Recolher menu">'+icon('back')+'<span class="t">Recolher menu</span></button><span style="display:flex;gap:7px;align-items:center;padding:0 4px" title="Identidade Microsoft 365">'+icon('shield')+'<span class="idt">Identidade Microsoft 365</span></span></div></aside>'+
  '<div class="ps-main"><header class="ps-top"><button class="ps-iconbtn ps-menubtn" id="ps-mb" aria-label="Abrir menu" aria-controls="ps-side" aria-expanded="false">'+icon('menu')+'</button>'+
  '<div class="ps-crumb"><a href="'+CFG.hubUrl+'" class="hide-sm">Polystell Apps</a><span class="hide-sm">'+icon('chevR')+'</span><span>'+esc(app)+'</span>'+icon('chevR')+'<b id="ps-cur"></b></div>'+
  '<div class="ps-topact"><span class="ps-sync" id="ps-sync"></span><a class="ps-iconbtn" href="'+CFG.supportUrl+'" target="_blank" rel="noopener" aria-label="Central de ajuda" title="Central de ajuda">'+icon('help')+'</a>'+
@@ -242,6 +242,9 @@ function mount({app,nav,current,onNav,account:acc}){
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeUser();if($('#ps-side').classList.contains('open')){closeMenu();$('#ps-mb').focus();}}});
  $('#ps-out').onclick=()=>auth.logout();
  photo().then(u=>{if(u)$('#ps-av').innerHTML='<img src="'+u+'" alt="">';});
+ const mt=$('#ps-mt');
+ const setCol=on=>{document.body.classList.toggle('ps-menucol',on);if(mt){const t=on?'Expandir menu':'Recolher menu';mt.title=t;mt.setAttribute('aria-label',t);const sp=mt.querySelector('.t');if(sp)sp.textContent=t;}try{localStorage.setItem('psMenuCol',on?'1':'0');}catch(_){}};
+ if(mt){mt.onclick=()=>setCol(!document.body.classList.contains('ps-menucol'));try{if(localStorage.getItem('psMenuCol')==='1')setCol(true);}catch(_){}}
  const api={
   page:$('#ps-page'),
   setCurrent(id,title){cur=id;$('#ps-cur').textContent=title||'';drawNav();},
