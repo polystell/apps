@@ -181,7 +181,7 @@ dialog.ps-dlg::backdrop{background:#0f1d355c;backdrop-filter:blur(3px)}
 .ps-umenu small{display:block;color:var(--muted);font-size:12px;margin:4px 0 12px;overflow-wrap:anywhere}
 .ps-umenu button,.ps-umenu a{display:flex;gap:9px;align-items:center;border:0;border-top:1px solid var(--line);background:none;width:100%;padding:12px 0 2px;text-align:left;font-size:14px;color:var(--ink);text-decoration:none}
 .ps-menubtn{display:none}
-.ps-page{padding:26px 32px 30px;width:100%;max-width:1440px;flex:1}
+.ps-page{padding:26px 32px 30px;width:100%;max-width:1440px;margin:0 auto;flex:1}
 .ps-pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
 .ps-pagehead h1{font-size:26px;font-weight:650;letter-spacing:-.7px;margin:0;line-height:1.25}
 .ps-pagehead p{margin:5px 0 0;font-size:14px;color:var(--muted)}

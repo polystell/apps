@@ -67,7 +67,11 @@ const IC={
  logout:'<path d="M9 3H4v18h5M9 12h12m-5-5 5 5-5 5"/>',
  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
  car:'<path d="M5 17h14M5 17a2 2 0 1 0 4 0m6 0a2 2 0 1 0 4 0M3 17v-4l2-5h14l2 5v4"/>',
- leaf:'<path d="M20 3c-8 0-16 2-16 10a7 7 0 0 0 7 7c8 0 9-9 9-17ZM4 21l11-11"/>'
+ leaf:'<path d="M20 3c-8 0-16 2-16 10a7 7 0 0 0 7 7c8 0 9-9 9-17ZM4 21l11-11"/>',
+ edit:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+ share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+ chart:'<path d="M18 20V10M12 20V4M6 20v-6"/>',
+ approve:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/>'
 };
 const icon=(n,cls='')=>'<svg class="i '+cls+'" viewBox="0 0 24 24" aria-hidden="true">'+(IC[n]||IC.grid)+'</svg>';
 /* ---------------- toast / diálogo ---------------- */
