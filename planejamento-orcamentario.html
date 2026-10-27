@@ -394,10 +394,11 @@ function busy(on,label){
   const b=document.getElementById('busy');
   b.hidden=busyN===0;if(label)b.textContent=label;else if(busyN)b.textContent='Gravando…';
 }
+let filaN=0;
 async function runQueue(tasks,label){
-  busy(true);
+  busy(true);filaN++;
   try{for(let i=0;i<tasks.length;i++){document.getElementById('busy').textContent=`${label} ${i+1}/${tasks.length}…`;await tasks[i]();}}
-  finally{busy(false);}
+  finally{filaN--;busy(false);}
 }
 function fail(e){
   console.error(e);
@@ -410,7 +411,7 @@ const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catM
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows){
-  const map={};
+  const map={};let dups=0;
   rows.forEach(r=>{
     if(!r.COD_CC||!r.COMPETENCIA)return;
     const m=new Date(r.COMPETENCIA).getUTCMonth();
@@ -418,7 +419,7 @@ function buildItems(rows){
     const k=itemKey(r.COD_DPTO,r.COD_CC,r.COD_CAT,det);
     if(!map[k])map[k]={key:k,dept:r.COD_DPTO,cc:r.COD_CC,cat:r.COD_CAT,det,obs:'',prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     const it=map[k];
-    if(it.ids[m])console.warn('Duplicidade mensal no SharePoint:',r.COD_DPTO,r.COD_CC,r.COD_CAT,it.det,'mês',m+1,'ids',it.ids[m],r.Id);
+    if(it.ids[m]){console.warn('Duplicidade mensal no SharePoint (linha ignorada):',r.COD_DPTO,r.COD_CC,r.COD_CAT,it.det,'mês',m+1,'mantido id',it.ids[m],'ignorado id',r.Id);dups++;return;}
     it.ids[m]=r.Id;
     it.prev[m]=Number(r.PREVISTO)||0;
     it.st[m]=r.STATUS||'Rascunho';
@@ -426,6 +427,7 @@ function buildItems(rows){
     if(r.MOTIVO)it.mot[m]=r.MOTIVO;
     if(r.OBSERVACAO&&!it.obs)it.obs=r.OBSERVACAO;
   });
+  if(dups)toast(`Atenção: ${dups} lançamento(s) mensal(is) duplicado(s) no SharePoint foram ignorados — avise a TI (detalhes no console do navegador).`,'err');
   return Object.values(map);
 }
 async function loadYear(ano,force){
@@ -482,6 +484,7 @@ const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
 const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
 const findPlanItem=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).find(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
 const mesesFaltantes=(it,vals,ano)=>vals.map((v,m)=>(v>0&&mOpen(ano,m)&&!it.ids[m]&&!(it.prev[m]>0))?m:-1).filter(m=>m>=0);
+const plural=(n,um,muitos)=>n===1?um:muitos;
 const descartaDec=()=>{const tinha=Object.values(S.dec||{}).some(d=>d&&(d.d||(d.months&&Object.values(d.months).some(x=>x&&x.d))));S.dec={};if(tinha)toast('As decisões ainda não confirmadas foram descartadas.','warn');};
 let tt;
 function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='show'+(kind?' '+kind:'');clearTimeout(tt);tt=setTimeout(()=>t.className='',kind==='err'?9000:5000);}
@@ -712,7 +715,7 @@ function toolHtml(){
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
         h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}</p>`;
-        if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} novo(s)`:''}${pv.novos.length&&pv.compl.length?' e ':pv.novos.length?'':'Importar: '}${pv.compl.length?`completar ${pv.compl.length} item(ns)`:''}</button></div>`;
+        if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} ${plural(pv.novos.length,'item novo','itens novos')}`:''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?`${pv.novos.length?'c':'C'}ompletar ${pv.compl.length} ${plural(pv.compl.length,'item','itens')}`:''}</button></div>`;
       }
     }
     return h+`</div>`;
@@ -775,6 +778,7 @@ function setCell(it,m,v,keepPend){
   return {changed:true,ev};
 }
 function editCell(key,m,v,keepPend){
+  if(filaN>0){toast('Aguarde a operação em andamento terminar.','warn');render();return;}
   const it=findItem(key);if(!it)return;
   const r=setCell(it,m,v,keepPend);
   if(!r.changed){rerenderKeepFocus();return;}
@@ -869,7 +873,7 @@ async function copyFrom(src){
   });
   S.tool=null;render();
   if(!n&&!comp){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
-  runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho${comp?` e ${comp} completados com os meses que faltavam`:''}.`)).catch(fail);
+  runQueue(tasks,'Copiando').then(()=>toast(`${n?n+' '+plural(n,'item copiado','itens copiados')+' de '+src+' como rascunho':''}${n&&comp?' e ':''}${comp?comp+' '+plural(comp,'item completado','itens completados')+' com os meses que faltavam':''}.`)).catch(fail);
 }
 function setMonthsStatus(key,fromSt){
   if(escrevendo())return;
@@ -1001,7 +1005,7 @@ function doImport(){
   });
   S.tool=null;S.imp=null;render();
   if(!tasks.length){toast('Não há valores em períodos abertos para importar.','warn');return;}
-  runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length?pv.novos.length+' itens importados como rascunho':''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?pv.compl.length+' completados com os meses que faltavam':''} em ${ano} (${money(pv.total)}).`)).catch(fail);
+  runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length?pv.novos.length+' '+plural(pv.novos.length,'item importado','itens importados')+' como rascunho':''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?pv.compl.length+' '+plural(pv.compl.length,'item completado','itens completados')+' com os meses que faltavam':''} em ${ano} (${money(pv.total)}).`)).catch(fail);
 }
 
 /* ============================ COMPARTILHADO =========================== */
