@@ -244,11 +244,31 @@ tr.mesrow td{background:var(--soft);padding:14px 10px;border-bottom:2px solid va
   .brand{border:0;padding:4px 8px;min-height:0}
   
   .grp,.back,.sidefoot,.hide-sm{display:none}
+  .app.menucol .side{width:auto;padding:10px}
+  .app.menucol .main{margin-left:0}
+  .app.menucol .nav span{display:inline}
+  .app.menucol #logoFull{display:block}
+  .app.menucol #logoMini{display:none}
   .nav{width:auto;min-height:38px;margin:0}
   #nav{display:flex;flex-wrap:wrap;flex:1 1 auto;overflow:visible;padding:0}
   .split{grid-template-columns:1fr}
   #busy{bottom:72px}
 }
+.side,.main{transition:width .18s ease,margin-left .18s ease,padding .18s ease}
+.mtoggle{display:flex;align-items:center;gap:9px;width:100%;margin:0 0 2px;padding:9px 12px;border:0;border-radius:8px;background:none;color:#b9c6de;font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+.mtoggle:hover{background:#1a2a5e;color:#fff}
+.mtoggle svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;transition:transform .18s}
+#logoMini{display:none;max-height:38px;object-fit:contain;margin:0 auto}
+.app.menucol .mtoggle svg{transform:rotate(180deg)}
+.app.menucol .side{width:68px;padding:18px 9px 12px}
+.app.menucol .main{margin-left:96px}
+.app.menucol #logoFull,.app.menucol .brand .fb{display:none}
+.app.menucol #logoMini{display:block}
+.app.menucol .brand{padding:0 0 14px}
+.app.menucol .grp{display:none}
+.app.menucol .back .t,.app.menucol .nav span,.app.menucol .mtoggle .t,.app.menucol .idline .t{display:none}
+.app.menucol .back,.app.menucol .nav,.app.menucol .mtoggle{justify-content:center;padding:10px 0;gap:0}
+.app.menucol .idline{justify-content:center;padding:0}
 td.r.click{cursor:pointer}
 td.r.click:hover .rv{text-decoration:underline}
 #modal{position:fixed;inset:0;z-index:250}
@@ -274,10 +294,10 @@ td.r.click:hover .rv{text-decoration:underline}
 
 <div class="app" id="appRoot" hidden>
   <aside class="side" aria-label="Navegação">
-    <div class="brand"><img src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="fb" hidden>polystell<i>.</i></span></div>
-    <a class="back" href="https://app.polystell.com.br/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5m6-6-6 6 6 6"/></svg>Todos os aplicativos</a>
+    <div class="brand"><img id="logoFull" src="logo-polystell.png" alt="Polystell" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="fb" hidden>polystell<i>.</i></span><img id="logoMini" src="logo-polystell-icone.png" alt="Polystell" onerror="this.style.visibility='hidden'"></div>
+    <a class="back" href="https://app.polystell.com.br/" title="Todos os aplicativos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5m6-6-6 6 6 6"/></svg><span class="t">Todos os aplicativos</span></a>
     <nav id="nav"></nav>
-    <div class="sidefoot"><span class="idline"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg>Identidade Microsoft 365</span></div>
+    <div class="sidefoot"><button class="mtoggle" id="menuToggle" title="Recolher menu" aria-label="Recolher menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/></svg><span class="t">Recolher menu</span></button><span class="idline" title="Identidade Microsoft 365"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><span class="t">Identidade Microsoft 365</span></span></div>
   </aside>
   <main class="main">
     <header class="top">
@@ -533,7 +553,7 @@ function render(){
   const vs=views();
   if(!vs.some(v=>v[0]===S.view))S.view='plan';
   let lastG='',nav='';
-  vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${NAVICON[id]||''}<span>${label}</span></button>`;});
+  vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" title="${label}" ${S.view===id?'aria-current="page"':''}>${NAVICON[id]||''}<span>${label}</span></button>`;});
   document.getElementById('nav').innerHTML=nav;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=async()=>{if(b.dataset.view==='aprov'&&S.view!=='aprov')S.dec={};S.view=b.dataset.view;S.adding=false;S.tool=null;
     if(S.view==='aprov'&&S.aAno){busy(true,'Atualizando…');try{await loadYear(S.aAno,true);}catch(e){console.warn(e);}busy(false);}
@@ -1700,6 +1720,9 @@ async function start(){
     if(_ub&&_um){_ub.onclick=e=>{e.stopPropagation();_um.hidden=!_um.hidden;_ub.setAttribute('aria-expanded',String(!_um.hidden));};
       document.addEventListener('click',e=>{if(!e.target.closest('#umenu')&&!e.target.closest('#userBtn')){_um.hidden=true;_ub.setAttribute('aria-expanded','false');}});
       document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!_um.hidden){_um.hidden=true;_ub.setAttribute('aria-expanded','false');_ub.focus();}});}
+    const _mt=document.getElementById('menuToggle'),_app=document.getElementById('appRoot');
+    const setMenuCol=on=>{_app.classList.toggle('menucol',on);if(_mt){const t=on?'Expandir menu':'Recolher menu';_mt.title=t;_mt.setAttribute('aria-label',t);const sp=_mt.querySelector('.t');if(sp)sp.textContent=t;}try{localStorage.setItem('psMenuCol',on?'1':'0');}catch(_){}};
+    if(_mt){_mt.onclick=()=>setMenuCol(!_app.classList.contains('menucol'));try{if(localStorage.getItem('psMenuCol')==='1')setMenuCol(true);}catch(_){}}
     document.getElementById('gate').hidden=true;
     document.getElementById('appRoot').hidden=false;
     if(!S.role.admin&&!mine.length)S.view='plan';
