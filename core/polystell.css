@@ -4,6 +4,7 @@
      <link rel="stylesheet" href="/core/polystell.css?v=1">
    Regras: cores só por token; texto auxiliar ≥ 12px; status não vira tema.
    ===================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap");
 :root{
  --navy:#0D1A41; --navy-2:#1a2a5e; --navy-line:#ffffff17;
  --brand:#2141A2;                 /* azul oficial da marca (logo, institucional) */
