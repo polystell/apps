@@ -1,7 +1,7 @@
 /* =====================================================================
-   POLYSTELL APPS — tema e componentes compartilhados (arredondado · out/2026)
+   POLYSTELL APPS — tema e componentes compartilhados (v3 · arredondado · out/2026)
    Referência visual: hub (app.polystell.com.br). Use em todos os apps:
-     <link rel="stylesheet" href="/core/polystell.css?v=1">
+     <link rel="stylesheet" href="/core/polystell.css?v=3">
    Regras: cores só por token; texto auxiliar ≥ 12px; status não vira tema.
    ===================================================================== */
 @import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap");
@@ -176,9 +176,9 @@ dialog.ps-dlg::backdrop{background:#0f1d355c;backdrop-filter:blur(3px)}
 .ps-user{border:0;background:none;padding:0 0 0 14px;border-left:1px solid var(--line);display:flex;align-items:center;gap:9px}
 .ps-av{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:#eaf0fb;color:#345994;border:2px solid #fff;outline:1px solid #e2e8f2;font-size:12px;font-weight:650;overflow:hidden;flex-shrink:0}
 .ps-av img{width:100%;height:100%;object-fit:cover}
-.ps-umenu{position:absolute;right:28px;top:64px;min-width:260px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 35px #16244020;z-index:60}
+.ps-umenu{position:absolute;right:28px;top:64px;min-width:300px;max-width:min(380px,calc(100vw - 24px));padding:14px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 35px #16244020;z-index:60}
 .ps-umenu strong{display:block;font-size:14px;overflow-wrap:anywhere}
-.ps-umenu small{display:block;color:var(--muted);font-size:12px;margin:4px 0 12px;overflow-wrap:anywhere}
+.ps-umenu small{display:block;color:var(--muted);font-size:12px;margin:4px 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ps-umenu button,.ps-umenu a{display:flex;gap:9px;align-items:center;border:0;border-top:1px solid var(--line);background:none;width:100%;padding:12px 0 2px;text-align:left;font-size:14px;color:var(--ink);text-decoration:none}
 .ps-menubtn{display:none}
 .ps-page{padding:26px 32px 30px;width:100%;max-width:1440px;margin:0 auto;flex:1}

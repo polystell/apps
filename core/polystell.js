@@ -1,6 +1,6 @@
 /* =====================================================================
-   POLYSTELL APPS — núcleo compartilhado (v1)
-   <script src="/core/polystell.js?v=1"></script>
+   POLYSTELL APPS — núcleo compartilhado (v3)
+   <script src="/core/polystell.js?v=3"></script>
    Fornece: PS.auth (MSAL com recuperação interativa), PS.graph (retry
    correto, sem repetir gravação incerta), PS.sp (lista/itens/paginação
    completa), PS.shell (menu lateral, cabeçalho, conta, voltar ao hub),
@@ -117,10 +117,11 @@ let mode='boot',lastGesture=0,popupP=null;
 function popupOnce(req){if(!popupP)popupP=msalApp.acquireTokenPopup(req).finally(()=>{popupP=null;});return popupP;}
 ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{lastGesture=Date.now();},true));
 const hasGesture=()=>navigator.userActivation?navigator.userActivation.isActive:Date.now()-lastGesture<4000;
-function sessionBar(){if($('#ps-sess'))return;const b=document.createElement('div');b.id='ps-sess';b.className='ps-sess';b.setAttribute('role','alert');
+function sessionBar(scopes){if($('#ps-sess'))return;const sc=(scopes&&scopes.length)?scopes:CFG.baseScopes;
+ const b=document.createElement('div');b.id='ps-sess';b.className='ps-sess';b.setAttribute('role','alert');
  b.innerHTML=icon('lock')+'<span><b>Sua sessão expirou.</b> O que você digitou continua na tela.</span><button type="button" class="btn sm primary">Entrar novamente</button>';
- b.querySelector('button').onclick=async()=>{try{const r=await popupOnce({scopes:CFG.baseScopes,account});account=r.account||account;b.remove();window.dispatchEvent(new Event('ps:session'));}
-  catch(p){if(isPopupBlocked(p))await msalApp.acquireTokenRedirect({scopes:CFG.baseScopes,account});else toast('Não foi possível entrar: '+(p.message||'erro'),'err');}};
+ b.querySelector('button').onclick=async()=>{try{const r=await popupOnce({scopes:sc,account});account=r.account||account;b.remove();window.dispatchEvent(new Event('ps:session'));}
+  catch(p){if(isPopupBlocked(p))await msalApp.acquireTokenRedirect({scopes:sc,account});else toast('Não foi possível entrar: '+(p.message||'erro'),'err');}};
  document.body.appendChild(b);}
 const auth={
  async init(){
@@ -137,7 +138,7 @@ const auth={
  login(scopes=CFG.baseScopes){return msalApp.loginRedirect({scopes});},
  logout(){try{sessionStorage.clear();}catch{}return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
  get account(){return account;},
- sessionLost(){sessionBar();return Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});},
+ sessionLost(scopes){sessionBar(scopes);return Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});},
  async token(scopes=CFG.baseScopes,{optional=false,force=false}={}){
   const req={scopes,account,forceRefresh:force};
   try{return (await msalApp.acquireTokenSilent(req)).accessToken;}
@@ -146,8 +147,8 @@ const auth={
    if(optional)throw Object.assign(new Error('Permissão opcional indisponível.'),{code:'optional'});
    if(mode==='boot'){await msalApp.acquireTokenRedirect(req);throw new Error('Redirecionando para entrar novamente…');}
    if(hasGesture()){try{const r=await popupOnce(req);account=r.account||account;const sb=$('#ps-sess');if(sb)sb.remove();return r.accessToken;}
-    catch(p){if(isPopupBlocked(p)){sessionBar();throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});}throw p;}}
-   sessionBar();throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});
+    catch(p){if(isPopupBlocked(p)){sessionBar(scopes);throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});}throw p;}}
+   sessionBar(scopes);throw Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});
   }
  }
 };
@@ -168,7 +169,7 @@ async function graph(path,opt={}){
    throw Object.assign(new Error(isRead?'Sem conexão com o Microsoft 365.':'Sem confirmação do servidor — a gravação pode ou não ter sido aplicada.'),{status:0,uncertain:!isRead});}
   clearTimeout(tm);
   if(r.status===401&&!renewed){renewed=true;tok=await auth.token(opt.scopes||CFG.baseScopes,{optional:!!opt.optional,force:true});a--;continue;}
-  if(r.status===401){if(opt.optional)throw Object.assign(new Error('Não autorizado (401).'),{status:401});throw auth.sessionLost();}
+  if(r.status===401){if(opt.optional)throw Object.assign(new Error('Não autorizado (401).'),{status:401});throw auth.sessionLost(opt.scopes||CFG.baseScopes);}
   /* 429 = não processado → pode repetir sempre. 503/504 → só leitura. */
   const retriable=r.status===429||(isRead&&[503,504].includes(r.status));
   if(retriable&&a<3){const ra=Number(r.headers.get('Retry-After'))||(a+1)*2;if(waited+ra>60)throw Object.assign(new Error('O Microsoft 365 pediu para aguardar '+ra+'s. Tente novamente em instantes.'),{status:r.status});waited+=ra;await sleep(ra*1000);continue;}
