@@ -25,8 +25,9 @@
 /* status do orçamento: tons locais só no conteúdo do app — os tokens globais
    --ok/--warn do core (shell, outros apps) ficam intactos */
 .ps-page,#modal{--ok:#2A7F36;--ok-soft:#E3F2E5;--warn:#7E5C00;--warn-soft:#FFF2C7}
-/* neutraliza padrões genéricos do core que não valem para os componentes locais */
-input,select,textarea{width:auto;min-height:0;font-size:inherit}
+/* neutraliza padrões genéricos do core que não valem para os componentes locais
+   (mesma especificidade dos seletores do core, senão input[type=…] vence) */
+input[type=text],input[type=search],input[type=number],input[type=tel],input[type=email],input[type=date],input[type=time],input:not([type]),select,textarea{width:auto;min-height:0;font-size:inherit}
 .btn{min-height:0}
 .seg button{min-height:0}
 .empty{font-size:inherit}
@@ -239,25 +240,32 @@ let acct=null;                                  // conta autenticada (PS.auth)
 const tok=()=>PS.auth.token(SCOPE_SP);          // token via core, com recuperação de sessão expirada
 
 /* ========================= CAMADA SHAREPOINT ========================= */
+/* Concorrência otimista: cada item carrega o seu ETag (versão). Toda gravação
+   envia If-Match com essa versão; se alguém alterou o registro nesse meio
+   tempo, o SharePoint responde 412 e recarregamos em vez de sobrescrever. */
 const API=CFG.spHost+CFG.sitePath+'/_api/';
+const ETAGS={};
+const tagKey=(list,id)=>list+'|'+id;
+const bumpTag=(list,id)=>{const k=tagKey(list,id);const m=/(\d+)/.exec(ETAGS[k]||'');if(m)ETAGS[k]='"'+(Number(m[1])+1)+'"';else delete ETAGS[k];};
 async function sp(path,opt={}){
   const t=await tok();
-  const headers={Authorization:'Bearer '+t,Accept:'application/json;odata=nometadata','Content-Type':opt.ctype||'application/json;odata=nometadata'};
-  if(opt.merge){headers['IF-MATCH']='*';headers['X-HTTP-Method']='MERGE';}
-  if(opt.del){headers['IF-MATCH']='*';headers['X-HTTP-Method']='DELETE';}
+  const headers={Authorization:'Bearer '+t,Accept:'application/json;odata=minimalmetadata','Content-Type':opt.ctype||'application/json;odata=nometadata'};
+  if(opt.merge){headers['IF-MATCH']=opt.etag||'*';headers['X-HTTP-Method']='MERGE';}
+  if(opt.del){headers['IF-MATCH']=opt.etag||'*';headers['X-HTTP-Method']='DELETE';}
   const res=await fetch(path.startsWith('http')?path:API+path,{method:opt.method||'GET',headers,body:opt.body!==undefined?JSON.stringify(opt.body):undefined});
+  if(res.status===412)throw Object.assign(new Error('O registro foi alterado por outra pessoa enquanto você editava (412).'),{status:412});
   if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}throw new Error(`HTTP ${res.status} em ${path}\n${d}`);}
   if(res.status===204)return null;
   const txt=await res.text();return txt?JSON.parse(txt):null;
 }
 async function getAll(list,query){
   let url=`web/lists/getbytitle('${encodeURIComponent(list)}')/items?${query}`;const out=[];
-  while(url){const j=await sp(url);out.push(...(j.value||[]));url=j['odata.nextLink']||null;}
+  while(url){const j=await sp(url);(j.value||[]).forEach(r=>{if(r['odata.etag']&&r.Id!=null)ETAGS[tagKey(list,r.Id)]=r['odata.etag'];});out.push(...(j.value||[]));url=j['odata.nextLink']||null;}
   return out;
 }
-const mergeItem=(list,id,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,body:fields});
-const delItem=(list,id)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',del:true});
-const addItem=(list,fields)=>sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items`,{method:'POST',body:fields});
+const mergeItem=async(list,id,fields)=>{const r=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',merge:true,etag:ETAGS[tagKey(list,id)],body:fields});bumpTag(list,id);return r;};
+const delItem=async(list,id)=>{const r=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items(${id})`,{method:'POST',del:true,etag:ETAGS[tagKey(list,id)]});delete ETAGS[tagKey(list,id)];return r;};
+const addItem=async(list,fields)=>{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(list)}')/items`,{method:'POST',body:fields});if(j&&j.Id!=null)ETAGS[tagKey(list,j.Id)]=j['odata.etag']||'"1"';return j;};
 async function ensureUser(email){const j=await sp('web/ensureuser',{method:'POST',body:{logonName:'i:0#.f|membership|'+email}});return j.Id;}
 
 // criação de item DENTRO da pasta do departamento (formato "como digitado na tela": pt-BR)
@@ -299,7 +307,7 @@ async function runQueue(tasks,label){
 }
 function fail(e){
   console.error(e);
-  toast('Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
+  toast(e&&e.status===412?'Alguém alterou este registro ao mesmo tempo que você — recarregando o que está gravado no SharePoint. Confira e repita o seu lançamento.':'Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
   (async()=>{try{if(S.ano)await loadYear(S.ano,true);if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);}catch(_){}render();})();
 }
 
@@ -657,6 +665,7 @@ async function persistCell(it,m,ano){
     await mergeItem(CFG.lists.plan,it.ids[m],{PREVISTO:it.prev[m],STATUS:it.st[m],APROVADO:null,MOTIVO:'',DATA_APROVACAO:null,APROVADO_PORId:null});
   }else if(it.prev[m]>0){
     it.ids[m]=await createPlanRow(it.dept,baseFields(it,m,ano));
+    ETAGS[tagKey(CFG.lists.plan,it.ids[m])]='"1"';
     // gestor gravado após a criação, do jeito confiável (Id de usuário); falha aqui não perde a linha
     try{await mergeItem(CFG.lists.plan,it.ids[m],{GESTORId:DB.me.uid});}catch(e){console.warn('GESTOR não gravado na linha',it.ids[m],e.message);}
   }
