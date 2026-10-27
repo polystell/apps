@@ -1,7 +1,7 @@
 /* =====================================================================
-   POLYSTELL APPS — tema e componentes compartilhados (v3 · arredondado · out/2026)
+   POLYSTELL APPS — tema e componentes compartilhados (v4 · arredondado · out/2026)
    Referência visual: hub (app.polystell.com.br). Use em todos os apps:
-     <link rel="stylesheet" href="/core/polystell.css?v=3">
+     <link rel="stylesheet" href="/core/polystell.css?v=4">
    Regras: cores só por token; texto auxiliar ≥ 12px; status não vira tema.
    ===================================================================== */
 @import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap");

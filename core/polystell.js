@@ -1,6 +1,6 @@
 /* =====================================================================
-   POLYSTELL APPS — núcleo compartilhado (v3)
-   <script src="/core/polystell.js?v=3"></script>
+   POLYSTELL APPS — núcleo compartilhado (v4)
+   <script src="/core/polystell.js?v=4"></script>
    Fornece: PS.auth (MSAL com recuperação interativa), PS.graph (retry
    correto, sem repetir gravação incerta), PS.sp (lista/itens/paginação
    completa), PS.shell (menu lateral, cabeçalho, conta, voltar ao hub),
@@ -136,7 +136,9 @@ const auth={
  },
  ready(){mode='app';},
  login(scopes=CFG.baseScopes){return msalApp.loginRedirect({scopes});},
- logout(){try{sessionStorage.clear();}catch{}return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
+ /* logout seletivo: remove só o cache do MSAL — rascunhos/estado de outros
+    Polystell Apps na mesma origem não são apagados por este app */
+ logout(){try{const ks=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i)||'';if(/^msal/i.test(k))ks.push(k);}ks.forEach(k=>sessionStorage.removeItem(k));}catch{}return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
  get account(){return account;},
  sessionLost(scopes){sessionBar(scopes);return Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});},
  async token(scopes=CFG.baseScopes,{optional=false,force=false}={}){
@@ -196,6 +198,31 @@ const sp={
  async del(listId,id){const s=await sp.site();return graph('/sites/'+s+'/lists/'+listId+'/items/'+id,{method:'DELETE'});},
  async get(listId,id){const s=await sp.site();const r=await graph('/sites/'+s+'/lists/'+listId+'/items/'+id+'?$expand=fields');return {id:String(r.id),_etag:r['@odata.etag']||r.eTag||'',_by:r.createdBy?.user?.displayName||'',_byEmail:String(r.createdBy?.user?.email||'').toLowerCase(),_byId:String(r.createdBy?.user?.id||''),...(r.fields||{})};}
 };
+/* ---------------- SharePoint REST (_api) — transporte resiliente ----------------
+   Mesma disciplina do graph(): timeout, retry seguro só de leitura, renovação
+   após 401, 429 com Retry-After. Gravação nunca é repetida às cegas (pode já
+   ter sido aplicada). O protocolo (headers IF-MATCH, parse) fica no app. */
+async function sprest(url,{method='GET',headers={},body,scopes=CFG.baseScopes,timeout=25000}={}){
+ const u=new URL(url);
+ if(!u.hostname.endsWith('.sharepoint.com'))throw new Error('Destino de API não autorizado.');
+ const isRead=(method||'GET').toUpperCase()==='GET'&&!headers['X-HTTP-Method'];
+ let tk=await auth.token(scopes);
+ let waited=0,renewed=false;
+ for(let a=0;a<4;a++){
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),timeout);let r;
+  try{r=await fetch(u,{method,headers:{Authorization:'Bearer '+tk,...headers},body,signal:ctl.signal});}
+  catch(e){clearTimeout(tm);
+   if(isRead&&a<2){await sleep(1500*(a+1));continue;}
+   throw Object.assign(new Error(isRead?'Sem conexão com o Microsoft 365.':'Sem confirmação do servidor — a gravação pode ou não ter sido aplicada.'),{status:0,uncertain:!isRead});}
+  clearTimeout(tm);
+  if(r.status===401&&!renewed){renewed=true;tk=await auth.token(scopes,{force:true});a--;continue;}
+  if(r.status===401)throw auth.sessionLost(scopes);
+  const retriable=r.status===429||(isRead&&[503,504].includes(r.status));
+  if(retriable&&a<3){const ra=Number(r.headers.get('Retry-After'))||(a+1)*2;if(waited+ra>60)throw Object.assign(new Error('O Microsoft 365 pediu para aguardar '+ra+'s. Tente novamente em instantes.'),{status:r.status});waited+=ra;await sleep(ra*1000);continue;}
+  return r;
+ }
+ throw new Error('Falha ao consultar o SharePoint.');
+}
 async function groups(){try{let next='/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName&$top=999';const out=new Set();
  while(next){const p=await graph(next,{scopes:CFG.groupScopes,optional:true,headers:{ConsistencyLevel:'eventual'}});(p.value||[]).forEach(g=>{if(g.id)out.add(String(g.id).toLowerCase());if(g.displayName)out.add(String(g.displayName).toLowerCase());});next=p['@odata.nextLink']||null;}
  return out;}catch(e){console.warn('Grupos indisponíveis:',e.message);return null;}}
@@ -260,5 +287,5 @@ function mount({app,nav,current,onNav,account:acc}){
  };
  drawNav();syncSide();return api;
 }
-window.PS=Object.freeze({cfg:CFG,$,$$,esc,norm,val,fmt,todayKey,dateKey,icon,toast,dialog,auth,graph,sp,groups,photo,screens,mount,loadScript,sleep});
+window.PS=Object.freeze({cfg:CFG,$,$$,esc,norm,val,fmt,todayKey,dateKey,icon,toast,dialog,auth,graph,sp,sprest,groups,photo,screens,mount,loadScript,sleep});
 })();
