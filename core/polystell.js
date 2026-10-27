@@ -1,6 +1,6 @@
 /* =====================================================================
-   POLYSTELL APPS — núcleo compartilhado (v4)
-   <script src="/core/polystell.js?v=4"></script>
+   POLYSTELL APPS — núcleo compartilhado (v5)
+   <script src="/core/polystell.js?v=5"></script>
    Fornece: PS.auth (MSAL com recuperação interativa), PS.graph (retry
    correto, sem repetir gravação incerta), PS.sp (lista/itens/paginação
    completa), PS.shell (menu lateral, cabeçalho, conta, voltar ao hub),
@@ -136,9 +136,9 @@ const auth={
  },
  ready(){mode='app';},
  login(scopes=CFG.baseScopes){return msalApp.loginRedirect({scopes});},
- /* logout seletivo: remove só o cache do MSAL — rascunhos/estado de outros
-    Polystell Apps na mesma origem não são apagados por este app */
- logout(){try{const ks=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i)||'';if(/^msal/i.test(k))ks.push(k);}ks.forEach(k=>sessionStorage.removeItem(k));}catch{}return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
+ /* logout: o próprio MSAL limpa o seu cache no logoutRedirect — nada além
+    disso é apagado, então rascunhos de outros Polystell Apps ficam intactos */
+ logout(){return msalApp.logoutRedirect({account,postLogoutRedirectUri:location.origin+location.pathname});},
  get account(){return account;},
  sessionLost(scopes){sessionBar(scopes);return Object.assign(new Error('Sessão expirada — use "Entrar novamente" no topo da tela.'),{code:'session'});},
  async token(scopes=CFG.baseScopes,{optional=false,force=false}={}){
@@ -204,7 +204,7 @@ const sp={
    ter sido aplicada). O protocolo (headers IF-MATCH, parse) fica no app. */
 async function sprest(url,{method='GET',headers={},body,scopes=CFG.baseScopes,timeout=25000}={}){
  const u=new URL(url);
- if(!u.hostname.endsWith('.sharepoint.com'))throw new Error('Destino de API não autorizado.');
+ if(u.hostname!==CFG.siteHost)throw new Error('Destino de API não autorizado.');
  const isRead=(method||'GET').toUpperCase()==='GET'&&!headers['X-HTTP-Method'];
  let tk=await auth.token(scopes);
  let waited=0,renewed=false;
