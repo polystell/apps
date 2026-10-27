@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/core/polystell.css?v=4">
+<link rel="stylesheet" href="/core/polystell.css?v=5">
 <style>
 /* =====================================================================
    PLANEJAMENTO ORÇAMENTÁRIO — estilos do app.
@@ -16,16 +16,17 @@
    próprios deste app, TODOS sob o namespace :is(.ps-page,#modal) — nada
    aqui altera componentes do core nem de outros Polystell Apps.
    ===================================================================== */
-:root{
+/* tokens locais do app, escopados — nada entra no :root global do core
+   (#busy fica fora de .ps-page, por isso entra na lista) */
+.ps-page,#modal,#busy{
   --panel:var(--surface); --soft:#F3F4F8; --mute:var(--muted);
   --primary:var(--blue); --primary-ink:#FFFFFF; --primary-soft:var(--blue-soft);
+  --ok:#2A7F36; --ok-soft:#E3F2E5;
+  --warn:#7E5C00; --warn-soft:#FFF2C7;
   --bad:#B81F46; --bad-soft:#FBE4EA;
   --draft:#5E6372; --draft-soft:#ECEDF2;
   --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
 }
-/* status do orçamento: tons locais só no conteúdo do app — os tokens globais
-   --ok/--warn do core (shell, outros apps) ficam intactos */
-.ps-page,#modal{--ok:#2A7F36;--ok-soft:#E3F2E5;--warn:#7E5C00;--warn-soft:#FFF2C7}
 /* dentro do app, campos voltam ao dimensionamento próprio (fora dele, o core manda) */
 :is(.ps-page,#modal) :is(input[type=text],input[type=search],input[type=number],input[type=tel],input[type=email],input[type=date],input[type=time],input:not([type]),select,textarea){width:auto;min-height:0;font-size:inherit}
 .ps-page{display:flex;flex-direction:column}
@@ -204,7 +205,7 @@
 </head>
 <body>
 
-<script src="/core/polystell.js?v=4"></script>
+<script src="/core/polystell.js?v=5"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 'use strict';
@@ -300,6 +301,7 @@ function busy(on,label){
   b.hidden=busyN===0;if(label)b.textContent=label;else if(busyN)b.textContent='Gravando…';
 }
 let filaN=0;
+let recuperando=false;   // true enquanto o fail() reconstrói o estado a partir do SharePoint
 async function runQueue(tasks,label){
   busy(true);filaN++;
   try{for(let i=0;i<tasks.length;i++){document.getElementById('busy').textContent=`${label} ${i+1}/${tasks.length}…`;await tasks[i]();}}
@@ -308,16 +310,17 @@ async function runQueue(tasks,label){
 function fail(e){
   console.error(e);
   const is412=e&&e.status===412;
+  const anoFalha=S.ano,aAnoFalha=S.aAno;   // congela quais anos recuperar, mesmo se o usuário navegar
   toast(is412?'Alguém alterou este registro ao mesmo tempo que você — recarregando o que está gravado no SharePoint. Confira e repita o seu lançamento.':'Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
   /* recarrega TUDO (base + anos): uma operação de várias etapas pode ter parado
-     no meio — a tela volta a refletir exatamente o que está gravado. O busy()
-     segura a aplicação (busyN>0) até a recuperação terminar. */
-  busy(true,'Recarregando…');
+     no meio — a tela volta a refletir exatamente o que está gravado. Enquanto
+     isso, recuperando+busyN seguram edições e gravações novas. */
+  recuperando=true;busy(true,'Recarregando…');
   (async()=>{try{
     await loadBase();setRoleLine();
-    if(S.ano)await loadYear(S.ano,true);
-    if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
-  }catch(_){console.warn(_);}finally{busy(false);render();}})();
+    if(anoFalha)await loadYear(anoFalha,true);
+    if(aAnoFalha&&aAnoFalha!==anoFalha)await loadYear(aAnoFalha,true);
+  }catch(_){console.warn(_);}finally{recuperando=false;busy(false);render();}})();
 }
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
@@ -692,7 +695,7 @@ function setCell(it,m,v,keepPend){
   return {changed:true,ev};
 }
 function editCell(key,m,v,keepPend){
-  if(filaN>0){toast('Aguarde a operação em andamento terminar.','warn');render();return;}
+  if(recuperando||filaN>0){toast(recuperando?'Aguarde a atualização dos dados terminar.':'Aguarde a operação em andamento terminar.','warn');render();return;}
   const it=findItem(key);if(!it)return;
   const r=setCell(it,m,v,keepPend);
   if(!r.changed){rerenderKeepFocus();return;}
