@@ -247,6 +247,7 @@ tr.mesrow td{background:var(--soft);padding:14px 10px;border-bottom:2px solid va
   .nav{width:auto;min-height:38px;margin:0}
   #nav{display:flex;flex-wrap:wrap;flex:1 1 auto;overflow:visible;padding:0}
   .split{grid-template-columns:1fr}
+  #busy{bottom:72px}
 }
 td.r.click{cursor:pointer}
 td.r.click:hover .rv{text-decoration:underline}
@@ -417,6 +418,7 @@ function buildItems(rows){
     const k=itemKey(r.COD_DPTO,r.COD_CC,r.COD_CAT,det);
     if(!map[k])map[k]={key:k,dept:r.COD_DPTO,cc:r.COD_CC,cat:r.COD_CAT,det,obs:'',prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     const it=map[k];
+    if(it.ids[m])console.warn('Duplicidade mensal no SharePoint:',r.COD_DPTO,r.COD_CC,r.COD_CAT,it.det,'mês',m+1,'ids',it.ids[m],r.Id);
     it.ids[m]=r.Id;
     it.prev[m]=Number(r.PREVISTO)||0;
     it.st[m]=r.STATUS||'Rascunho';
@@ -478,6 +480,9 @@ const myDepts=()=>[...new Set(DB.vincs.filter(v=>v.email===DB.me.email).map(v=>v
 const vig=(i,m)=>i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:(i.st[m]==='Reprovado'?0:i.prev[m]);
 const itemsOf=(ano,dept)=>(DB.plan[ano]||[]).filter(i=>i.dept===dept);
 const exists=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).some(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
+const findPlanItem=(ano,dept,cc,cat,det)=>(DB.plan[ano]||[]).find(i=>i.dept===dept&&i.cc===cc&&i.cat===cat&&i.det.trim().toLowerCase()===det.trim().toLowerCase());
+const mesesFaltantes=(it,vals,ano)=>vals.map((v,m)=>(v>0&&mOpen(ano,m)&&!it.ids[m]&&!(it.prev[m]>0))?m:-1).filter(m=>m>=0);
+const descartaDec=()=>{const tinha=Object.values(S.dec||{}).some(d=>d&&(d.d||(d.months&&Object.values(d.months).some(x=>x&&x.d))));S.dec={};if(tinha)toast('As decisões ainda não confirmadas foram descartadas.','warn');};
 let tt;
 function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='show'+(kind?' '+kind:'');clearTimeout(tt);tt=setTimeout(()=>t.className='',kind==='err'?9000:5000);}
 
@@ -525,7 +530,7 @@ function render(){
   let lastG='',nav='';
   vs.forEach(([id,label,g])=>{if(g!==lastG){nav+=`<div class="grp">${g}</div>`;lastG=g;}nav+=`<button class="nav" data-view="${id}" ${S.view===id?'aria-current="page"':''}>${NAVICON[id]||''}<span>${label}</span></button>`;});
   document.getElementById('nav').innerHTML=nav;
-  document.querySelectorAll('.nav').forEach(b=>b.onclick=async()=>{S.view=b.dataset.view;S.adding=false;S.tool=null;
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=async()=>{if(b.dataset.view==='aprov'&&S.view!=='aprov')S.dec={};S.view=b.dataset.view;S.adding=false;S.tool=null;
     if(S.view==='aprov'&&S.aAno){busy(true,'Atualizando…');try{await loadYear(S.aAno,true);}catch(e){console.warn(e);}busy(false);}
     render();});
   const deps=allowedDepts();
@@ -563,7 +568,7 @@ function renderPlan(){
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
   const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
   const draftIn=its.some(i=>ms.some(m=>mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho'));
-  const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
+  const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]===undefined||(DB.plan[a]||[]).some(i=>i.dept===S.dept)));
   const quarters=S.scope==='ANO'?[0,1,2,3]:[S.scope];
   const scopeName=S.scope==='ANO'?'o ano':'o '+QLAB[S.scope];
 
@@ -689,7 +694,7 @@ function toolHtml(){
       <div class="line"><button class="btn" id="tDelGo" style="background:var(--bad);border-color:var(--bad)">Excluir item</button><button class="btn ghost" id="tCancel">Cancelar</button></div></div>`;
   }
   if(T.kind==='copy'){
-    const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]||[]).some(i=>i.dept===S.dept));
+    const srcYears=ANOS().filter(a=>a<S.ano&&(DB.plan[a]===undefined||(DB.plan[a]||[]).some(i=>i.dept===S.dept)));
     const sel=T.src&&srcYears.includes(T.src)?T.src:srcYears[srcYears.length-1];
     return `<div class="tool" role="region" aria-label="Copiar de outro exercício"><h2>Copiar itens para ${S.ano}</h2>
       <div class="line"><label for="tSrc" class="hint">Copiar do exercício</label><select id="tSrc">${srcYears.map(a=>`<option ${a===sel?'selected':''}>${a}</option>`).join('')}</select>
@@ -706,8 +711,8 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}</p>`;
-        if(pv.novos.length)h+=`<div class="line"><button class="btn" id="tImport">Importar ${pv.novos.length} itens como rascunho</button></div>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}</p>`;
+        if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} novo(s)`:''}${pv.novos.length&&pv.compl.length?' e ':pv.novos.length?'':'Importar: '}${pv.compl.length?`completar ${pv.compl.length} item(ns)`:''}</button></div>`;
       }
     }
     return h+`</div>`;
@@ -847,20 +852,24 @@ function doDelete(){
   S.tool=null;render();
   runQueue(ids.map(id=>()=>delItem(CFG.lists.plan,id)),'Excluindo').then(()=>toast(`“${it.det}” excluído${ids.length?` (${ids.length} linha(s) removida(s))`:''}.`)).catch(fail);
 }
-function copyFrom(src){
+async function copyFrom(src){
   if(escrevendo())return;
+  if(DB.plan[src]===undefined){busy(true,'Carregando '+src+'…');try{await loadYear(src);}catch(e){busy(false);fail(e);return;}busy(false);}
   const list=(DB.plan[src]||[]).filter(i=>i.dept===S.dept);
-  const ano=S.ano;const tasks=[];let n=0;
+  if(!list.length){S.tool=null;render();toast(`Nenhum item de ${src} para este departamento.`,'warn');return;}
+  const ano=S.ano;const tasks=[];let n=0,comp=0;
   list.forEach(i=>{
-    if(exists(ano,i.dept,i.cc,i.cat,i.det))return;
-    const prev=i.prev.map((v,m)=>!mOpen(ano,m)?0:(i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v));
-    const it={key:itemKey(i.dept,i.cc,i.cat,i.det),dept:i.dept,cc:i.cc,cat:i.cat,det:i.det,obs:i.obs,prev,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    const vals=i.prev.map((v,m)=>!mOpen(ano,m)?0:(i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v));
+    if(!vals.some(v=>v>0))return;
+    const ja=findPlanItem(ano,i.dept,i.cc,i.cat,i.det);
+    if(ja){const falt=mesesFaltantes(ja,vals,ano);if(falt.length){comp++;falt.forEach(m=>{ja.prev[m]=vals[m];ja.st[m]='Rascunho';tasks.push(()=>persistCell(ja,m,ano));});}return;}
+    const it={key:itemKey(i.dept,i.cc,i.cat,i.det),dept:i.dept,cc:i.cc,cat:i.cat,det:i.det,obs:i.obs,prev:vals,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     (DB.plan[ano]=DB.plan[ano]||[]).push(it);n++;
-    prev.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
+    vals.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
   });
   S.tool=null;render();
-  if(!n){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
-  runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho, com os valores aprovados lá.`)).catch(fail);
+  if(!n&&!comp){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
+  runQueue(tasks,'Copiando').then(()=>toast(`${n} itens copiados de ${src} como rascunho${comp?` e ${comp} completados com os meses que faltavam`:''}.`)).catch(fail);
 }
 function setMonthsStatus(key,fromSt){
   if(escrevendo())return;
@@ -955,19 +964,24 @@ function readFile(file){
   fr.readAsArrayBuffer(file);
 }
 function impPreview(){
-  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0;const novos=[];const seen=new Set();
+  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0,soFech=0,fechX=0;const novos=[];const compl=[];const seen=new Set();
   p.items.forEach(r=>{
     // o cadastro do ERP decide: CC existe? categoria existe? o CC é deste departamento?
     const cad=DB.ccs.find(c=>c.COD_CC===r.cc);
     if(!cad||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
     if(cad.COD_DPTO!==S.dept){outro++;return;}
     const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
-    if(seen.has(k)||exists(S.ano,S.dept,r.cc,r.cat,r.det)){dup++;return;}
-    seen.add(k);novos.push(r);
+    if(seen.has(k)){dup++;return;}
+    seen.add(k);
+    const ja=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);
+    if(ja){if(mesesFaltantes(ja,r.vals,S.ano).length)compl.push(r);else dup++;return;}
+    if(!r.vals.some((v,m)=>v>0&&mOpen(S.ano,m))){soFech++;fechX+=r.vals.reduce((b,v)=>b+(v>0?v:0),0);return;}
+    novos.push(r);
   });
-  return {found:p.items.length,dup,outro,inval,novos,
-    total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0),
-    fech:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
+  const totalCompl=compl.reduce((a,r)=>{const it=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);return a+mesesFaltantes(it,r.vals,S.ano).reduce((b,m)=>b+r.vals[m],0);},0);
+  return {found:p.items.length,dup,outro,inval,novos,compl,soFech,
+    total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0)+totalCompl,
+    fech:fechX+novos.concat(compl).reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
 }
 function doImport(){
   if(escrevendo())return;
@@ -980,8 +994,14 @@ function doImport(){
     (DB.plan[ano]=DB.plan[ano]||[]).push(it);
     prevA.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
   });
+  pv.compl.forEach(r=>{
+    const ja=findPlanItem(ano,S.dept,r.cc,r.cat,r.det);
+    if(!ja)return;
+    mesesFaltantes(ja,r.vals,ano).forEach(m=>{ja.prev[m]=r.vals[m];ja.st[m]='Rascunho';tasks.push(()=>persistCell(ja,m,ano));});
+  });
   S.tool=null;S.imp=null;render();
-  runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length} itens importados como rascunho em ${ano} (${money(pv.total)}).`)).catch(fail);
+  if(!tasks.length){toast('Não há valores em períodos abertos para importar.','warn');return;}
+  runQueue(tasks,'Importando').then(()=>toast(`${pv.novos.length?pv.novos.length+' itens importados como rascunho':''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?pv.compl.length+' completados com os meses que faltavam':''} em ${ano} (${money(pv.total)}).`)).catch(fail);
 }
 
 /* ============================ COMPARTILHADO =========================== */
@@ -1294,9 +1314,9 @@ function renderAprov(){
   const v=document.getElementById('view');
   v.innerHTML=`<div class="split"><div class="panel">${left}</div>${r}</div>`;
   updateAprovFooter();
-  v.querySelectorAll('[data-aano]').forEach(b=>b.onclick=async()=>{S.dec={};S.aAno=Number(b.dataset.aano);S.aDept=null;try{await loadYear(S.aAno);}catch(e){fail(e);}render();});
-  v.querySelectorAll('[data-adept]').forEach(b=>b.onclick=()=>{S.dec={};S.aDept=b.dataset.adept;render();});
-  v.querySelectorAll('[data-ascope]').forEach(b=>b.onclick=()=>{S.dec={};const x=b.dataset.ascope;S.aScope=x==='ANO'?'ANO':Number(x);render();});
+  v.querySelectorAll('[data-aano]').forEach(b=>b.onclick=async()=>{if(Number(b.dataset.aano)===S.aAno)return;descartaDec();S.aAno=Number(b.dataset.aano);S.aDept=null;try{await loadYear(S.aAno);}catch(e){fail(e);}render();});
+  v.querySelectorAll('[data-adept]').forEach(b=>b.onclick=()=>{if(b.dataset.adept===S.aDept)return;descartaDec();S.aDept=b.dataset.adept;render();});
+  v.querySelectorAll('[data-ascope]').forEach(b=>b.onclick=()=>{const x=b.dataset.ascope;const nv=x==='ANO'?'ANO':Number(x);if(nv===S.aScope)return;descartaDec();S.aScope=nv;render();});
   v.querySelectorAll('.dec button[data-k]').forEach(b=>b.onclick=()=>{const d=S.dec[b.dataset.k];d.d=d.d===b.dataset.d?null:b.dataset.d;render();});
   v.querySelectorAll('[data-mode-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.modeK;const d=S.dec[k];const x=aRows().find(r=>dKey(r)===k);if(!d||!x)return;
@@ -1594,7 +1614,6 @@ function roleLabel(mine){
 function setReabs(rows){DB.reabFail=!rows;DB.reabs=(rows||[]).filter(r=>r.ANO&&r.COD_DPTO&&r.TRIMESTRE).map(r=>({Id:r.Id,ano:Number(r.ANO),cod:String(r.COD_DPTO),tri:String(r.TRIMESTRE),motivo:r.MOTIVO||'',ativo:!!r.ATIVO}));}
 function setEx(rows){DB.ex={};rows.forEach(r=>{if(r.ANO)DB.ex[Number(r.ANO)]={Id:r.Id,status:r.STATUS||'Aberto',prazos:[r.PRAZO_Q1,r.PRAZO_Q2,r.PRAZO_Q3,r.PRAZO_Q4].map(x=>x?String(x).slice(0,10):''),enc:[r.ENCERRADO_Q1,r.ENCERRADO_Q2,r.ENCERRADO_Q3,r.ENCERRADO_Q4].map(x=>!!x)};});}
 async function refreshData(){
-  S.dec={};
   busy(true,'Atualizando…');
   try{
     const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
