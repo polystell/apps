@@ -410,8 +410,8 @@ function fail(e){
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
-function buildItems(rows){
-  const map={};let dups=0;DB.dupPlan=0;
+function buildItems(rows,ano){
+  const map={};let dups=0;
   rows.forEach(r=>{
     if(!r.COD_CC||!r.COMPETENCIA)return;
     const m=new Date(r.COMPETENCIA).getUTCMonth();
@@ -427,7 +427,9 @@ function buildItems(rows){
     if(r.MOTIVO)it.mot[m]=r.MOTIVO;
     if(r.OBSERVACAO&&!it.obs)it.obs=r.OBSERVACAO;
   });
-  if(dups){DB.dupPlan=dups;toast(`Atenção: ${dups} lançamento(s) mensal(is) duplicado(s) no SharePoint foram ignorados — avise a TI (detalhes no console do navegador).`,'err');}
+  if(typeof DB.dupPlan!=='object'||!DB.dupPlan)DB.dupPlan={};
+  DB.dupPlan[ano]=dups;
+  if(dups)toast(`Atenção: ${dups} lançamento(s) mensal(is) duplicado(s) no SharePoint foram ignorados — avise a TI (detalhes no console do navegador).`,'err');
   return Object.values(map);
 }
 async function loadYear(ano,force){
@@ -436,7 +438,7 @@ async function loadYear(ano,force){
   try{
     const rows=await getAll(CFG.lists.plan,`$select=Id,COD_DPTO,ANO,COMPETENCIA,COD_CC,DESC_CC,COD_CAT,DESC_CAT,DETALHAMENTO,OBSERVACAO,PREVISTO,STATUS,APROVADO,MOTIVO&$filter=ANO eq ${ano}&$orderby=Id asc&$top=2000`);
     rows.forEach(r=>{if(r.DESC_CC&&!DB.ccMap[r.COD_CC])DB.ccMap[r.COD_CC]=r.DESC_CC;if(r.DESC_CAT&&!DB.catMap[r.COD_CAT])DB.catMap[r.COD_CAT]=r.DESC_CAT;});
-    DB.plan[ano]=buildItems(rows);
+    DB.plan[ano]=buildItems(rows,ano);
   }finally{busy(false);}
 }
 async function loadReal(ano,dept){
@@ -1637,7 +1639,11 @@ async function refreshData(){
     DB.real={};
     if(S.ano){await loadYear(S.ano,true);}
     if(S.aAno&&S.aAno!==S.ano)await loadYear(S.aAno,true);
-    toast(DB.dupPlan?`Dados atualizados — mas ${DB.dupPlan} lançamento(s) duplicado(s) foram ignorados. Avise a TI.`:DB.reabFail?'Dados atualizados — mas as reaberturas não puderam ser carregadas.':'Dados atualizados.',DB.dupPlan?'err':DB.reabFail?'warn':undefined);
+    const _dupT=[...new Set([S.ano,S.aAno].filter(Boolean))].reduce((t,a)=>t+(((DB.dupPlan||{})[a])||0),0);
+    const _avisos=[];
+    if(_dupT)_avisos.push(`${_dupT} lançamento(s) duplicado(s) foram ignorados`);
+    if(DB.reabFail)_avisos.push('as reaberturas não puderam ser carregadas');
+    toast(_avisos.length?`Dados atualizados — mas ${_avisos.join(' e ')}. Avise a TI.`:'Dados atualizados.',_dupT?'err':DB.reabFail?'warn':undefined);
   }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
   finally{busy(false);render();}
 }
