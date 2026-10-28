@@ -225,7 +225,8 @@ const CFG={
     cc:'98_Cadastro_Centro_Custo',
     cat:'98_Cadastro_Categoria_Financeira',
     perfil:'08_Perfis',                         // papéis: Administrador / Aprovador / Assessoria (dados, não código)
-    reab:'08_Reaberturas'                       // reaberturas pontuais por departamento/trimestre
+    reab:'08_Reaberturas',                      // reaberturas pontuais por departamento/trimestre
+    config:'08_Config'                          // parâmetros de comportamento (tela Segurança) — dados, não código
   }
 };
 
@@ -325,6 +326,16 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
+DB.conf=null;   // linhas da 08_Config; null = lista indisponível (app usa os padrões)
+const PARAMS=[
+  {k:'BLOQUEAR_ENVIO_FORA_PRAZO',tipo:'sn',padrao:'Não',nome:'Bloquear envio para aprovação após o prazo do trimestre',desc:'Com “Sim”, meses de trimestre com prazo vencido não entram no envio — o padrão é só sinalizar “Atrasado”.'},
+  {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total enviado passa desse limite.'},
+  {k:'DIA_LIMITE_REVISAO',tipo:'num',padrao:'10',nome:'Dia-limite para pedir revisão do realizado',desc:'Dia do mês seguinte até o qual o extrato orienta pedir revisão ao Financeiro.'},
+  {k:'BLOQUEAR_EXCLUSAO_COM_LANCAMENTO',tipo:'sn',padrao:'Não',nome:'Bloquear exclusão de item com lançamento gravado',desc:'Com “Sim”, item que já gravou linha no SharePoint não pode ser excluído pelo gestor, mesmo em rascunho.'}
+];
+const confRaw=k=>{const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);return r?String(r.VALOR==null?'':r.VALOR).trim():null;};
+const confSN=k=>/^s/i.test(confRaw(k)||'');
+const confNum=(k,d)=>{const v=confRaw(k);if(v==null||v==='')return d;const n=Number(v.replace(/\./g,'').replace(',','.'));return isFinite(n)&&n>=0?n:d;};
 const rep=v=>Array(12).fill(v);
 const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
 function buildItems(rows,ano){
@@ -434,11 +445,12 @@ const NAVDEF=[
  {id:'plan',label:'Planejamento',icon:'edit',section:'Operações'},
  {id:'comp',label:'Compartilhado',icon:'share',section:'Operações'},
  {id:'acomp',label:'Acompanhamento',icon:'chart',section:'Operações'},
- {id:'aprov',label:'Aprovação',icon:'approve',section:'Operações'}
+ {id:'aprov',label:'Aprovação',icon:'approve',section:'Operações'},
+ {id:'seg',label:'Segurança (TI)',icon:'gear',section:'Administração'}
 ];
 function buildNav(){
  return NAVDEF.map(n=>({...n,hidden:
-  (n.id==='gest'||n.id==='prazos')?!S.role.admin:
+  (n.id==='gest'||n.id==='prazos'||n.id==='seg')?!S.role.admin:
   n.id==='comp'?!myGrupos().length:
   n.id==='aprov'?!S.role.aprov:false}));
 }
@@ -462,7 +474,7 @@ function render(){
     if(DB.plan[S.ano]===undefined)DB.plan[S.ano]=DB.plan[S.ano]||[];
   }
   const _ha=document.getElementById('hActions');if(_ha)_ha.innerHTML='';
-  ({plan:renderPlan,comp:renderComp,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos})[S.view]();
+  ({plan:renderPlan,comp:renderComp,acomp:renderAcomp,aprov:renderAprov,gest:renderGest,prazos:renderPrazos,seg:renderSeg})[S.view]();
 }
 function setHead(t,m){document.getElementById('vTitle').textContent=t;document.getElementById('vMeta').textContent=m;if(UI)UI.setCurrent(S.view,t);}
 function deptTabs(deps){return deps.length>1?`<div class="tabs" role="group" aria-label="Departamento">${deps.map(d=>`<button class="tab" data-dept="${d}" aria-pressed="${S.dept===d}">${esc(deptName(d))}</button>`).join('')}</div>`:`<b>${esc(deptName(deps[0]||''))}</b>`;}
@@ -602,9 +614,10 @@ function toolHtml(){
     const temDecisao=it.st.some((st,m)=>it.prev[m]>0&&(st==='Aprovado'||st==='Reprovado'));
     const temPend=it.st.some((st,m)=>it.prev[m]>0&&st==='Pendente');
     const temFechado=it.ids.some((id,m)=>id&&!mOpen(S.ano,m));
-    if(temDecisao||temPend||temFechado){
+    const travaConf=confSN('BLOQUEAR_EXCLUSAO_COM_LANCAMENTO')&&it.ids.some(Boolean);
+    if(temDecisao||temPend||temFechado||travaConf){
       return `<div class="tool" role="region" aria-label="Excluir item"><h2>Não dá para excluir “${esc(it.det)}”</h2>
-        <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':temPend?'O item está aguardando a diretoria — use “Cancelar envio” e depois exclua.':'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.'}</p>
+        <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':temPend?'O item está aguardando a diretoria — use “Cancelar envio” e depois exclua.':temFechado?'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.':'A exclusão de itens com lançamento gravado está bloqueada (tela Segurança). Zere os valores ou peça à TI.'}</p>
         <div class="line"><button class="btn ghost" id="tCancel">Fechar</button></div></div>`;
     }
     const n=it.ids.filter(Boolean).length;
@@ -809,13 +822,33 @@ function setMonthsStatus(key,fromSt){
 function sendScope(){
   if(escrevendo())return;
   const ms=monthsOf(S.scope);const tasks=[];let n=0;
-  itemsOf(S.ano,S.dept).forEach(i=>ms.forEach(m=>{
-    if(mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho'){i.st[m]='Pendente';n++;
+  const bloqPrazo=confSN('BLOQUEAR_ENVIO_FORA_PRAZO');
+  const limObs=confNum('OBS_OBRIGATORIA_ACIMA_DE',0);
+  const hoje=new Date();
+  const dentroPrazo=q=>{const p=DB.ex[S.ano]&&DB.ex[S.ano].prazos[q];return !bloqPrazo||!p||hoje<=new Date(p.slice(0,10)+'T23:59:59');};
+  let foraPrazo=0;const semObs=[];
+  itemsOf(S.ano,S.dept).forEach(i=>{
+    const envi=ms.filter(m=>mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho');
+    if(!envi.length)return;
+    if(limObs>0&&envi.reduce((a,m)=>a+i.prev[m],0)>limObs&&!(i.obs||'').trim()){semObs.push(i.det);return;}
+    envi.forEach(m=>{
+      if(!dentroPrazo(Math.floor(m/3))){foraPrazo++;return;}
+      i.st[m]='Pendente';n++;
       if(i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,i.ids[m],{STATUS:'Pendente'}));
-    }
-  }));
+    });
+  });
+  if(!n){
+    if(semObs.length){toast(`Envio bloqueado: ${semObs.slice(0,3).join(', ')}${semObs.length>3?'…':''} ${plural(semObs.length,'precisa','precisam')} de observação para a diretoria (itens acima de ${money(limObs)} — regra da tela Segurança).`,'warn');return;}
+    if(foraPrazo){toast('Envio bloqueado: o prazo deste período já venceu (regra da tela Segurança). Peça uma reabertura ou ajuste o prazo em Exercícios e prazos.','warn');return;}
+    toast('Nada em rascunho para enviar neste período.','warn');return;
+  }
   render();
-  runQueue(tasks,'Enviando').then(()=>toast(`${n} lançamento(s) de ${deptName(S.dept)} enviados para a diretoria.`)).catch(fail);
+  runQueue(tasks,'Enviando').then(()=>{
+    let msg=`${n} lançamento(s) de ${deptName(S.dept)} enviados para a diretoria.`;
+    if(foraPrazo)msg+=` ${foraPrazo} mês(es) com prazo vencido ficaram de fora.`;
+    if(semObs.length)msg+=` ${semObs.length} ${plural(semObs.length,'item ficou de fora por falta','itens ficaram de fora por falta')} de observação.`;
+    toast(msg,(foraPrazo||semObs.length)?'warn':undefined);
+  }).catch(fail);
 }
 
 /* ---- importação do Excel ---- */
@@ -1079,7 +1112,7 @@ function renderCompAcomp(h,G,set,its){
 }
 
 /* ============================ ACOMPANHAMENTO ========================== */
-const revLimite=(a,m)=>new Date(a,m+1,10,23,59,59);
+const revLimite=(a,m)=>new Date(a,m+1,confNum('DIA_LIMITE_REVISAO',10),23,59,59);
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
 const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
 function baixarRealizado(){
@@ -1492,6 +1525,42 @@ function renderPrazos(){
   });
 }
 
+/* ============================== SEGURANÇA ============================= */
+function renderSeg(){
+  setHead('Segurança (TI)','Parâmetros de comportamento — gravados na lista 08_Config, não no código');
+  let h='';
+  if(DB.conf===null){
+    h+=`<p class="empty">A lista <b>08_Config</b> ainda não existe (ou você não tem acesso a ela) — o aplicativo está usando os padrões abaixo.<br>Para ativar: crie a lista “08_Config” com as colunas <b>CHAVE</b> e <b>VALOR</b> (uma linha de texto cada), dê <b>Leitura</b> a todos os usuários do app e <b>Edição</b> à TI, e clique em Atualizar.</p>`;
+  }
+  h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Parâmetro</th><th style="width:140px">Valor</th><th style="width:110px">Situação</th></tr></thead><tbody>`;
+  PARAMS.forEach(p=>{
+    const raw=confRaw(p.k);
+    const val=raw==null?p.padrao:raw;
+    const sim=/^s/i.test(val);
+    const ctl=p.tipo==='sn'
+      ?`<select data-ck="${p.k}" ${DB.conf===null?'disabled':''} aria-label="${esc(p.nome)}"><option ${sim?'':'selected'}>Não</option><option ${sim?'selected':''}>Sim</option></select>`
+      :`<input type="text" inputmode="numeric" data-ck="${p.k}" value="${esc(val)}" style="width:110px;text-align:right" ${DB.conf===null?'disabled':''} aria-label="${esc(p.nome)}">`;
+    h+=`<tr><td><b>${esc(p.nome)}</b><span class="detline">${esc(p.desc)}</span><span class="sub code">${p.k}</span></td><td>${ctl}</td><td><span class="chip c-${raw!=null?'ok':'draft'}">${raw!=null?'Gravado':'Padrão'}</span></td></tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  h+=`<p class="hint">Os padrões reproduzem o comportamento original do aplicativo — nada muda até alterar um valor aqui. A alteração grava na hora e vale para todos na próxima atualização de tela.</p>`;
+  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
+  v.querySelectorAll('[data-ck]').forEach(el=>{
+    el.onchange=async()=>{
+      if(escrevendo()){render();return;}
+      const k=el.dataset.ck;const def=PARAMS.find(x=>x.k===k);
+      let nv=String(el.value).trim();
+      if(def.tipo==='num'){const nx=Number(nv.replace(/\./g,'').replace(',','.'));if(!isFinite(nx)||nx<0){toast('Informe um número válido (0 desliga).','warn');render();return;}nv=String(nx);}
+      const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);
+      busy(true);
+      try{
+        if(r){await mergeItem(CFG.lists.config,r.Id,{VALOR:nv});r.VALOR=nv;toast('Parâmetro atualizado.');}
+        else{const j=await addItem(CFG.lists.config,{Title:k,CHAVE:k,VALOR:nv});DB.conf.push({Id:j.Id,CHAVE:k,VALOR:nv});toast('Parâmetro gravado na 08_Config.');}
+      }catch(e){fail(e);}finally{busy(false);render();}
+    };
+  });
+}
+
 /* ======================= DADOS COMPARTILHADOS ======================== */
 function setCadastros(depts,ccs,cats){
   DB.deptByCod={};DB.deptById={};DB.ccMap={};DB.catMap={};
@@ -1557,18 +1626,20 @@ async function refreshData(){
 function setRoleLine(){const s=document.querySelector('#ps-um small');if(s)s.textContent=roleLabel(myDepts())+(DB.me&&DB.me.email?' · '+DB.me.email:'');}
 /* carrega cadastros, vínculos, exercícios, perfis e reaberturas (com os ETags) */
 async function loadBase(){
-  const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows]=await Promise.all([
+  const [depts,ccs,cats,vincRows,exRows,perfRows,reabRows,confRows]=await Promise.all([
     getAll(CFG.lists.dept,'$select=Id,COD_DPTO,DESC_DPTO&$top=500'),
     getAll(CFG.lists.cc,'$select=Id,COD_CC,DESC_CC,COD_DPTO,GESTAO&$top=2000'),
     getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
     getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
     getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
     getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
-    getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null)
+    getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null),
+    getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').catch(()=>null)
   ]);
   setPerfis(perfRows);
   setCadastros(depts,ccs,cats);
   setVincs(vincRows);setEx(exRows);setReabs(reabRows);
+  DB.conf=confRows;   // null = 08_Config indisponível → padrões valem
   recalcRole();
 }
 async function start(){
