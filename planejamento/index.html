@@ -254,8 +254,9 @@ async function sp(path,opt={}){
   if(opt.del){headers['IF-MATCH']=opt.etag;headers['X-HTTP-Method']='DELETE';}
   /* transporte resiliente do core: timeout, retry seguro, renovação de token */
   const res=await PS.sprest(path.startsWith('http')?path:API+path,{method:opt.method||'GET',headers,body:opt.body!==undefined?JSON.stringify(opt.body):undefined,scopes:SCOPE_SP});
-  if(res.status===412)throw Object.assign(new Error('O registro foi alterado por outra pessoa enquanto você editava (412).'),{status:412});
-  if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}throw new Error(`HTTP ${res.status} em ${path}\n${d}`);}
+  if(res.status===412)throw Object.assign(new Error('O registro foi alterado por outra pessoa enquanto você editava (412).'),{status:412,requestId:res.headers.get('SPRequestGuid')||res.headers.get('request-id')||''});
+  if(!res.ok){let d='';try{d=(await res.text()).slice(0,400);}catch(e){}
+    throw Object.assign(new Error(`HTTP ${res.status} em ${path}\n${d}`),{status:res.status,requestId:res.headers.get('SPRequestGuid')||res.headers.get('request-id')||''});}
   if(res.status===204)return {ETag:res.headers.get('ETag')||null};
   const txt=await res.text();return txt?JSON.parse(txt):null;
 }
@@ -328,11 +329,11 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.1.0';const APP_BUILD='2026-10-28';
-DB.conf=null;   // linhas da 08_Config; null = indisponível (ver DB.confState: 'ok' | 'missing' | 'error')
-DB.confState='missing';
+const APP_VERSION='1.2.0';const APP_BUILD='2026-10-28';
+DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
+DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
-function logApp(e){try{addItem(CFG.lists.log,{Title:new Date().toISOString(),APP:'Planejamento',VERSAO:APP_VERSION,USUARIO:(DB.me&&DB.me.email)||'',TELA:(S&&S.view)||'',HTTP_STATUS:e&&e.status!=null?String(e.status):'',MENSAGEM:String((e&&e.message)||e).slice(0,255)}).catch(err=>console.warn('log não gravado:',err&&err.message));}catch(_){}}
+function logApp(e){try{addItem(CFG.lists.log,{Title:new Date().toISOString(),APP:'Planejamento',VERSAO:APP_VERSION,USUARIO:(DB.me&&DB.me.email)||'',TELA:(S&&S.view)||'',HTTP_STATUS:e&&e.status!=null?String(e.status):'',REQUEST_ID:(e&&e.requestId)||'',MENSAGEM:String((e&&e.message)||e).slice(0,255)}).catch(err=>console.warn('log não gravado:',err&&err.message));}catch(_){}}
 const PARAMS=[
   {k:'BLOQUEAR_ENVIO_FORA_PRAZO',tipo:'sn',padrao:'Não',nome:'Bloquear envio para aprovação após o prazo do trimestre',desc:'Com “Sim”, meses de trimestre com prazo vencido não entram no envio — o padrão é só sinalizar “Atrasado”.'},
   {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',min:0,nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total elegível (dentro do prazo) passa desse limite.'},
@@ -1536,13 +1537,40 @@ function renderPrazos(){
 }
 
 /* ============================== SEGURANÇA ============================= */
+/* diagnóstico somente leitura: core, biblioteca local, listas, Realizado,
+   unicidade das chaves e estado das políticas */
+async function diagAmbiente(){
+  const out=[];const ok=(n,d)=>out.push([n,true,d||'']);const bad=(n,d)=>out.push([n,false,d||'']);
+  ok('Aplicativo','Planejamento Orçamentário v'+APP_VERSION+' · build '+APP_BUILD);
+  if(window.PS&&PS.sprest&&PS.mount&&PS.auth)ok('Core compartilhado','/core/polystell.js carregado (auth · sprest · shell)');else bad('Core compartilhado','PS incompleto — confira /core/polystell.js');
+  if(typeof XLSX==='object'&&XLSX.utils)ok('Biblioteca XLSX local','0.18.5 em /core/vendor/');else bad('Biblioteca XLSX local','não carregou — importar/exportar planilha indisponível');
+  ok('Usuário autenticado',DB.me.email+' · '+roleLabel(myDepts()));
+  const listas=[CFG.lists.plan,CFG.lists.vinc,CFG.lists.ex,CFG.lists.dept,CFG.lists.cc,CFG.lists.cat,CFG.lists.perfil,CFG.lists.reab,CFG.lists.config,CFG.lists.log];
+  for(const lista of listas){
+    try{await getAll(lista,'$select=Id&$top=1');ok('Lista '+lista);}
+    catch(e){bad('Lista '+lista,e&&e.status?'HTTP '+e.status+(e.status===404?' — não existe ou sem acesso':''):String((e&&e.message)||e).split('\n')[0]);}
+  }
+  try{const f=await sp(`web/GetFolderByServerRelativePath(decodedurl='${CFG.sitePath}/${CFG.realLib}')?$select=Exists`);
+    (f&&f.Exists)?ok('Biblioteca '+CFG.realLib):bad('Biblioteca '+CFG.realLib,'não encontrada');}
+  catch(e){bad('Biblioteca '+CFG.realLib,e&&e.status?'HTTP '+e.status:'');}
+  const unica=async(lista,col)=>{
+    try{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(lista)}')/fields?$filter=InternalName eq '${col}'&$select=Required,EnforceUniqueValues,Indexed`);
+      const f=j&&j.value&&j.value[0];
+      if(!f)return bad(col+' em '+lista,'coluna não encontrada');
+      if(f.Required&&f.EnforceUniqueValues)ok(col+' em '+lista,'obrigatória · exclusiva'+(f.Indexed?' · indexada':''));
+      else bad(col+' em '+lista,`Obrigatória=${f.Required?'Sim':'Não'} · Exclusiva=${f.EnforceUniqueValues?'Sim':'Não'} — configure na coluna`);}
+    catch(e){bad(col+' em '+lista,e&&e.status?'HTTP '+e.status:'');}
+  };
+  await unica(CFG.lists.plan,'CHAVE_ITEM');
+  await unica(CFG.lists.config,'CHAVE');
+  out.push(['Políticas (08_Config)',DB.confState==='ok',DB.confState==='ok'?((DB.conf||[]).length+' parâmetro(s) gravado(s); ausentes usam o padrão'):'não carregadas — envio e exclusão bloqueados']);
+  return out;
+}
 function renderSeg(){
   setHead('Segurança (TI)','Parâmetros de comportamento — gravados na lista 08_Config, não no código');
   let h='';
   if(DB.conf===null){
-    h+=DB.confState==='error'
-      ?`<p class="empty warnline">⚠ Falha ao LER a 08_Config (a lista existe, mas a consulta falhou). Por segurança, envio para aprovação e exclusão estão bloqueados até recarregar — clique em Atualizar ou avise a TI.</p>`
-      :`<p class="empty">A lista <b>08_Config</b> ainda não existe (ou você não tem acesso a ela) — o aplicativo está usando os padrões abaixo.<br>Para ativar: crie a lista “08_Config” com as colunas <b>CHAVE</b> (uma linha de texto, obrigatória e com valores exclusivos) e <b>VALOR</b> (uma linha de texto), dê <b>Leitura</b> a todos os usuários do app e <b>Edição</b> à TI, e clique em Atualizar.</p>`;
+    h+=`<p class="empty warnline">⚠ Não foi possível carregar a 08_Config — por segurança, envio para aprovação e exclusão ficam bloqueados até recarregar (clique em Atualizar ou avise a TI).<br>Se a lista ainda não existe: crie “08_Config” com as colunas <b>CHAVE</b> (uma linha de texto, obrigatória e com valores exclusivos) e <b>VALOR</b> (uma linha de texto), com <b>Leitura</b> para todos os usuários do app e <b>Edição</b> para a TI.</p>`;
   }
   h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Parâmetro</th><th style="width:140px">Valor</th><th style="width:110px">Situação</th></tr></thead><tbody>`;
   PARAMS.forEach(p=>{
@@ -1556,7 +1584,18 @@ function renderSeg(){
   });
   h+=`</tbody></table></div>`;
   h+=`<p class="hint">Os padrões reproduzem o comportamento original do aplicativo — nada muda até alterar um valor aqui. A alteração grava na hora e vale para todos na próxima atualização de tela.</p>`;
+  h+=`<div class="row" style="margin-top:6px"><b style="font-size:13px">Diagnóstico do ambiente</b><button class="btn ghost" id="segDiag">Verificar ambiente</button></div><div id="segDiagOut"></div>`;
   const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
+  const dg=document.getElementById('segDiag');
+  if(dg)dg.onclick=async()=>{
+    const outEl=document.getElementById('segDiagOut');
+    dg.disabled=true;outEl.innerHTML='<p class="hint">Verificando… (somente leitura)</p>';
+    try{
+      const res=await diagAmbiente();
+      outEl.innerHTML=`<div class="gridwrap"><table class="simple"><thead><tr><th>Verificação</th><th style="width:110px">Resultado</th><th>Detalhe</th></tr></thead><tbody>${res.map(r=>`<tr><td>${esc(r[0])}</td><td><span class="chip c-${r[1]?'ok':'bad'}">${r[1]?'OK':'Falhou'}</span></td><td class="muted">${esc(r[2]||'')}</td></tr>`).join('')}</tbody></table></div>`;
+    }catch(e){outEl.innerHTML=`<p class="warnline">Não foi possível concluir a verificação: ${esc(String((e&&e.message)||e).split('\n')[0])}</p>`;}
+    dg.disabled=false;
+  };
   v.querySelectorAll('[data-ck]').forEach(el=>{
     el.onchange=async()=>{
       if(escrevendo()){render();return;}
@@ -1634,7 +1673,7 @@ async function refreshData(){
     if(DB.reabFail)_avisos.push('as reaberturas não puderam ser carregadas');
     if(DB.confState==='error')_avisos.push('as políticas (08_Config) não puderam ser carregadas — envio e exclusão estão bloqueados');
     toast(_avisos.length?`Dados atualizados — mas ${_avisos.join(' e ')}. Avise a TI.`:'Dados atualizados.',_dupT?'err':DB.reabFail?'warn':undefined);
-  }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
+  }catch(e){console.error(e);logApp(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
   finally{busy(false);render();}
 }
 
@@ -1650,12 +1689,12 @@ async function loadBase(){
     getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
     getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
     getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null),
-    getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').then(r=>({st:'ok',rows:r})).catch(e=>({st:/404/.test(String((e&&e.message)||''))?'missing':'error',rows:null}))
+    getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').then(r=>({st:'ok',rows:r})).catch(()=>({st:'error',rows:null}))
   ]);
   setPerfis(perfRows);
   setCadastros(depts,ccs,cats);
   setVincs(vincRows);setEx(exRows);setReabs(reabRows);
-  DB.conf=confRows.rows;DB.confState=confRows.st;   // 'missing' = modo compatibilidade (padrões); 'error' = bloqueia envio/exclusão
+  DB.conf=confRows.rows;DB.confState=confRows.st;   // produção fail-closed: qualquer falha (404 incluído) bloqueia envio/exclusão; padrão vale só para CHAVE ausente numa lista carregada
   recalcRole();
 }
 async function start(){
@@ -1693,6 +1732,7 @@ async function start(){
     render();
   }catch(e){
     console.error(e);
+    try{logApp(e);}catch(_){}
     PS.screens.error('Não foi possível carregar','Confira se as listas e permissões da Etapa 1 foram criadas.',{retry:true,details:[String((e&&e.message)||e).slice(0,300)]});
   }
 }
