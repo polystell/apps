@@ -965,7 +965,7 @@ function renderComp(){
   if(!gs.length){setHead('Compartilhado','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Nenhum centro de custo compartilhado sob sua gestão.</p></div>`;return;}
   if(!S.grp||!gs.some(g=>g.ctrl===S.grp))S.grp=gs[0].ctrl;
   const G=gs.find(g=>g.ctrl===S.grp);
-  const canEdit=S.role.admin||myDepts().includes(S.grp);
+  const canEdit=myDepts().includes(S.grp);   // editar exige vínculo de gestor com o depto que gere o grupo — Administrador sem vínculo só consulta
   setHead(`Compartilhado ${S.ano}`,canEdit?'O que você edita aqui vale como o planejamento do departamento':'');
   const set=new Set(G.ccs);
   const its=(DB.plan[S.ano]||[]).filter(i=>set.has(i.cc)).sort((a,b)=>a.dept.localeCompare(b.dept)||a.cc.localeCompare(b.cc)||a.det.localeCompare(b.det));
