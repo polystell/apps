@@ -206,7 +206,7 @@
 <body>
 
 <script src="/core/polystell.js?v=5"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/core/vendor/xlsx-0.18.5.full.min.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -226,7 +226,8 @@ const CFG={
     cat:'98_Cadastro_Categoria_Financeira',
     perfil:'08_Perfis',                         // papéis: Administrador / Aprovador / Assessoria (dados, não código)
     reab:'08_Reaberturas',                      // reaberturas pontuais por departamento/trimestre
-    config:'08_Config'                          // parâmetros de comportamento (tela Segurança) — dados, não código
+    config:'08_Config',                         // parâmetros de comportamento (tela Segurança) — dados, não código
+    log:'08_Log_App'                            // log técnico de erros (best effort — nunca atrapalha o usuário)
   }
 };
 
@@ -310,6 +311,7 @@ async function runQueue(tasks,label){
 }
 function fail(e){
   console.error(e);
+  logApp(e);
   const is412=e&&e.status===412;
   const anoFalha=S.ano,aAnoFalha=S.aAno;   // congela quais anos recuperar, mesmo se o usuário navegar
   toast(is412?'Alguém alterou este registro ao mesmo tempo que você — recarregando o que está gravado no SharePoint. Confira e repita o seu lançamento.':'Erro ao gravar no SharePoint: '+String(e.message||e).split('\n')[0]+' — recarregando o que está gravado.','err');
@@ -326,11 +328,15 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-DB.conf=null;   // linhas da 08_Config; null = lista indisponível (app usa os padrões)
+const APP_VERSION='1.1.0';const APP_BUILD='2026-10-28';
+DB.conf=null;   // linhas da 08_Config; null = indisponível (ver DB.confState: 'ok' | 'missing' | 'error')
+DB.confState='missing';
+/* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
+function logApp(e){try{addItem(CFG.lists.log,{Title:new Date().toISOString(),APP:'Planejamento',VERSAO:APP_VERSION,USUARIO:(DB.me&&DB.me.email)||'',TELA:(S&&S.view)||'',HTTP_STATUS:e&&e.status!=null?String(e.status):'',MENSAGEM:String((e&&e.message)||e).slice(0,255)}).catch(err=>console.warn('log não gravado:',err&&err.message));}catch(_){}}
 const PARAMS=[
   {k:'BLOQUEAR_ENVIO_FORA_PRAZO',tipo:'sn',padrao:'Não',nome:'Bloquear envio para aprovação após o prazo do trimestre',desc:'Com “Sim”, meses de trimestre com prazo vencido não entram no envio — o padrão é só sinalizar “Atrasado”.'},
-  {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total enviado passa desse limite.'},
-  {k:'DIA_LIMITE_REVISAO',tipo:'num',padrao:'10',nome:'Dia-limite para pedir revisão do realizado',desc:'Dia do mês seguinte até o qual o extrato orienta pedir revisão ao Financeiro.'},
+  {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',min:0,nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total elegível (dentro do prazo) passa desse limite.'},
+  {k:'DIA_LIMITE_REVISAO',tipo:'num',padrao:'10',min:1,max:31,inteiro:true,nome:'Dia-limite para pedir revisão do realizado',desc:'Dia do mês seguinte (1 a 31) até o qual o extrato orienta pedir revisão ao Financeiro. Em mês mais curto vale o último dia.'},
   {k:'BLOQUEAR_EXCLUSAO_COM_LANCAMENTO',tipo:'sn',padrao:'Não',nome:'Bloquear exclusão de item com lançamento gravado',desc:'Com “Sim”, item que já gravou linha no SharePoint não pode ser excluído pelo gestor, mesmo em rascunho.'}
 ];
 const confRaw=k=>{const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);return r?String(r.VALOR==null?'':r.VALOR).trim():null;};
@@ -780,6 +786,7 @@ function saveObs(){
 }
 function doDelete(){
   if(escrevendo())return;
+  if(DB.confState==='error'){toast('Não foi possível carregar as políticas do aplicativo (08_Config) — exclusão bloqueada por segurança. Clique em Atualizar ou avise a TI.','err');return;}
   const it=findItem(S.tool.key);if(!it)return;
   const ids=it.ids.filter(Boolean);
   DB.plan[S.ano]=DB.plan[S.ano].filter(x=>x!==it);
@@ -821,6 +828,7 @@ function setMonthsStatus(key,fromSt){
 }
 function sendScope(){
   if(escrevendo())return;
+  if(DB.confState==='error'){toast('Não foi possível carregar as políticas do aplicativo (08_Config) — envio bloqueado por segurança. Clique em Atualizar ou avise a TI.','err');return;}
   const ms=monthsOf(S.scope);const tasks=[];let n=0;
   const bloqPrazo=confSN('BLOQUEAR_ENVIO_FORA_PRAZO');
   const limObs=confNum('OBS_OBRIGATORIA_ACIMA_DE',0);
@@ -830,9 +838,11 @@ function sendScope(){
   itemsOf(S.ano,S.dept).forEach(i=>{
     const envi=ms.filter(m=>mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho');
     if(!envi.length)return;
-    if(limObs>0&&envi.reduce((a,m)=>a+i.prev[m],0)>limObs&&!(i.obs||'').trim()){semObs.push(i.det);return;}
-    envi.forEach(m=>{
-      if(!dentroPrazo(Math.floor(m/3))){foraPrazo++;return;}
+    const enviPrazo=envi.filter(m=>dentroPrazo(Math.floor(m/3)));   // o prazo decide ANTES: a observação só considera o valor realmente elegível
+    foraPrazo+=envi.length-enviPrazo.length;
+    if(!enviPrazo.length)return;
+    if(limObs>0&&enviPrazo.reduce((a,m)=>a+i.prev[m],0)>limObs&&!(i.obs||'').trim()){semObs.push(i.det);return;}
+    enviPrazo.forEach(m=>{
       i.st[m]='Pendente';n++;
       if(i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,i.ids[m],{STATUS:'Pendente'}));
     });
@@ -1112,7 +1122,7 @@ function renderCompAcomp(h,G,set,its){
 }
 
 /* ============================ ACOMPANHAMENTO ========================== */
-const revLimite=(a,m)=>new Date(a,m+1,confNum('DIA_LIMITE_REVISAO',10),23,59,59);
+const revLimite=(a,m)=>{const d=Math.trunc(confNum('DIA_LIMITE_REVISAO',10));const ult=new Date(a,m+2,0).getDate();return new Date(a,m+1,Math.min(Math.max(d,1),ult),23,59,59);};
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
 const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
 function baixarRealizado(){
@@ -1530,7 +1540,9 @@ function renderSeg(){
   setHead('Segurança (TI)','Parâmetros de comportamento — gravados na lista 08_Config, não no código');
   let h='';
   if(DB.conf===null){
-    h+=`<p class="empty">A lista <b>08_Config</b> ainda não existe (ou você não tem acesso a ela) — o aplicativo está usando os padrões abaixo.<br>Para ativar: crie a lista “08_Config” com as colunas <b>CHAVE</b> e <b>VALOR</b> (uma linha de texto cada), dê <b>Leitura</b> a todos os usuários do app e <b>Edição</b> à TI, e clique em Atualizar.</p>`;
+    h+=DB.confState==='error'
+      ?`<p class="empty warnline">⚠ Falha ao LER a 08_Config (a lista existe, mas a consulta falhou). Por segurança, envio para aprovação e exclusão estão bloqueados até recarregar — clique em Atualizar ou avise a TI.</p>`
+      :`<p class="empty">A lista <b>08_Config</b> ainda não existe (ou você não tem acesso a ela) — o aplicativo está usando os padrões abaixo.<br>Para ativar: crie a lista “08_Config” com as colunas <b>CHAVE</b> (uma linha de texto, obrigatória e com valores exclusivos) e <b>VALOR</b> (uma linha de texto), dê <b>Leitura</b> a todos os usuários do app e <b>Edição</b> à TI, e clique em Atualizar.</p>`;
   }
   h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Parâmetro</th><th style="width:140px">Valor</th><th style="width:110px">Situação</th></tr></thead><tbody>`;
   PARAMS.forEach(p=>{
@@ -1550,7 +1562,10 @@ function renderSeg(){
       if(escrevendo()){render();return;}
       const k=el.dataset.ck;const def=PARAMS.find(x=>x.k===k);
       let nv=String(el.value).trim();
-      if(def.tipo==='num'){const nx=Number(nv.replace(/\./g,'').replace(',','.'));if(!isFinite(nx)||nx<0){toast('Informe um número válido (0 desliga).','warn');render();return;}nv=String(nx);}
+      if(def.tipo==='num'){const nx=Number(nv.replace(/\./g,'').replace(',','.'));
+        const ok=isFinite(nx)&&nx>=(def.min!=null?def.min:0)&&(def.max==null||nx<=def.max)&&(!def.inteiro||nx%1===0);
+        if(!ok){toast(def.max!=null?`Informe um número inteiro entre ${def.min} e ${def.max}.`:'Informe um número válido (0 desliga).','warn');render();return;}
+        nv=String(nx);}
       const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);
       busy(true);
       try{
@@ -1617,6 +1632,7 @@ async function refreshData(){
     const _avisos=[];
     if(_dupT)_avisos.push(`${_dupT} lançamento(s) duplicado(s) foram ignorados`);
     if(DB.reabFail)_avisos.push('as reaberturas não puderam ser carregadas');
+    if(DB.confState==='error')_avisos.push('as políticas (08_Config) não puderam ser carregadas — envio e exclusão estão bloqueados');
     toast(_avisos.length?`Dados atualizados — mas ${_avisos.join(' e ')}. Avise a TI.`:'Dados atualizados.',_dupT?'err':DB.reabFail?'warn':undefined);
   }catch(e){console.error(e);toast('Não foi possível atualizar: '+String(e.message||e).split('\n')[0],'err');}
   finally{busy(false);render();}
@@ -1634,12 +1650,12 @@ async function loadBase(){
     getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
     getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
     getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null),
-    getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').catch(()=>null)
+    getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').then(r=>({st:'ok',rows:r})).catch(e=>({st:/404/.test(String((e&&e.message)||''))?'missing':'error',rows:null}))
   ]);
   setPerfis(perfRows);
   setCadastros(depts,ccs,cats);
   setVincs(vincRows);setEx(exRows);setReabs(reabRows);
-  DB.conf=confRows;   // null = 08_Config indisponível → padrões valem
+  DB.conf=confRows.rows;DB.confState=confRows.st;   // 'missing' = modo compatibilidade (padrões); 'error' = bloqueia envio/exclusão
   recalcRole();
 }
 async function start(){
@@ -1661,7 +1677,7 @@ async function start(){
     PS.auth.ready();
     UI.page.innerHTML='<div class="pagehead"><div><h1 id="vTitle"></h1><p id="vMeta"></p></div><span id="hActions" style="display:flex;gap:10px;align-items:center"></span></div>'+
       '<section id="view"></section>'+
-      '<footer id="pfoot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Neste aplicativo, você vê apenas os departamentos liberados para o seu perfil. Precisa de acesso ou de um ajuste? Fale com a TI.</footer>';
+      '<footer id="pfoot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Neste aplicativo, você vê apenas os departamentos liberados para o seu perfil. Precisa de acesso ou de um ajuste? Fale com a TI.<span style="margin-left:auto;white-space:nowrap" title="build '+APP_BUILD+'">Planejamento Orçamentário · v'+APP_VERSION+'</span></footer>';
     document.body.insertAdjacentHTML('beforeend','<div id="busy" hidden>Gravando…</div>'+
       '<div id="modal" hidden><div class="mback"></div><div class="mcard" role="dialog" aria-modal="true" aria-labelledby="mTitle"><div class="mhead"><h2 id="mTitle"></h2><button class="btn ghost" id="mClose">Fechar</button></div><div class="mbody" id="mBody"></div></div></div>');
     const ta=document.querySelector('.ps-topact');
@@ -1673,6 +1689,7 @@ async function start(){
     setRoleLine();
     if(!DB.perfis)toast('Não foi possível carregar os perfis de acesso — funções administrativas ficam ocultas. Avise a TI.','warn');
     else if(DB.reabFail)toast('Não foi possível carregar as reaberturas — reaberturas pontuais ficam desativadas. Avise a TI.','warn');
+    if(DB.confState==='error')toast('Não foi possível carregar as políticas do aplicativo (08_Config) — envio e exclusão ficam bloqueados até recarregar. Avise a TI.','err');
     render();
   }catch(e){
     console.error(e);
