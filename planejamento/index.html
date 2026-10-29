@@ -329,7 +329,7 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.4.0';const APP_BUILD='2026-10-29';
+const APP_VERSION='1.4.1';const APP_BUILD='2026-10-29';
 DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
 DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
@@ -652,7 +652,7 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}${pv.obsFalta?` · <span class="warnline">${pv.obsFalta} ${plural(pv.obsFalta,'item acima','itens acima')} de ${money(pv.limObs)} sem observação para a diretoria — o envio vai exigir</span>`:''}</p>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}${pv.obsFalta?` · <span class="warnline">${pv.obsFalta} ${plural(pv.obsFalta,'item acima','itens acima')} de ${money(pv.limObs)} sem observação para a diretoria — o envio poderá exigir</span>`:''}</p>`;
         if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} ${plural(pv.novos.length,'item novo','itens novos')}`:''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?`${pv.novos.length?'c':'C'}ompletar ${pv.compl.length} ${plural(pv.compl.length,'item','itens')}`:''}</button></div>`;
       }
     }
@@ -947,7 +947,11 @@ function impPreview(){
   });
   const totalCompl=compl.reduce((a,r)=>{const it=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);return a+mesesFaltantes(it,r.vals,S.ano).reduce((b,m)=>b+r.vals[m],0);},0);
   const limObs=confNum('OBS_OBRIGATORIA_ACIMA_DE',0);
-  const obsFalta=limObs>0?novos.concat(compl).filter(r=>!r.obs&&r.vals.reduce((a,v)=>a+(v>0?v:0),0)>limObs).length:0;
+  /* aviso prévio: conta só meses importáveis e respeita observação já existente no item (a autoridade final é o envio) */
+  const obsFalta=limObs>0?(
+    novos.filter(r=>!r.obs&&r.vals.reduce((a,v,m)=>a+(v>0&&mOpen(S.ano,m)?v:0),0)>limObs).length
+    +compl.filter(r=>{if(r.obs)return false;const ja=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);if(!ja||ja.obs)return false;return mesesFaltantes(ja,r.vals,S.ano).reduce((a,m)=>a+r.vals[m],0)>limObs;}).length
+  ):0;
   return {found:p.items.length,dup,outro,inval,novos,compl,soFech,obsFalta,limObs,
     total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0)+totalCompl,
     fech:fechX+novos.concat(compl).reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
@@ -990,7 +994,7 @@ function renderComp(){
   const sumIf=f=>its.reduce((a,i)=>a+i.prev.reduce((b,v,m)=>b+(v>0&&f(i,m)?v:0),0),0);
   const totApr=its.reduce((a,i)=>a+i.apr.reduce((b,v,m)=>b+(i.st[m]==='Aprovado'&&v?v:0),0),0);
   let h=`<div class="row"><div class="seg" role="group" aria-label="Grupo">${gs.map(g=>`<button data-grp="${g.ctrl}" aria-pressed="${S.grp===g.ctrl}">${esc(g.label)}</button>`).join('')}</div>${yearSeg(S.ano,'data-ano')}</div>`;
-  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div><div class="seg" role="group" aria-label="Per\u00edodo">${['ANO',0,1,2,3].map(sc=>`<button data-cscope="${sc}" aria-pressed="${String(S.cScope)===String(sc)}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div>${S.cMode==='acomp'?'<button class="btn ghost" id="xlsComp">Baixar Excel</button>':''}</div>`;
+  h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Modo"><button data-cmode="plan" aria-pressed="${S.cMode==='plan'}">Planejamento</button><button data-cmode="acomp" aria-pressed="${S.cMode==='acomp'}">Acompanhamento</button></div><div class="seg" role="group" aria-label="Per\u00edodo">${['ANO',0,1,2,3].map(sc=>`<button data-cscope="${sc}" aria-pressed="${String(S.cScope)===String(sc)}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div>${S.cMode==='acomp'?'<button class="btn ghost" id="xlsComp">\u2b73 Baixar realizado</button>':''}</div>`;
   if(S.cMode==='acomp'){renderCompAcomp(h,G,set,its);return;}
   h+=`<div class="stats"><div class="stat"><span>Previsto no ano</span><b>${money(its.reduce((a,i)=>a+i.prev.reduce((x,y)=>x+y,0),0))}</b></div><div class="stat"><span>Aprovado</span><b>${money(totApr)}</b></div><div class="stat"><span>Aguardando diretoria</span><b>${money(sumIf((i,m)=>i.st[m]==='Pendente'))}</b></div><div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div><div class="stat"><span>Departamentos</span><b>${new Set(its.map(i=>i.dept)).size} de ${DB.depts.length}</b></div></div>`;
   let t=`<div class="gridwrap"><table class="grid"><thead><tr><th class="item" rowspan="2">Item</th>`;
@@ -1184,7 +1188,7 @@ function renderAcomp(){
   if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
   const cache=(DB.real[S.ano]||{})[S.dept];
   const temReal=Array.isArray(cache)&&cache.length>0;
-  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}${temReal?'<button class="btn ghost" id="xlsReal" style="margin-left:auto">\u2b73 Baixar Excel</button>':''}</div>`;
+  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}${temReal?'<button class="btn ghost" id="xlsReal" style="margin-left:auto">\u2b73 Baixar realizado</button>':''}</div>`;
   if(cache===undefined){
     setHead(`Acompanhamento ${S.ano}`,'');
     loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
