@@ -329,7 +329,7 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.3.0';const APP_BUILD='2026-10-28';
+const APP_VERSION='1.3.0';const APP_BUILD='2026-10-29';
 DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
 DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
@@ -1680,12 +1680,14 @@ function segDiagPane(){
   };
 }
 /* --- aba Acessos (papéis do app na 08_Perfis) --- */
+/* fail closed: sem validar o tipo real da coluna PERFIL, nenhuma alteração de acesso é gravada */
 async function acePerfMeta(){
   if(segPerfMeta)return segPerfMeta;
   try{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(CFG.lists.perfil)}')/fields?$filter=InternalName eq 'PERFIL'&$select=TypeAsString`);
-    segPerfMeta=(j&&j.value&&j.value[0]&&j.value[0].TypeAsString)||'MultiChoice';}
-  catch(e){segPerfMeta='MultiChoice';}
-  return segPerfMeta;
+    const t=j&&j.value&&j.value[0]&&j.value[0].TypeAsString;
+    if(t==='Choice'||t==='MultiChoice'){segPerfMeta=t;return t;}}
+  catch(e){}
+  return null;
 }
 function segAce(){
   const box=document.getElementById('segBody');
@@ -1710,6 +1712,7 @@ function segAce(){
     const atual=Array.isArray(r.PERFIL)?r.PERFIL.slice():[r.PERFIL].filter(Boolean);
     const novo=cb.checked?atual.concat(atual.includes(p)?[]:[p]):atual.filter(x=>x!==p);
     const tipo=await acePerfMeta();
+    if(!tipo){toast('Não foi possível validar a coluna PERFIL da 08_Perfis — por segurança, as alterações de acesso estão bloqueadas no momento. Tente novamente.','err');render();return;}
     if(tipo==='Choice'&&novo.length>1){toast('A coluna PERFIL desta lista aceita um único papel por pessoa — desmarque o atual antes.','warn');render();return;}
     busy(true);
     try{const grava=tipo==='Choice'?(novo[0]||''):novo;
@@ -1736,6 +1739,7 @@ function segAce(){
     if(!sel.length){toast('Marque ao menos um papel para a pessoa.','warn');return;}
     if(DB.perfRaw.some(r=>r.PESSOA&&String(r.PESSOA.EMail||'').toLowerCase()===em)){toast('Essa pessoa já está na lista — ajuste os papéis na própria linha.','warn');return;}
     const tipo=await acePerfMeta();
+    if(!tipo){toast('Não foi possível validar a coluna PERFIL da 08_Perfis — por segurança, as alterações de acesso estão bloqueadas no momento. Tente novamente.','err');return;}
     if(tipo==='Choice'&&sel.length>1){toast('A coluna PERFIL desta lista aceita um único papel por pessoa.','warn');return;}
     busy(true);
     try{const uid=await ensureUser(em);
@@ -1822,7 +1826,7 @@ async function loadBase(){
     getAll(CFG.lists.cat,'$select=Id,COD_CAT,DESC_CAT&$top=2000'),
     getAll(CFG.lists.vinc,'$select=Id,ATIVO,DEPARTAMENTOId,GESTOR/Title,GESTOR/EMail&$expand=GESTOR&$top=2000'),
     getAll(CFG.lists.ex,'$select=Id,ANO,STATUS,PRAZO_Q1,PRAZO_Q2,PRAZO_Q3,PRAZO_Q4,ENCERRADO_Q1,ENCERRADO_Q2,ENCERRADO_Q3,ENCERRADO_Q4&$top=100'),
-    getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail&$expand=PESSOA&$top=500').catch(()=>null),
+    getAll(CFG.lists.perfil,'$select=Id,ATIVO,PERFIL,PESSOA/EMail,PESSOA/Title&$expand=PESSOA&$top=500').catch(()=>null),
     getAll(CFG.lists.reab,'$select=Id,ANO,COD_DPTO,TRIMESTRE,MOTIVO,ATIVO&$top=500').catch(()=>null),
     getAll(CFG.lists.config,'$select=Id,CHAVE,VALOR&$top=100').then(r=>({st:'ok',rows:r})).catch(()=>({st:'error',rows:null}))
   ]);
