@@ -329,7 +329,7 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.2.0';const APP_BUILD='2026-10-28';
+const APP_VERSION='1.3.0';const APP_BUILD='2026-10-28';
 DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
 DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
@@ -1566,8 +1566,19 @@ async function diagAmbiente(){
   out.push(['Políticas (08_Config)',DB.confState==='ok',DB.confState==='ok'?((DB.conf||[]).length+' parâmetro(s) gravado(s); ausentes usam o padrão'):'não carregadas — envio e exclusão bloqueados']);
   return out;
 }
+let segTab='par';let segLogRows=null;let segPerfMeta=null;
+const PAPEIS=['Administrador','Aprovador','Assessoria'];
 function renderSeg(){
-  setHead('Segurança (TI)','Parâmetros de comportamento — gravados na lista 08_Config, não no código');
+  setHead('Segurança (TI)','Administração do aplicativo — acessos, parâmetros, centros de custo, log e diagnóstico');
+  const TABS=[['ace','Acessos'],['par','Parâmetros'],['ccs','Centros de custo'],['log','Log do sistema'],['diag','Diagnóstico']];
+  const v=document.getElementById('view');
+  v.innerHTML=`<div class="seg" role="tablist" style="margin-bottom:14px">${TABS.map(t=>`<button data-st="${t[0]}" aria-pressed="${segTab===t[0]}">${t[1]}</button>`).join('')}</div><div class="panel" id="segBody"></div>`;
+  v.querySelectorAll('[data-st]').forEach(b=>{b.onclick=()=>{segTab=b.dataset.st;render();};});
+  ({ace:segAce,par:segPar,ccs:segCcs,log:segLog,diag:segDiagPane})[segTab]();
+}
+/* --- aba Parâmetros (08_Config) --- */
+function segPar(){
+  const box=document.getElementById('segBody');
   let h='';
   if(DB.conf===null){
     h+=`<p class="empty warnline">⚠ Não foi possível carregar a 08_Config — por segurança, envio para aprovação e exclusão ficam bloqueados até recarregar (clique em Atualizar ou avise a TI).<br>Se a lista ainda não existe: crie “08_Config” com as colunas <b>CHAVE</b> (uma linha de texto, obrigatória e com valores exclusivos) e <b>VALOR</b> (uma linha de texto), com <b>Leitura</b> para todos os usuários do app e <b>Edição</b> para a TI.</p>`;
@@ -1584,19 +1595,8 @@ function renderSeg(){
   });
   h+=`</tbody></table></div>`;
   h+=`<p class="hint">Os padrões reproduzem o comportamento original do aplicativo — nada muda até alterar um valor aqui. A alteração grava na hora e vale para todos na próxima atualização de tela.</p>`;
-  h+=`<div class="row" style="margin-top:6px"><b style="font-size:13px">Diagnóstico do ambiente</b><button class="btn ghost" id="segDiag">Verificar ambiente</button></div><div id="segDiagOut"></div>`;
-  const v=document.getElementById('view');v.innerHTML=`<div class="panel">${h}</div>`;
-  const dg=document.getElementById('segDiag');
-  if(dg)dg.onclick=async()=>{
-    const outEl=document.getElementById('segDiagOut');
-    dg.disabled=true;outEl.innerHTML='<p class="hint">Verificando… (somente leitura)</p>';
-    try{
-      const res=await diagAmbiente();
-      outEl.innerHTML=`<div class="gridwrap"><table class="simple"><thead><tr><th>Verificação</th><th style="width:110px">Resultado</th><th>Detalhe</th></tr></thead><tbody>${res.map(r=>`<tr><td>${esc(r[0])}</td><td><span class="chip c-${r[1]?'ok':'bad'}">${r[1]?'OK':'Falhou'}</span></td><td class="muted">${esc(r[2]||'')}</td></tr>`).join('')}</tbody></table></div>`;
-    }catch(e){outEl.innerHTML=`<p class="warnline">Não foi possível concluir a verificação: ${esc(String((e&&e.message)||e).split('\n')[0])}</p>`;}
-    dg.disabled=false;
-  };
-  v.querySelectorAll('[data-ck]').forEach(el=>{
+  box.innerHTML=h;
+  box.querySelectorAll('[data-ck]').forEach(el=>{
     el.onchange=async()=>{
       if(escrevendo()){render();return;}
       const k=el.dataset.ck;const def=PARAMS.find(x=>x.k===k);
@@ -1613,6 +1613,140 @@ function renderSeg(){
       }catch(e){fail(e);}finally{busy(false);render();}
     };
   });
+}
+/* --- aba Centros de custo compartilhados (coluna GESTAO da 98_) --- */
+function segCcs(){
+  const box=document.getElementById('segBody');
+  box.innerHTML=`<div class="row"><b style="font-size:13px">Centros de custo compartilhados</b><input type="text" id="segCcQ" placeholder="Buscar centro de custo…" style="width:260px" aria-label="Buscar centro de custo"></div><p class="hint">Defina qual departamento controla o CC (coluna GESTAO da 98_Cadastro_Centro_Custo — a sincronização do ERP não altera essa coluna). O CC controlado aparece no grupo Compartilhado do departamento controlador. Sem busca, a lista mostra só os CCs já compartilhados. A gravação exige Edição na 98_ (TI).</p><div id="segCcOut"></div>`;
+  const ccOut=document.getElementById('segCcOut'),ccQ=document.getElementById('segCcQ');
+  const ccPaint=()=>{
+    const q=(ccQ.value||'').trim().toLowerCase();
+    let rows=DB.ccs.filter(c=>q?((c.COD_CC+' '+(c.DESC_CC||'')).toLowerCase().includes(q)):String(c.GESTAO||'').trim());
+    const corte=rows.length>60;if(corte)rows=rows.slice(0,60);
+    const opts=c=>{const cur=String(c.GESTAO||'').trim();
+      return `<option value=""${cur?'':' selected'}>— Gestão própria</option>`+DB.depts.map(d=>`<option value="${esc(d.COD_DPTO)}"${cur===d.COD_DPTO?' selected':''}>${esc(d.COD_DPTO)} — ${esc(d.DESC_DPTO||'')}</option>`).join('');};
+    ccOut.innerHTML=rows.length
+      ?`<div class="gridwrap"><table class="simple"><thead><tr><th>Centro de custo</th><th style="width:180px">Departamento</th><th style="width:280px">Controlado por</th></tr></thead><tbody>${rows.map(c=>`<tr><td><span class="sub code">${esc(c.COD_CC)}</span> <b>${esc(c.DESC_CC||'')}</b></td><td>${esc((DB.deptByCod[c.COD_DPTO]||{}).DESC_DPTO||c.COD_DPTO||'')}</td><td><select data-gcc="${c.Id}" aria-label="Departamento controlador de ${esc(c.COD_CC)}">${opts(c)}</select></td></tr>`).join('')}</tbody></table>${corte?'<p class="hint">Mostrando os 60 primeiros — refine a busca.</p>':''}</div>`
+      :`<p class="empty">${q?'Nenhum centro de custo encontrado.':'Nenhum CC compartilhado ainda — use a busca para localizar um CC e definir o departamento controlador.'}</p>`;
+    ccOut.querySelectorAll('[data-gcc]').forEach(s=>{s.onchange=async()=>{
+      if(escrevendo()){ccPaint();return;}
+      const cc=DB.ccs.find(x=>x.Id===Number(s.dataset.gcc));if(!cc)return;
+      const nv=s.value;busy(true);
+      try{await mergeItem(CFG.lists.cc,cc.Id,{GESTAO:nv});cc.GESTAO=nv;
+        toast(nv?cc.COD_CC+' agora é controlado por '+((DB.deptByCod[nv]||{}).DESC_DPTO||nv)+'.':cc.COD_CC+' voltou à gestão do próprio departamento.');}
+      catch(e){fail(e);return;}
+      finally{busy(false);}
+      ccPaint();
+    };});
+  };
+  ccQ.oninput=ccPaint;ccPaint();
+}
+/* --- aba Log do sistema (08_Log_App, somente leitura) --- */
+function segLog(){
+  const box=document.getElementById('segBody');
+  box.innerHTML=`<div class="row"><b style="font-size:13px">Log do sistema</b><span style="display:flex;gap:8px;align-items:center"><input type="text" id="segLogQ" placeholder="Filtrar registros…" style="width:240px" aria-label="Filtrar registros do log"><button class="btn ghost" id="segLogR">Atualizar</button></span></div><p class="hint">Últimos 100 registros técnicos da 08_Log_App, gravados pelo próprio aplicativo em falhas de gravação, do Atualizar e da inicialização — sem token e sem dados de negócio. Somente leitura.</p><div id="segLogOut"><p class="hint">Carregando registros…</p></div>`;
+  const out=document.getElementById('segLogOut'),q=document.getElementById('segLogQ');
+  const fmt=t=>{const d=new Date(t);return isFinite(d)?d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):String(t||'');};
+  const paint=()=>{
+    const f=(q.value||'').trim().toLowerCase();
+    const rows=(segLogRows||[]).filter(r=>!f||JSON.stringify(r).toLowerCase().includes(f));
+    out.innerHTML=rows.length
+      ?`<div class="gridwrap"><table class="simple"><thead><tr><th style="width:140px">Quando</th><th style="width:230px">Usuário</th><th style="width:110px">Tela</th><th style="width:70px">HTTP</th><th>Mensagem</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmt(r.Title)}<span class="detline">v${esc(r.VERSAO||'')}</span></td><td>${esc(r.USUARIO||'')}</td><td>${esc(r.TELA||'')}</td><td>${esc(r.HTTP_STATUS||'')}</td><td>${esc(r.MENSAGEM||'')}${r.REQUEST_ID?`<span class="detline sub code">req ${esc(r.REQUEST_ID)}</span>`:''}</td></tr>`).join('')}</tbody></table></div>`
+      :(segLogRows?`<p class="empty">Nenhum registro${f?' para o filtro':''} — bom sinal.</p>`:'');
+  };
+  const load=async(force)=>{
+    if(segLogRows&&!force){paint();return;}
+    out.innerHTML='<p class="hint">Carregando registros…</p>';
+    try{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(CFG.lists.log)}')/items?$select=Id,Title,APP,VERSAO,USUARIO,TELA,HTTP_STATUS,REQUEST_ID,MENSAGEM&$orderby=Id desc&$top=100`);
+      segLogRows=(j&&j.value)||[];paint();}
+    catch(e){out.innerHTML=`<p class="warnline">Não foi possível ler a 08_Log_App${e&&e.status?' (HTTP '+e.status+')':''} — confira se a lista existe e se você tem Leitura nela.</p>`;}
+  };
+  q.oninput=paint;document.getElementById('segLogR').onclick=()=>load(true);
+  load(false);
+}
+/* --- aba Diagnóstico --- */
+function segDiagPane(){
+  const box=document.getElementById('segBody');
+  box.innerHTML=`<div class="row"><b style="font-size:13px">Diagnóstico do ambiente</b><button class="btn ghost" id="btnDiag">Verificar ambiente</button></div><p class="hint">Verificação somente leitura — versão, core, listas, biblioteca do Realizado, unicidade das chaves e políticas. É o teste pré-Go-Live e o primeiro passo de qualquer suporte.</p><div id="segDiagOut"></div>`;
+  const dg=document.getElementById('btnDiag');
+  dg.onclick=async()=>{
+    const outEl=document.getElementById('segDiagOut');
+    dg.disabled=true;outEl.innerHTML='<p class="hint">Verificando… (somente leitura)</p>';
+    try{
+      const res=await diagAmbiente();
+      outEl.innerHTML=`<div class="gridwrap"><table class="simple"><thead><tr><th>Verificação</th><th style="width:110px">Resultado</th><th>Detalhe</th></tr></thead><tbody>${res.map(r=>`<tr><td>${esc(r[0])}</td><td><span class="chip c-${r[1]?'ok':'bad'}">${r[1]?'OK':'Falhou'}</span></td><td class="muted">${esc(r[2]||'')}</td></tr>`).join('')}</tbody></table></div>`;
+    }catch(e){outEl.innerHTML=`<p class="warnline">Não foi possível concluir a verificação: ${esc(String((e&&e.message)||e).split('\n')[0])}</p>`;}
+    dg.disabled=false;
+  };
+}
+/* --- aba Acessos (papéis do app na 08_Perfis) --- */
+async function acePerfMeta(){
+  if(segPerfMeta)return segPerfMeta;
+  try{const j=await sp(`web/lists/getbytitle('${encodeURIComponent(CFG.lists.perfil)}')/fields?$filter=InternalName eq 'PERFIL'&$select=TypeAsString`);
+    segPerfMeta=(j&&j.value&&j.value[0]&&j.value[0].TypeAsString)||'MultiChoice';}
+  catch(e){segPerfMeta='MultiChoice';}
+  return segPerfMeta;
+}
+function segAce(){
+  const box=document.getElementById('segBody');
+  if(!DB.perfRaw){box.innerHTML=`<p class="empty warnline">⚠ Não foi possível carregar a 08_Perfis — os papéis ficam indisponíveis. Clique em Atualizar ou verifique a lista e a sua permissão de Leitura.</p>`;return;}
+  const rows=DB.perfRaw.filter(r=>r.PESSOA&&r.PESSOA.EMail);
+  let h=`<p class="hint">Papéis do aplicativo, gravados na 08_Perfis: <b>Administrador</b> administra e vê tudo, <b>Aprovador</b> decide na tela de Aprovação, <b>Assessoria</b> acompanha. O papel controla o que o aplicativo mostra — o acesso de uso continua sendo a permissão de cada lista/pasta no SharePoint. A gravação exige Edição na 08_Perfis (TI).</p>`;
+  h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Pessoa</th>${PAPEIS.map(p=>`<th style="width:125px">${p}</th>`).join('')}<th style="width:80px">Ativo</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const lista=Array.isArray(r.PERFIL)?r.PERFIL:[r.PERFIL].filter(Boolean);
+    h+=`<tr${r.ATIVO?'':' style="opacity:.55"'}><td><b>${esc(r.PESSOA.Title||r.PESSOA.EMail)}</b><span class="detline">${esc(r.PESSOA.EMail)}</span></td>${PAPEIS.map(p=>`<td><input type="checkbox" data-pf="${r.Id}" data-papel="${p}"${lista.includes(p)?' checked':''}${r.ATIVO?'':' disabled'} aria-label="${p} para ${esc(r.PESSOA.EMail)}"></td>`).join('')}<td><input type="checkbox" data-pativo="${r.Id}"${r.ATIVO?' checked':''} aria-label="Ativo para ${esc(r.PESSOA.EMail)}"></td></tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  h+=`<div class="row" style="margin-top:14px;flex-wrap:wrap"><b style="font-size:13px">Adicionar pessoa</b><input type="email" id="aceEmail" placeholder="email@polystell.com.br" style="width:250px" aria-label="E-mail da pessoa">${PAPEIS.map(p=>`<label style="display:inline-flex;gap:5px;align-items:center;font-size:13px"><input type="checkbox" data-novo="${p}">${p}</label>`).join('')}<button class="btn" id="aceAdd">Adicionar</button></div>`;
+  box.innerHTML=h;
+  const souEu=r=>String((r.PESSOA&&r.PESSOA.EMail)||'').toLowerCase()===DB.me.email;
+  const aposGravar=()=>{setPerfis(DB.perfRaw);recalcRole();if(UI)UI.setNav(buildNav());render();};
+  box.querySelectorAll('[data-pf]').forEach(cb=>{cb.onchange=async()=>{
+    if(escrevendo()){render();return;}
+    const r=DB.perfRaw.find(x=>x.Id===Number(cb.dataset.pf));if(!r)return;
+    const p=cb.dataset.papel;
+    if(p==='Administrador'&&!cb.checked&&souEu(r)){toast('Você não pode remover o seu próprio papel de Administrador.','warn');render();return;}
+    const atual=Array.isArray(r.PERFIL)?r.PERFIL.slice():[r.PERFIL].filter(Boolean);
+    const novo=cb.checked?atual.concat(atual.includes(p)?[]:[p]):atual.filter(x=>x!==p);
+    const tipo=await acePerfMeta();
+    if(tipo==='Choice'&&novo.length>1){toast('A coluna PERFIL desta lista aceita um único papel por pessoa — desmarque o atual antes.','warn');render();return;}
+    busy(true);
+    try{const grava=tipo==='Choice'?(novo[0]||''):novo;
+      await mergeItem(CFG.lists.perfil,r.Id,{PERFIL:grava});r.PERFIL=grava;toast('Papéis atualizados.');}
+    catch(e){fail(e);return;}
+    finally{busy(false);}
+    aposGravar();
+  };});
+  box.querySelectorAll('[data-pativo]').forEach(cb=>{cb.onchange=async()=>{
+    if(escrevendo()){render();return;}
+    const r=DB.perfRaw.find(x=>x.Id===Number(cb.dataset.pativo));if(!r)return;
+    if(!cb.checked&&souEu(r)){toast('Você não pode desativar o seu próprio registro.','warn');render();return;}
+    busy(true);
+    try{await mergeItem(CFG.lists.perfil,r.Id,{ATIVO:cb.checked});r.ATIVO=cb.checked;toast(cb.checked?'Pessoa reativada.':'Pessoa desativada — os papéis ficam guardados.');}
+    catch(e){fail(e);return;}
+    finally{busy(false);}
+    aposGravar();
+  };});
+  document.getElementById('aceAdd').onclick=async()=>{
+    if(escrevendo())return;
+    const em=String(document.getElementById('aceEmail').value||'').trim().toLowerCase();
+    const sel=Array.from(box.querySelectorAll('[data-novo]:checked')).map(c=>c.dataset.novo);
+    if(!em||em.indexOf('@')<1||em.indexOf('.')<0){toast('Informe um e-mail corporativo válido.','warn');return;}
+    if(!sel.length){toast('Marque ao menos um papel para a pessoa.','warn');return;}
+    if(DB.perfRaw.some(r=>r.PESSOA&&String(r.PESSOA.EMail||'').toLowerCase()===em)){toast('Essa pessoa já está na lista — ajuste os papéis na própria linha.','warn');return;}
+    const tipo=await acePerfMeta();
+    if(tipo==='Choice'&&sel.length>1){toast('A coluna PERFIL desta lista aceita um único papel por pessoa.','warn');return;}
+    busy(true);
+    try{const uid=await ensureUser(em);
+      const grava=tipo==='Choice'?sel[0]:sel;
+      const j=await addItem(CFG.lists.perfil,{Title:em,ATIVO:true,PESSOAId:uid,PERFIL:grava});
+      DB.perfRaw.push({Id:j.Id,ATIVO:true,PERFIL:grava,PESSOA:{EMail:em}});
+      toast('Pessoa adicionada aos papéis do aplicativo.');}
+    catch(e){fail(e);return;}
+    finally{busy(false);}
+    aposGravar();
+  };
 }
 
 /* ======================= DADOS COMPARTILHADOS ======================== */
@@ -1632,6 +1766,7 @@ function setVincs(rows){
   DB.vincsOff=valid.filter(v=>!v.ATIVO).map(map);
 }
 function setPerfis(rows){
+  DB.perfRaw=rows||null;
   if(!rows){DB.perfis=null;return;}
   // PERFIL pode ser opção única (texto) ou múltipla (lista) — aceita os dois
   DB.perfis=rows.filter(r=>r.ATIVO&&r.PESSOA&&r.PESSOA.EMail&&r.PERFIL)
