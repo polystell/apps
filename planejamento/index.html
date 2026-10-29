@@ -329,7 +329,7 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.3.0';const APP_BUILD='2026-10-29';
+const APP_VERSION='1.4.0';const APP_BUILD='2026-10-29';
 DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
 DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
@@ -518,11 +518,12 @@ function renderPlan(){
     <div class="stat"><span>Em rascunho</span><b>${money(sumIf((i,m)=>i.st[m]==='Rascunho'))}</b></div></div>`;
   if(DB.ex[S.ano])h+=`<div class="prazos"><span>Prazos de envio</span>${[0,1,2,3].map(q=>{const p=prazoStatus(S.dept,S.ano,q);return `<span class="chip c-${p.c}">${QLAB[q]} · até ${fmtD(DB.ex[S.ano].prazos[q])} · ${p.s}</span>`;}).join('')}</div>`;
   h+=`<div class="toolbar"><div class="seg" role="group" aria-label="Período">${['ANO',0,1,2,3].map(sc=>`<button data-scope="${sc}" aria-pressed="${S.scope===sc}">${sc==='ANO'?'Ano':QLAB[sc]}</button>`).join('')}</div>`;
+  const xpBtn='<button class="btn ghost" id="xlsPlan">⭳ Baixar planejado</button>';
   if(!ro){
-    h+=`<div class="actions"><button class="btn ghost" id="addBtn">+ Novo item</button><button class="btn ghost" id="impBtn">Importar planilha</button>`;
+    h+=`<div class="actions">${xpBtn}<button class="btn ghost" id="addBtn">+ Novo item</button><button class="btn ghost" id="impBtn">Importar planilha</button>`;
     if(srcYears.length)h+=`<button class="btn ghost" id="copyBtn">Copiar de outro ano</button>`;
     h+=`<button class="btn" id="sendBtn" ${draftIn?'':'disabled'}>Enviar ${scopeName} para aprovação</button></div>`;
-  }
+  }else h+=`<div class="actions">${xpBtn}</div>`;
   h+=`</div>`;
   if(!ro)h+=toolHtml();
   if(S.adding&&!ro){
@@ -578,6 +579,7 @@ function renderPlan(){
   const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn;};
   on('addBtn',()=>{S.adding=true;S.tool=null;render();document.getElementById('fDet').focus();});
   on('impBtn',()=>{S.tool={kind:'imp'};S.adding=false;render();});
+  on('xlsPlan',()=>baixarPlanejado(S.dept));
   on('copyBtn',()=>{S.tool={kind:'copy',src:null};S.adding=false;render();});
   on('sendBtn',sendScope);
   on('cancelAdd',()=>{S.adding=false;render();});
@@ -650,7 +652,7 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}</p>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}${pv.obsFalta?` · <span class="warnline">${pv.obsFalta} ${plural(pv.obsFalta,'item acima','itens acima')} de ${money(pv.limObs)} sem observação para a diretoria — o envio vai exigir</span>`:''}</p>`;
         if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} ${plural(pv.novos.length,'item novo','itens novos')}`:''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?`${pv.novos.length?'c':'C'}ompletar ${pv.compl.length} ${plural(pv.compl.length,'item','itens')}`:''}</button></div>`;
       }
     }
@@ -870,13 +872,13 @@ function baixarModelo(){
   const MESES=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
   const aoa=[
     [`PLANEJAMENTO ORÇAMENTÁRIO ${ano} · ${deptName(S.dept)}`],
-    ['Preencha o código da categoria (aba CATEGORIAS), o detalhamento e os valores mensais. Linhas sem categoria ou sem valor são ignoradas. Para lançar mais de um item no mesmo centro de custo, duplique a linha dele.'],
+    ['Preencha o código da categoria (aba CATEGORIAS), o detalhamento e os valores mensais. Linhas sem categoria ou sem valor são ignoradas. Para lançar mais de um item no mesmo centro de custo, duplique a linha dele. A última coluna, Observação para a diretoria, é opcional — acima do limite configurado pela TI, o envio para aprovação exige observação.'],
     ['','','','','',...MESES],
-    ['COD C.CUSTO','CENTRO DE CUSTO','COD C.FINANCEIRA','CATEGORIA FINANCEIRA','DETALHAMENTO'],
+    ['COD C.CUSTO','CENTRO DE CUSTO','COD C.FINANCEIRA','CATEGORIA FINANCEIRA','DETALHAMENTO',...Array(12).fill(''),'OBSERVAÇÃO PARA A DIRETORIA (OPCIONAL)'],
     ...myCCs.map(c=>[c.COD_CC,c.DESC_CC||'','','',''])
   ];
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:34},{wch:15},{wch:32},{wch:32},...Array(12).fill({wch:11})];
+  ws['!cols']=[{wch:12},{wch:34},{wch:15},{wch:32},{wch:32},...Array(12).fill({wch:11}),{wch:42}];
   const wsCat=XLSX.utils.aoa_to_sheet([['COD C.FINANCEIRA','CATEGORIA FINANCEIRA'],...DB.cats.map(c=>[c.COD_CAT,c.DESC_CAT||''])]);
   wsCat['!cols']=[{wch:16},{wch:50}];
   const wb=XLSX.utils.book_new();
@@ -893,7 +895,7 @@ function parseSheet(rows){
   for(let i=0;i<rows.length;i++){const H=(rows[i]||[]).map(norm);if(H.includes('COD C.CUSTO')&&H.some(h=>h.startsWith('DETALHAMENTO'))){hi=i;break;}}
   if(hi<0)return null;
   const H=rows[hi].map(norm);
-  const ccI=H.indexOf('COD C.CUSTO'),catI=H.indexOf('COD C.FINANCEIRA'),detI=H.findIndex(h=>h.startsWith('DETALHAMENTO')),cdI=H.indexOf('COD DETALHAMENTO'),catDI=H.indexOf('CATEGORIA FINANCEIRA'),ccDI=H.indexOf('CENTRO DE CUSTO');
+  const ccI=H.indexOf('COD C.CUSTO'),catI=H.indexOf('COD C.FINANCEIRA'),detI=H.findIndex(h=>h.startsWith('DETALHAMENTO')),cdI=H.indexOf('COD DETALHAMENTO'),catDI=H.indexOf('CATEGORIA FINANCEIRA'),ccDI=H.indexOf('CENTRO DE CUSTO'),obsI=H.findIndex(h=>h.startsWith('OBSERVACAO'));
   if(catI<0)return null;
   let mrow=null;for(let k=hi-1;k>=Math.max(0,hi-6);k--){const R=(rows[k]||[]).map(norm);if(R.includes('JANEIRO')){mrow=R;break;}}
   if(!mrow)return null;
@@ -909,7 +911,7 @@ function parseSheet(rows){
     const det=normDet(String(!blank(g(detI))?g(detI):(catD||'Item'))).slice(0,120);
     const vals=mc.map(c=>{const x=g(c);return typeof x==='number'&&isFinite(x)&&x>0?Math.round(x*100)/100:0;});
     if(!vals.some(v=>v>0))return;
-    out.push({cc:String(cc).replace(/\D/g,'').padStart(10,'0'),cat:String(cat).replace(/\D/g,'').padStart(6,'0'),det,catD,vals});
+    out.push({cc:String(cc).replace(/\D/g,'').padStart(10,'0'),cat:String(cat).replace(/\D/g,'').padStart(6,'0'),det,catD,vals,obs:obsI>=0&&!blank(g(obsI))?String(g(obsI)).trim().slice(0,255):''});
   });
   return {items:out,ccD};
 }
@@ -944,7 +946,9 @@ function impPreview(){
     novos.push(r);
   });
   const totalCompl=compl.reduce((a,r)=>{const it=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);return a+mesesFaltantes(it,r.vals,S.ano).reduce((b,m)=>b+r.vals[m],0);},0);
-  return {found:p.items.length,dup,outro,inval,novos,compl,soFech,
+  const limObs=confNum('OBS_OBRIGATORIA_ACIMA_DE',0);
+  const obsFalta=limObs>0?novos.concat(compl).filter(r=>!r.obs&&r.vals.reduce((a,v)=>a+(v>0?v:0),0)>limObs).length:0;
+  return {found:p.items.length,dup,outro,inval,novos,compl,soFech,obsFalta,limObs,
     total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0)+totalCompl,
     fech:fechX+novos.concat(compl).reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
 }
@@ -955,13 +959,14 @@ function doImport(){
     if(!DB.ccMap[r.cc]&&p.ccD[r.cc])DB.ccMap[r.cc]=p.ccD[r.cc];
     if(!DB.catMap[r.cat]&&r.catD)DB.catMap[r.cat]=r.catD;
     const prevA=r.vals.map((v,m)=>mOpen(ano,m)?v:0);
-    const it={key:itemKey(S.dept,r.cc,r.cat,r.det),dept:S.dept,cc:r.cc,cat:r.cat,det:r.det,obs:'',prev:prevA,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
+    const it={key:itemKey(S.dept,r.cc,r.cat,r.det),dept:S.dept,cc:r.cc,cat:r.cat,det:r.det,obs:r.obs||'',prev:prevA,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     (DB.plan[ano]=DB.plan[ano]||[]).push(it);
     prevA.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
   });
   pv.compl.forEach(r=>{
     const ja=findPlanItem(ano,S.dept,r.cc,r.cat,r.det);
     if(!ja)return;
+    if(r.obs&&!ja.obs){ja.obs=r.obs;ja.ids.forEach(id=>{if(id)tasks.push(()=>mergeItem(CFG.lists.plan,id,{OBSERVACAO:ja.obs}));});}
     mesesFaltantes(ja,r.vals,ano).forEach(m=>{ja.prev[m]=r.vals[m];ja.st[m]='Rascunho';tasks.push(()=>persistCell(ja,m,ano));});
   });
   S.tool=null;S.imp=null;render();
@@ -1126,6 +1131,28 @@ function renderCompAcomp(h,G,set,its){
 const revLimite=(a,m)=>{const d=Math.trunc(confNum('DIA_LIMITE_REVISAO',10));const ult=new Date(a,m+2,0).getDate();return new Date(a,m+1,Math.min(Math.max(d,1),ult),23,59,59);};
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
 const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
+function baixarPlanejado(depto){
+  const its=(DB.plan[S.ano]||[]).filter(i=>!depto||i.dept===depto);
+  if(!its.length){toast('Nada para exportar.','warn');return;}
+  const data=its.slice().sort((a,b)=>a.dept.localeCompare(b.dept)||a.cc.localeCompare(b.cc)||a.cat.localeCompare(b.cat)||a.det.localeCompare(b.det)).map(i=>{
+    const o={};
+    if(!depto)o['Departamento']=deptName(i.dept)||i.dept;
+    o['Cod. centro de custo']=i.cc;o['Centro de custo']=ccDesc(i.cc)||'';
+    o['Cod. categoria']=i.cat;o['Categoria']=catDesc(i.cat)||'';
+    o['Detalhamento']=i.det;
+    MES.forEach((nm,x)=>{o[nm]=Number(i.prev[x])||0;});
+    o['Total previsto']=i.prev.reduce((a,v)=>a+(Number(v)||0),0);
+    o['Total aprovado']=(i.apr||[]).reduce((a,v)=>a+(Number(v)||0),0);
+    o['Situação']=[...new Set(i.st.map((s,x)=>(Number(i.prev[x])||0)>0?s:null).filter(Boolean))].join(' / ')||'—';
+    o['Observação para a diretoria']=i.obs||'';
+    return o;});
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[...(depto?[]:[{wch:28}]),{wch:14},{wch:32},{wch:10},{wch:32},{wch:32},...Array(12).fill({wch:10}),{wch:13},{wch:13},{wch:22},{wch:40}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Planejado');
+  XLSX.writeFile(wb,`Planejado_${S.ano}_${depto?String(deptName(depto)||depto).replace(/[\\/:*?"<>|]/g,''):'TODOS'}.xlsx`);
+  toast(depto?'Excel do planejado gerado.':'Excel do planejado de todos os departamentos visíveis gerado.');
+}
 function baixarRealizado(){
   const rows=((DB.real[S.ano]||{})[S.dept])||[];
   if(!rows.length){toast('Nada para exportar.','warn');return;}
@@ -1156,7 +1183,7 @@ function renderAcomp(){
   if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
   const cache=(DB.real[S.ano]||{})[S.dept];
   const temReal=Array.isArray(cache)&&cache.length>0;
-  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}${temReal?'<button class="btn ghost" id="xlsReal" style="margin-left:auto">\u2b73 Baixar Excel</button>':''}</div>`;
+  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}<span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="xlsPlanAll">\u2b73 Baixar planejado</button>${temReal?'<button class="btn ghost" id="xlsReal">\u2b73 Baixar realizado</button>':''}</span></div>`;
   if(cache===undefined){
     setHead(`Acompanhamento ${S.ano}`,'');
     loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
@@ -1210,6 +1237,7 @@ function renderAcomp(){
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-ext]').forEach(td=>td.onclick=()=>{const x=td.dataset.ext,i1=x.indexOf('|'),i2=x.lastIndexOf('|');openExtrato(x.slice(0,i1),x.slice(i1+1,i2),+x.slice(i2+1));});
   const xr=document.getElementById('xlsReal');if(xr)xr.onclick=baixarRealizado;
+  const xp=document.getElementById('xlsPlanAll');if(xp)xp.onclick=()=>baixarPlanejado(null);
 }
 function openExtrato(cc,cat,m,dep){
   const dp=dep||S.dept;
