@@ -1131,8 +1131,9 @@ function renderCompAcomp(h,G,set,its){
 const revLimite=(a,m)=>{const d=Math.trunc(confNum('DIA_LIMITE_REVISAO',10));const ult=new Date(a,m+2,0).getDate();return new Date(a,m+1,Math.min(Math.max(d,1),ult),23,59,59);};
 const revAberta=(a,m)=>new Date()<=revLimite(a,m);
 const revData=(a,m)=>{const d=revLimite(a,m);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
-function baixarPlanejado(depto){
-  const its=(DB.plan[S.ano]||[]).filter(i=>!depto||i.dept===depto);
+function baixarPlanejado(depto,ano){
+  ano=ano||S.ano;
+  const its=(DB.plan[ano]||[]).filter(i=>!depto||i.dept===depto);
   if(!its.length){toast('Nada para exportar.','warn');return;}
   const data=its.slice().sort((a,b)=>a.dept.localeCompare(b.dept)||a.cc.localeCompare(b.cc)||a.cat.localeCompare(b.cat)||a.det.localeCompare(b.det)).map(i=>{
     const o={};
@@ -1150,7 +1151,7 @@ function baixarPlanejado(depto){
   ws['!cols']=[...(depto?[]:[{wch:28}]),{wch:14},{wch:32},{wch:10},{wch:32},{wch:32},...Array(12).fill({wch:10}),{wch:13},{wch:13},{wch:22},{wch:40}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Planejado');
-  XLSX.writeFile(wb,`Planejado_${S.ano}_${depto?String(deptName(depto)||depto).replace(/[\\/:*?"<>|]/g,''):'TODOS'}.xlsx`);
+  XLSX.writeFile(wb,`Planejado_${ano}_${depto?String(deptName(depto)||depto).replace(/[\\/:*?"<>|]/g,''):'TODOS'}.xlsx`);
   toast(depto?'Excel do planejado gerado.':'Excel do planejado de todos os departamentos visíveis gerado.');
 }
 function baixarRealizado(){
@@ -1183,7 +1184,7 @@ function renderAcomp(){
   if(!deps.length){setHead('Acompanhamento','');document.getElementById('view').innerHTML=`<div class="panel"><p class="empty">Voc\u00ea ainda n\u00e3o est\u00e1 vinculado a nenhum departamento.</p></div>`;return;}
   const cache=(DB.real[S.ano]||{})[S.dept];
   const temReal=Array.isArray(cache)&&cache.length>0;
-  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}<span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="xlsPlanAll">\u2b73 Baixar planejado</button>${temReal?'<button class="btn ghost" id="xlsReal">\u2b73 Baixar realizado</button>':''}</span></div>`;
+  let h=`<div class="row">${deptTabs(deps)}</div><div class="row">${yearSeg(S.ano,'data-ano')}${temReal?'<button class="btn ghost" id="xlsReal" style="margin-left:auto">\u2b73 Baixar Excel</button>':''}</div>`;
   if(cache===undefined){
     setHead(`Acompanhamento ${S.ano}`,'');
     loadReal(S.ano,S.dept).then(()=>{if(S.view==='acomp')render();});
@@ -1237,7 +1238,6 @@ function renderAcomp(){
   v.querySelectorAll('[data-ano]').forEach(b=>b.onclick=async()=>{S.ano=Number(b.dataset.ano);try{await loadYear(S.ano);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-ext]').forEach(td=>td.onclick=()=>{const x=td.dataset.ext,i1=x.indexOf('|'),i2=x.lastIndexOf('|');openExtrato(x.slice(0,i1),x.slice(i1+1,i2),+x.slice(i2+1));});
   const xr=document.getElementById('xlsReal');if(xr)xr.onclick=baixarRealizado;
-  const xp=document.getElementById('xlsPlanAll');if(xp)xp.onclick=()=>baixarPlanejado(null);
 }
 function openExtrato(cc,cat,m,dep){
   const dp=dep||S.dept;
@@ -1276,7 +1276,7 @@ function renderAprov(){
   if(!S.aDept||!PD.includes(S.aDept)){const f=PD.find(d=>pendInfo(d).c>0);S.aDept=f||PD[0];}
   const closed=exStatus(S.aAno)==='Encerrado'&&!anyReab(S.aAno,S.aDept);
   const rows=aRows();
-  let left=`<div class="dlist"><div class="row">${yearSeg(S.aAno,'data-aano')}</div><div class="hint">Departamentos</div>`;
+  let left=`<div class="dlist"><div class="row">${yearSeg(S.aAno,'data-aano')}</div><div class="row"><button class="btn ghost" id="xlsPlanAll" style="width:100%;white-space:normal" title="Exporta o planejado de todos os departamentos em Excel">⭳ Baixar planejado (todos)</button></div><div class="hint">Departamentos</div>`;
   PD.forEach(d=>{
     const p=pendInfo(d);const late=[0,1,2,3].filter(q=>prazoStatus(d,S.aAno,q).s==='Atrasado');
     const gest=[...new Set(DB.vincs.filter(v=>v.cod===d).map(v=>v.nome))];
@@ -1309,6 +1309,7 @@ function renderAprov(){
   updateAprovFooter();
   v.querySelectorAll('[data-aano]').forEach(b=>b.onclick=async()=>{if(Number(b.dataset.aano)===S.aAno)return;descartaDec();S.aAno=Number(b.dataset.aano);S.aDept=null;try{await loadYear(S.aAno);}catch(e){fail(e);}render();});
   v.querySelectorAll('[data-adept]').forEach(b=>b.onclick=()=>{if(b.dataset.adept===S.aDept)return;descartaDec();S.aDept=b.dataset.adept;render();});
+  const xp=document.getElementById('xlsPlanAll');if(xp)xp.onclick=()=>baixarPlanejado(null,S.aAno);
   v.querySelectorAll('[data-ascope]').forEach(b=>b.onclick=()=>{const x=b.dataset.ascope;const nv=x==='ANO'?'ANO':Number(x);if(nv===S.aScope)return;descartaDec();S.aScope=nv;render();});
   v.querySelectorAll('.dec button[data-k]').forEach(b=>b.onclick=()=>{const d=S.dec[b.dataset.k];d.d=d.d===b.dataset.d?null:b.dataset.d;render();});
   v.querySelectorAll('[data-mode-k]').forEach(b=>b.onclick=()=>{
