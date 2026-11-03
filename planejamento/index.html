@@ -339,7 +339,8 @@ const PARAMS=[
   {k:'BLOQUEAR_ENVIO_FORA_PRAZO',tipo:'sn',padrao:'Não',nome:'Bloquear envio para aprovação após o prazo do trimestre',desc:'Com “Sim”, meses de trimestre com prazo vencido não entram no envio — o padrão é só sinalizar “Atrasado”.'},
   {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',min:0,nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total elegível (dentro do prazo) passa desse limite.'},
   {k:'DIA_LIMITE_REVISAO',tipo:'num',padrao:'10',min:1,max:31,inteiro:true,nome:'Dia-limite para pedir revisão do realizado',desc:'Dia do mês seguinte (1 a 31) até o qual o extrato orienta pedir revisão ao Financeiro. Em mês mais curto vale o último dia.'},
-  {k:'BLOQUEAR_EXCLUSAO_COM_LANCAMENTO',tipo:'sn',padrao:'Não',nome:'Bloquear exclusão de item com lançamento gravado',desc:'Com “Sim”, item que já gravou linha no SharePoint não pode ser excluído pelo gestor, mesmo em rascunho.'}
+  {k:'BLOQUEAR_EXCLUSAO_COM_LANCAMENTO',tipo:'sn',padrao:'Não',nome:'Bloquear exclusão de item com lançamento gravado',desc:'Com “Sim”, item que já gravou linha no SharePoint não pode ser excluído pelo gestor, mesmo em rascunho.'},
+  {k:'DETALHAMENTO_OBRIGATORIO',tipo:'sn',padrao:'Sim',nome:'Exigir detalhamento na importação de planilha',desc:'Com “Sim”, linhas da planilha sem detalhamento são ignoradas (o resumo da importação avisa). Com “Não”, o nome da categoria do cadastro do ERP entra automaticamente como detalhamento. A inclusão manual sempre exige.'}
 ];
 const confRaw=k=>{const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);return r?String(r.VALOR==null?'':r.VALOR).trim():null;};
 const confSN=k=>/^s/i.test(confRaw(k)||'');
@@ -939,7 +940,7 @@ function impPreview(){
     const cad=DB.ccs.find(c=>c.COD_CC===r.cc);
     if(!cad||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
     if(cad.COD_DPTO!==S.dept){outro++;return;}
-    if(r.detAuto){semDet++;if(detObrig())return;}
+    if(r.detAuto){semDet++;if(detObrig())return;const dcat=(DB.cats.find(x=>x.COD_CAT===r.cat)||{}).DESC_CAT;r.det=normDet(dcat||r.catD||'Item').slice(0,120);}
     const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
     if(seen.has(k)){dup++;return;}
     seen.add(k);
@@ -1580,6 +1581,7 @@ async function diagAmbiente(){
   ok('Aplicativo','Planejamento Orçamentário v'+APP_VERSION+' · build '+APP_BUILD);
   if(window.PS&&PS.sprest&&PS.mount&&PS.auth)ok('Core compartilhado','/core/polystell.js carregado (auth · sprest · shell)');else bad('Core compartilhado','PS incompleto — confira /core/polystell.js');
   if(typeof XLSX==='object'&&XLSX.utils)ok('Biblioteca XLSX local','0.18.5 em /core/vendor/');else bad('Biblioteca XLSX local','não carregou — importar/exportar planilha indisponível');
+  if(typeof JSZip!=='undefined'&&JSZip.version==='3.10.1')ok('Biblioteca JSZip local','3.10.1 em /core/vendor/');else bad('Biblioteca JSZip local','não carregou — relatórios em ZIP indisponíveis');
   ok('Usuário autenticado',DB.me.email+' · '+roleLabel(myDepts()));
   const listas=[CFG.lists.plan,CFG.lists.vinc,CFG.lists.ex,CFG.lists.dept,CFG.lists.cc,CFG.lists.cat,CFG.lists.perfil,CFG.lists.reab,CFG.lists.config,CFG.lists.log];
   for(const lista of listas){
@@ -1692,8 +1694,9 @@ function segRel(){
   const bRel=document.getElementById('btnRelSal');if(bRel)bRel.onclick=gerarPlanilhasSalarios;
 }
 async function gerarPlanilhasSalarios(){
+  if(typeof JSZip==='undefined'){toast('Biblioteca de ZIP n\u00e3o carregada \u2014 confira /core/vendor/jszip-3.10.1.min.js.','err');return;}
+  busy(true,'Gerando planilhas\u2026');
   try{
-    if(typeof JSZip==='undefined'){toast('Biblioteca de ZIP n\u00e3o carregada \u2014 confira /core/vendor/jszip-3.10.1.min.js.','err');return;}
     const ano=relAno,OBS='Massa salarial informada pelo RH';
     const MESES=['JANEIRO','FEVEREIRO','MAR\u00c7O','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
     const folha=DB.cats.filter(c=>/^01[12]/.test(String(c.COD_CAT)));
@@ -1717,12 +1720,13 @@ async function gerarPlanilhasSalarios(){
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,String(dep).replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'PLANEJAMENTO');
       XLSX.utils.book_append_sheet(wb,wsCat,'CATEGORIAS');
-      zip.file(`RH_Salarios_${ano}_${c.COD_DPTO}_${norm(dep).replace(/[^A-Z0-9]+/g,'_')}_${c.COD_CC.slice(-4)}.xlsx`,XLSX.write(wb,{type:'array',bookType:'xlsx'}));
+      zip.file(`RH_Salarios_${ano}_${c.COD_DPTO}_${norm(dep).replace(/[^A-Z0-9]+/g,'_')}_${String(c.COD_CC).replace(/[^A-Za-z0-9_-]/g,'_')}.xlsx`,XLSX.write(wb,{type:'array',bookType:'xlsx'}));
     });
     const blob=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`RH_Salarios_${ano}_Polystell.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
     toast(sal.length+' planilhas de sal\u00e1rios geradas num ZIP \u2014 encaminhe ao RH.');
-  }catch(e){toast('Falha ao gerar as planilhas: '+(e&&e.message||e),'err');}
+  }catch(e){console.error(e);logApp(e);toast('Falha ao gerar as planilhas: '+(e&&e.message||e),'err');}
+  finally{busy(false);}
 }
 function segLog(){
   const box=document.getElementById('segBody');
