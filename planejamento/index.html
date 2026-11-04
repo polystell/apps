@@ -330,7 +330,7 @@ function fail(e){
 
 /* ============================ DADOS EM MEMÓRIA ======================== */
 const DB={me:null,depts:[],deptByCod:{},deptById:{},ccs:[],ccMap:{},cats:[],catMap:{},vincs:[],vincsOff:[],ex:{},plan:{},real:{},perfis:null,reabs:[]};
-const APP_VERSION='1.5.0';const APP_BUILD='2026-11-03';
+const APP_VERSION='1.7.1';const APP_BUILD='2026-11-03';
 DB.conf=null;   // linhas da 08_Config; null = indisponível (DB.confState: 'ok' | 'error' — fail closed)
 DB.confState='error';   // fail closed até a 08_Config carregar
 /* log técnico best effort na 08_Log_App — sem token, sem payload; falha do log nunca chega ao usuário */
@@ -340,20 +340,20 @@ const PARAMS=[
   {k:'OBS_OBRIGATORIA_ACIMA_DE',tipo:'num',padrao:'0',min:0,nome:'Exigir observação do gestor em itens acima de (R$)',desc:'0 desliga. Com um valor, o envio exige observação nos itens cujo total elegível (dentro do prazo) passa desse limite.'},
   {k:'DIA_LIMITE_REVISAO',tipo:'num',padrao:'10',min:1,max:31,inteiro:true,nome:'Dia-limite para pedir revisão do realizado',desc:'Dia do mês seguinte (1 a 31) até o qual o extrato orienta pedir revisão ao Financeiro. Em mês mais curto vale o último dia.'},
   {k:'BLOQUEAR_EXCLUSAO_COM_LANCAMENTO',tipo:'sn',padrao:'Não',nome:'Bloquear exclusão de item com lançamento gravado',desc:'Com “Sim”, item que já gravou linha no SharePoint não pode ser excluído pelo gestor, mesmo em rascunho.'},
-  {k:'DETALHAMENTO_OBRIGATORIO',tipo:'sn',padrao:'Sim',nome:'Exigir detalhamento na importação de planilha',desc:'Com “Sim”, linhas da planilha sem detalhamento são ignoradas (o resumo da importação avisa). Com “Não”, o nome da categoria do cadastro do ERP entra automaticamente como detalhamento. A inclusão manual sempre exige.'}
+  {k:'DETALHAMENTO_OBRIGATORIO',tipo:'sn',padrao:'Sim',nome:'Exigir detalhamento nos itens do planejamento',desc:'Com “Sim”, todo item precisa de detalhamento — na inclusão manual e na importação, onde linhas sem detalhamento viram pendências para resolver no próprio resumo. Com “Não”, o campo fica opcional em todas as origens.'}
 ];
 const confRaw=k=>{const r=(DB.conf||[]).find(x=>String(x.CHAVE||'').trim().toUpperCase()===k);return r?String(r.VALOR==null?'':r.VALOR).trim():null;};
 const confSN=k=>/^s/i.test(confRaw(k)||'');
 const detObrig=()=>{const v=confRaw('DETALHAMENTO_OBRIGATORIO');return v==null||v===''?true:/^s/i.test(v);};
 const confNum=(k,d)=>{const v=confRaw(k);if(v==null||v==='')return d;const n=Number(v.replace(/\./g,'').replace(',','.'));return isFinite(n)&&n>=0?n:d;};
 const rep=v=>Array(12).fill(v);
-const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()}`;
+const itemKey=(dept,cc,cat,det)=>`${dept}|${cc}|${cat}|${det.trim().toLowerCase()||'__sem_detalhamento__'}`;
 function buildItems(rows,ano){
   const map={};let dups=0;
   rows.forEach(r=>{
     if(!r.COD_CC||!r.COMPETENCIA)return;
     const m=new Date(r.COMPETENCIA).getUTCMonth();
-    const det=(r.DETALHAMENTO||'').trim()||'(sem detalhamento)';
+    const det=(r.DETALHAMENTO||'').trim();
     const k=itemKey(r.COD_DPTO,r.COD_CC,r.COD_CAT,det);
     if(!map[k])map[k]={key:k,dept:r.COD_DPTO,cc:r.COD_CC,cat:r.COD_CAT,det,obs:'',prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
     const it=map[k];
@@ -402,6 +402,7 @@ const fmtD=iso=>{if(!iso)return '—';const d=iso.slice(0,10).split('-');return 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function parse(v){v=String(v).trim();if(!v)return 0;v=v.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');const n=Number(v);return isFinite(n)&&n>0?Math.round(n*100)/100:0;}
 const normDet=sx=>String(sx||'').replace(/\s+/g,' ').trim();
+const detShow=d=>String(d||'').trim()||'Sem detalhamento';
 const escrevendo=()=>{if(busyN>0){toast('Aguarde a grava\u00e7\u00e3o em andamento terminar.','warn');return true;}return false;};
 const monthsOf=sc=>sc==='ANO'?[0,1,2,3,4,5,6,7,8,9,10,11]:[sc*3,sc*3+1,sc*3+2];
 const mAprovavel=(a,m,d)=>exStatus(a)!=='Encerrado'||reabAtiva(a,Math.floor(m/3),d);
@@ -534,7 +535,7 @@ function renderPlan(){
     h+=`<form class="additem" id="addForm">
       <label for="fCC">Centro de custo<input id="fCC" list="dlCC" placeholder="Pesquise por código ou nome" autocomplete="off"><datalist id="dlCC">${myCCs.map(c=>`<option value="${c.COD_CC} - ${esc(c.DESC_CC)}"></option>`).join('')}</datalist></label>
       <label for="fCat">Categoria financeira<input id="fCat" list="dlCat" placeholder="Pesquise por código ou nome" autocomplete="off"><datalist id="dlCat">${DB.cats.map(c=>`<option value="${c.COD_CAT} - ${esc(c.DESC_CAT)}"></option>`).join('')}</datalist></label>
-      <label for="fDet">Detalhamento<input id="fDet" placeholder="Ex.: Microsoft 365" autocomplete="off" maxlength="120"></label>
+      <label for="fDet">Detalhamento${detObrig()?'':' (opcional)'}<input id="fDet" placeholder="Ex.: Microsoft 365" autocomplete="off" maxlength="120"></label>
       <label for="fObs" class="wide">Observação para a diretoria (opcional)<input id="fObs" placeholder="Ex.: renovação do contrato, reajuste de 8%" autocomplete="off"></label>
       <div class="formbtns"><button type="submit" class="btn">Adicionar</button><button type="button" class="btn ghost" id="cancelAdd">Cancelar</button></div>
 </form>`;
@@ -554,8 +555,9 @@ function renderPlan(){
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
       const temDec=i.st.some((st,m)=>i.prev[m]>0&&(st==='Aprovado'||st==='Reprovado'));
       const temPen=ms.some(m=>i.prev[m]>0&&i.st[m]==='Pendente'&&mOpen(S.ano,m));
+      const soRasc=!i.st.some((st,m)=>i.prev[m]>0&&st!=='Rascunho')&&!i.ids.some((id,m)=>id&&!mOpen(S.ano,m));
       const temRep=ms.some(m=>i.prev[m]>0&&i.st[m]==='Reprovado'&&mOpen(S.ano,m));
-      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button>${temDec?'':`<button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button>`}${temPen?`<button class="lnk" data-cenv="${esc(i.key)}">Cancelar envio</button>`:''}${temRep?`<button class="lnk" data-reab="${esc(i.key)}">Reabrir reprovados</button>`:''}<button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
+      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(detShow(i.det))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}${ro?'':`<span class="rowact"><button class="lnk" data-fill="${esc(i.key)}">Preencher</button>${temDec?'':`<button class="lnk" data-obs="${esc(i.key)}">${i.obs?'Editar observação':'Observação'}</button>${soRasc?`<button class="lnk" data-edet="${esc(i.key)}">Editar detalhamento</button>`:''}`}${temPen?`<button class="lnk" data-cenv="${esc(i.key)}">Cancelar envio</button>`:''}${temRep?`<button class="lnk" data-reab="${esc(i.key)}">Reabrir reprovados</button>`:''}<button class="lnk" data-del="${esc(i.key)}" style="color:var(--bad)">Excluir</button></span>`}</td>`;
       ms.forEach(m=>{
         const s=i.prev[m]>0?i.st[m]:'';
         const ap=s==='Aprovado'&&i.apr[m]!=null;
@@ -590,6 +592,7 @@ function renderPlan(){
   v.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{S.tool={kind:'fill',key:b.dataset.fill,mode:'rep'};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tVal');if(x)x.focus();});
   v.querySelectorAll('[data-obs]').forEach(b=>b.onclick=()=>{S.tool={kind:'obs',key:b.dataset.obs};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tObs');if(x)x.focus();});
   v.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.tool={kind:'del',key:b.dataset.del};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});});
+  v.querySelectorAll('[data-edet]').forEach(b=>b.onclick=()=>{S.tool={kind:'edet',key:b.dataset.edet};S.adding=false;render();window.scrollTo({top:0,behavior:'smooth'});const x=document.getElementById('tDet');if(x)x.focus();});
   v.querySelectorAll('[data-cenv]').forEach(b=>b.onclick=()=>setMonthsStatus(b.dataset.cenv,'Pendente'));
   v.querySelectorAll('[data-reab]').forEach(b=>b.onclick=()=>setMonthsStatus(b.dataset.reab,'Reprovado'));
   bindTool();
@@ -607,16 +610,23 @@ function toolHtml(){
   const scopeName=S.scope==='ANO'?'no ano inteiro':'no '+QLAB[S.scope];
   if(T.kind==='fill'){
     const it=findItem(T.key);if(!it)return '';
-    return `<div class="tool" role="region" aria-label="Preencher linha"><h2>Preencher “${esc(it.det)}” ${scopeName}</h2>
+    return `<div class="tool" role="region" aria-label="Preencher linha"><h2>Preencher “${esc(detShow(it.det))}” ${scopeName}</h2>
       <div class="line"><div class="seg" role="group" aria-label="Forma de preencher"><button data-mode="rep" aria-pressed="${T.mode==='rep'}">Repetir valor mensal</button><button data-mode="dist" aria-pressed="${T.mode==='dist'}">Distribuir um total no período</button></div>
       <label for="tVal" class="hint">${T.mode==='rep'?'Valor por mês (R$)':'Total a distribuir (R$)'}</label><input type="text" id="tVal" inputmode="decimal" placeholder="${T.mode==='rep'?'3.300':'39.600'}">
       <button class="btn" id="tApply">Aplicar</button><button class="btn ghost" id="tCancel">Fechar</button></div>
       <p class="hint">Este painel é só um atalho — para lançar um único mês, feche e digite o valor direto na célula do mês. Nada do item é perdido ao fechar.</p>
 </div>`;
   }
+  if(T.kind==='edet'){
+    const it=findItem(T.key);if(!it)return '';
+    return `<div class="tool" role="region" aria-label="Editar detalhamento"><h2>Editar detalhamento de \u201c${esc(detShow(it.det))}\u201d</h2>
+      <p class="hint">O detalhamento identifica o item \u2014 por isso s\u00f3 pode ser editado enquanto todos os meses est\u00e3o em rascunho.</p>
+      <div class="line"><input id="tDet" value="${esc(it.det)}" maxlength="120" placeholder="${detObrig()?'Obrigat\u00f3rio':'Opcional'}" aria-label="Novo detalhamento"><button class="btn" id="tSaveDet">Salvar</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
+</div>`;
+  }
   if(T.kind==='obs'){
     const it=findItem(T.key);if(!it)return '';
-    return `<div class="tool" role="region" aria-label="Observação do item"><h2>Observação de “${esc(it.det)}”</h2>
+    return `<div class="tool" role="region" aria-label="Observação do item"><h2>Observação de “${esc(detShow(it.det))}”</h2>
       <textarea id="tObs" placeholder="Explique para a diretoria por que esse valor é necessário">${esc(it.obs)}</textarea>
       <div class="line"><button class="btn" id="tSaveObs">Salvar observação</button><button class="btn ghost" id="tCancel">Cancelar</button></div>
 </div>`;
@@ -628,12 +638,12 @@ function toolHtml(){
     const temFechado=it.ids.some((id,m)=>id&&!mOpen(S.ano,m));
     const travaConf=confSN('BLOQUEAR_EXCLUSAO_COM_LANCAMENTO')&&it.ids.some(Boolean);
     if(temDecisao||temPend||temFechado||travaConf){
-      return `<div class="tool" role="region" aria-label="Excluir item"><h2>Não dá para excluir “${esc(it.det)}”</h2>
+      return `<div class="tool" role="region" aria-label="Excluir item"><h2>Não dá para excluir “${esc(detShow(it.det))}”</h2>
         <p class="hint warnline">${temDecisao?'O item já tem mês aprovado ou reprovado pela diretoria — ajuste os valores (o mês volta para aprovação) em vez de excluir.':temPend?'O item está aguardando a diretoria — use “Cancelar envio” e depois exclua.':temFechado?'O item tem lançamento em trimestre encerrado — reabra o trimestre em Exercícios e prazos antes de excluir.':'A exclusão de itens com lançamento gravado está bloqueada (tela Segurança). Zere os valores ou peça à TI.'}</p>
         <div class="line"><button class="btn ghost" id="tCancel">Fechar</button></div></div>`;
     }
     const n=it.ids.filter(Boolean).length;
-    return `<div class="tool" role="region" aria-label="Excluir item"><h2>Excluir “${esc(it.det)}” de ${S.ano}?</h2>
+    return `<div class="tool" role="region" aria-label="Excluir item"><h2>Excluir “${esc(detShow(it.det))}” de ${S.ano}?</h2>
       <p class="hint">${n?`Serão removidas ${n} linha(s) gravadas.`:'Nada foi gravado ainda.'}</p>
       <div class="line"><button class="btn" id="tDelGo" style="background:var(--bad);border-color:var(--bad)">Excluir item</button><button class="btn ghost" id="tCancel">Cancelar</button></div></div>`;
   }
@@ -655,8 +665,14 @@ function toolHtml(){
         const names=Object.keys(I.sheets);
         if(names.length>1)h+=`<div class="line"><label for="tSheet" class="hint">Aba</label><select id="tSheet">${names.map(n=>`<option ${n===I.sel?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
         const pv=impPreview();
-        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.semDet?` · <span class="warnline">${pv.semDet} sem detalhamento \u2014 ${pv.detObrig?'campo obrigat\u00f3rio (ignorados)':'entrar\u00e3o com o nome da categoria'}</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}${pv.obsFalta?` · <span class="warnline">${pv.obsFalta} ${plural(pv.obsFalta,'item acima','itens acima')} de ${money(pv.limObs)} sem observação para a diretoria — o envio poderá exigir</span>`:''}</p>`;
-        if(pv.novos.length||pv.compl.length)h+=`<div class="line"><button class="btn" id="tImport">${pv.novos.length?`Importar ${pv.novos.length} ${plural(pv.novos.length,'item novo','itens novos')}`:''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?`${pv.novos.length?'c':'C'}ompletar ${pv.compl.length} ${plural(pv.compl.length,'item','itens')}`:''}</button></div>`;
+        h+=`<p><b>${esc(I.file)}</b> · aba “${esc(I.sel)}”: ${pv.found} itens com valor · <b>${pv.novos.length} novos</b>${pv.compl.length?` · ${pv.compl.length} só com meses a completar`:''}${pv.dup?` · ${pv.dup} já existem`:''}${pv.outro?` · ${pv.outro} de outro departamento`:''}${pv.inval?` · <span class="warnline">${pv.inval} com código que não existe no cadastro do ERP (ignorados)</span>`:''}${pv.pend.length?` · <span class="warnline">\u26a0 ${pv.pend.length} ${plural(pv.pend.length,'item precisa','itens precisam')} de detalhamento</span>`:''}${pv.soFech?` · ${pv.soFech} só com valores em períodos encerrados (ignorados)`:''} · total a importar <b>${money(pv.total)}</b>${pv.fech?` · <span class="warnline">${money(pv.fech)} em trimestre(s) encerrado(s) serão ignorados</span>`:''}${pv.obsFalta?` · <span class="warnline">${pv.obsFalta} ${plural(pv.obsFalta,'item acima','itens acima')} de ${money(pv.limObs)} sem observação para a diretoria — o envio poderá exigir</span>`:''}</p>`;
+        if(pv.pend.length){
+          h+=`<div class="gridwrap"><table class="simple"><thead><tr><th>Centro de custo</th><th>Categoria</th><th style="text-align:right">Total</th><th>Detalhamento</th></tr></thead><tbody>`;
+          pv.pend.forEach((r,ix)=>{const dcat=normDet((DB.cats.find(x=>x.COD_CAT===r.cat)||{}).DESC_CAT||r.catD||'');const dcc=(DB.ccs.find(x=>x.COD_CC===r.cc)||{}).DESC_CC||'';
+            h+=`<tr><td><span class="code">${esc(r.cc)}</span> ${esc(dcc)}</td><td><span class="code">${esc(r.cat)}</span> ${esc(dcat)}</td><td style="text-align:right">${money(r.vals.reduce((a,v)=>a+v,0))}</td><td><input data-pend="${ix}" value="${esc(r.det||'')}" placeholder="Obrigat\u00f3rio para importar" maxlength="120" style="width:100%" aria-label="Detalhamento do item ${esc(r.cc)} ${esc(r.cat)}">${dcat?`<button class="lnk" data-psug="${ix}" title="Usar o nome da categoria como detalhamento">Usar \u201c${esc(dcat)}\u201d</button>`:''}</td></tr>`;});
+          h+=`</tbody></table></div>`;
+        }
+        if(pv.novos.length||pv.compl.length||pv.pend.length)h+=`<div class="line"><button class="btn" id="tImport" ${pv.pend.length?'disabled title="H\u00e1 itens sem detalhamento \u2014 complete acima"':''}>${pv.novos.length?`Importar ${pv.novos.length} ${plural(pv.novos.length,'item novo','itens novos')}`:''}${pv.novos.length&&pv.compl.length?' e ':''}${pv.compl.length?`${pv.novos.length?'c':'C'}ompletar ${pv.compl.length} ${plural(pv.compl.length,'item','itens')}`:''}${!pv.novos.length&&!pv.compl.length?'Importar planejamento':''}</button></div>`;
       }
     }
     return h+`</div>`;
@@ -672,18 +688,22 @@ function bindTool(){
   const ts=document.getElementById('tSrc');if(ts)ts.onchange=()=>{S.tool.src=Number(ts.value);};
   on('tCopyGo',()=>{const e=document.getElementById('tSrc');copyFrom(Number(e.value));});
   on('tSaveObs',saveObs);
+  on('tSaveDet',saveDet);
+  const td=document.getElementById('tDet');if(td)td.onkeydown=e=>{if(e.key==='Enter')saveDet();};
   on('tDelGo',doDelete);
   on('tModelo',baixarModelo);
   const f=document.getElementById('tFile');if(f)f.onchange=()=>{if(f.files[0])readFile(f.files[0]);};
   const sh=document.getElementById('tSheet');if(sh)sh.onchange=()=>{S.imp.sel=sh.value;render();};
   on('tImport',doImport);
+  document.querySelectorAll('[data-pend]').forEach(inp=>{inp.onchange=()=>{const pvX=impPreview();const r=pvX.pend[Number(inp.dataset.pend)];if(r){r.det=normDet(inp.value).slice(0,120);render();}};});
+  document.querySelectorAll('[data-psug]').forEach(b=>{b.onclick=()=>{const pvX=impPreview();const r=pvX.pend[Number(b.dataset.psug)];if(r){r.det=normDet((DB.cats.find(x=>x.COD_CAT===r.cat)||{}).DESC_CAT||r.catD||'').slice(0,120);render();}};});
 }
 
 /* ---- gravações do planejamento ---- */
 function baseFields(it,m,ano){
   return {
-    Title:`${it.det} · ${MES[m]}/${ano}`,
-    CHAVE_ITEM:`${ano}-${String(m+1).padStart(2,'0')}-${it.cc}-${it.cat}-${it.det}`,
+    Title:`${detShow(it.det)} · ${MES[m]}/${ano}`,
+    CHAVE_ITEM:`${ano}-${String(m+1).padStart(2,'0')}-${it.cc}-${it.cat}-${it.det||'__SEM_DETALHAMENTO__'}`,
     COD_DPTO:it.dept,
     ANO:String(ano),
     COMPETENCIA:locDate(ano,m),
@@ -773,13 +793,28 @@ function addNewItem(){
   const det=normDet(document.getElementById('fDet').value),obs=document.getElementById('fObs').value.trim();
   if(!cc){toast('Escolha um centro de custo da lista.','warn');document.getElementById('fCC').focus();return;}
   if(!cat){toast('Escolha uma categoria financeira da lista.','warn');document.getElementById('fCat').focus();return;}
-  if(!det){toast('Informe o detalhamento do item.','warn');document.getElementById('fDet').focus();return;}
+  if(detObrig()&&!det){toast('Informe o detalhamento do item.','warn');document.getElementById('fDet').focus();return;}
   if(exists(S.ano,S.dept,cc,cat,det)){toast('Já existe um item com esse centro de custo, categoria e detalhamento.','warn');return;}
   const it={key:itemKey(S.dept,cc,cat,det),dept:S.dept,cc,cat,det,obs,prev:rep(0),st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
   (DB.plan[S.ano]=DB.plan[S.ano]||[]).push(it);
   S.adding=false;S.tool={kind:'fill',key:it.key,mode:'rep'};render();
   const x=document.getElementById('tVal');if(x)x.focus();
-  toast(`“${det}” adicionado como rascunho. Preencha os meses (nada é gravado até ter valor).`);
+  toast(`“${detShow(det)}” adicionado como rascunho. Preencha os meses (nada é gravado até ter valor).`);
+}
+function saveDet(){
+  if(escrevendo())return;
+  const it=findItem(S.tool.key);if(!it)return;
+  const nv=normDet(document.getElementById('tDet').value).slice(0,120);
+  if(detObrig()&&!nv){toast('Informe o detalhamento do item.','warn');return;}
+  if(it.st.some((st,m)=>it.prev[m]>0&&st!=='Rascunho')){toast('S\u00f3 \u00e9 poss\u00edvel editar o detalhamento com todos os meses em rascunho.','warn');return;}
+  if(it.ids.some((id,m)=>id&&!mOpen(S.ano,m))){toast('N\u00e3o \u00e9 poss\u00edvel alterar o detalhamento: o item tem lan\u00e7amento em trimestre encerrado. Reabra o trimestre antes de editar.','warn');return;}
+  if(nv.toLowerCase()===it.det.trim().toLowerCase()){S.tool=null;render();return;}
+  if(exists(S.ano,it.dept,it.cc,it.cat,nv)){toast('J\u00e1 existe um item com esse centro de custo, categoria e detalhamento.','warn');return;}
+  const antigo=it.det;it.det=nv;it.key=itemKey(it.dept,it.cc,it.cat,nv);
+  const ano=S.ano;const tasks=[];
+  it.ids.forEach((id,m)=>{if(id)tasks.push(()=>mergeItem(CFG.lists.plan,id,{Title:`${detShow(nv)} \u00b7 ${MES[m]}/${ano}`,DETALHAMENTO:nv,CHAVE_ITEM:`${ano}-${String(m+1).padStart(2,'0')}-${it.cc}-${it.cat}-${nv||'__SEM_DETALHAMENTO__'}`}));});
+  S.tool=null;render();
+  runQueue(tasks,'Gravando').then(()=>toast(`Detalhamento alterado de \u201c${detShow(antigo)}\u201d para \u201c${detShow(nv)}\u201d.`)).catch(fail);
 }
 function saveObs(){
   if(escrevendo())return;
@@ -797,26 +832,26 @@ function doDelete(){
   const ids=it.ids.filter(Boolean);
   DB.plan[S.ano]=DB.plan[S.ano].filter(x=>x!==it);
   S.tool=null;render();
-  runQueue(ids.map(id=>()=>delItem(CFG.lists.plan,id)),'Excluindo').then(()=>toast(`“${it.det}” excluído${ids.length?` (${ids.length} linha(s) removida(s))`:''}.`)).catch(fail);
+  runQueue(ids.map(id=>()=>delItem(CFG.lists.plan,id)),'Excluindo').then(()=>toast(`“${detShow(it.det)}” excluído${ids.length?` (${ids.length} linha(s) removida(s))`:''}.`)).catch(fail);
 }
 async function copyFrom(src){
   if(escrevendo())return;
   if(DB.plan[src]===undefined){busy(true,'Carregando '+src+'…');try{await loadYear(src);}catch(e){busy(false);fail(e);return;}busy(false);}
   const list=(DB.plan[src]||[]).filter(i=>i.dept===S.dept);
   if(!list.length){S.tool=null;render();toast(`Nenhum item de ${src} para este departamento.`,'warn');return;}
-  const ano=S.ano;const tasks=[];let n=0,comp=0;
+  const ano=S.ano;const tasks=[];let n=0,comp=0,sdCopia=0;
   list.forEach(i=>{
     const vals=i.prev.map((v,m)=>!mOpen(ano,m)?0:(i.st[m]==='Aprovado'&&i.apr[m]!=null?i.apr[m]:i.st[m]==='Reprovado'?0:v));
     if(!vals.some(v=>v>0))return;
     const ja=findPlanItem(ano,i.dept,i.cc,i.cat,i.det);
     if(ja){const falt=mesesFaltantes(ja,vals,ano);if(falt.length){comp++;falt.forEach(m=>{ja.prev[m]=vals[m];ja.st[m]='Rascunho';tasks.push(()=>persistCell(ja,m,ano));});}return;}
     const it={key:itemKey(i.dept,i.cc,i.cat,i.det),dept:i.dept,cc:i.cc,cat:i.cat,det:i.det,obs:i.obs,prev:vals,st:rep('Rascunho'),apr:rep(null),mot:{},ids:rep(null)};
-    (DB.plan[ano]=DB.plan[ano]||[]).push(it);n++;
+    (DB.plan[ano]=DB.plan[ano]||[]).push(it);n++;if(detObrig()&&!it.det)sdCopia++;
     vals.forEach((v,m)=>{if(v>0)tasks.push(()=>persistCell(it,m,ano));});
   });
   S.tool=null;render();
   if(!n&&!comp){toast(`Todos os itens de ${src} já estão em ${S.ano}.`);return;}
-  runQueue(tasks,'Copiando').then(()=>toast(`${n?n+' '+plural(n,'item copiado','itens copiados')+' de '+src+' como rascunho':''}${n&&comp?' e ':''}${comp?comp+' '+plural(comp,'item completado','itens completados')+' com os meses que faltavam':''}.`)).catch(fail);
+  runQueue(tasks,'Copiando').then(()=>toast(`${n?n+' '+plural(n,'item copiado','itens copiados')+' de '+src+' como rascunho':''}${n&&comp?' e ':''}${comp?comp+' '+plural(comp,'item completado','itens completados')+' com os meses que faltavam':''}.${sdCopia?` Aten\u00e7\u00e3o: ${sdCopia} ${plural(sdCopia,'item veio','itens vieram')} sem detalhamento \u2014 complete pelo \u201cEditar detalhamento\u201d antes de enviar.`:''}`,sdCopia?'warn':undefined)).catch(fail);
 }
 function setMonthsStatus(key,fromSt){
   if(escrevendo())return;
@@ -840,20 +875,22 @@ function sendScope(){
   const limObs=confNum('OBS_OBRIGATORIA_ACIMA_DE',0);
   const hoje=new Date();
   const dentroPrazo=q=>{const p=DB.ex[S.ano]&&DB.ex[S.ano].prazos[q];return !bloqPrazo||!p||hoje<=new Date(p.slice(0,10)+'T23:59:59');};
-  let foraPrazo=0;const semObs=[];
+  let foraPrazo=0;const semObs=[];const semDetEnv=[];
   itemsOf(S.ano,S.dept).forEach(i=>{
     const envi=ms.filter(m=>mOpen(S.ano,m)&&i.prev[m]>0&&i.st[m]==='Rascunho');
     if(!envi.length)return;
     const enviPrazo=envi.filter(m=>dentroPrazo(Math.floor(m/3)));   // o prazo decide ANTES: a observação só considera o valor realmente elegível
     foraPrazo+=envi.length-enviPrazo.length;
     if(!enviPrazo.length)return;
-    if(limObs>0&&enviPrazo.reduce((a,m)=>a+i.prev[m],0)>limObs&&!(i.obs||'').trim()){semObs.push(i.det);return;}
+    if(detObrig()&&!normDet(i.det)){semDetEnv.push(`${i.cc} \u00b7 ${catDesc(i.cat)||i.cat}`);return;}
+    if(limObs>0&&enviPrazo.reduce((a,m)=>a+i.prev[m],0)>limObs&&!(i.obs||'').trim()){semObs.push(detShow(i.det));return;}
     enviPrazo.forEach(m=>{
       i.st[m]='Pendente';n++;
       if(i.ids[m])tasks.push(()=>mergeItem(CFG.lists.plan,i.ids[m],{STATUS:'Pendente'}));
     });
   });
   if(!n){
+    if(semDetEnv.length){toast(`Envio bloqueado: ${semDetEnv.length} ${plural(semDetEnv.length,'item est\u00e1','itens est\u00e3o')} sem detalhamento (${semDetEnv.slice(0,2).join('; ')}${semDetEnv.length>2?'\u2026':''}). Complete pelo \u201cEditar detalhamento\u201d na linha do item.`,'warn');return;}
     if(semObs.length){toast(`Envio bloqueado: ${semObs.slice(0,3).join(', ')}${semObs.length>3?'…':''} ${plural(semObs.length,'precisa','precisam')} de observação para a diretoria (itens acima de ${money(limObs)} — regra da tela Segurança).`,'warn');return;}
     if(foraPrazo){toast('Envio bloqueado: o prazo deste período já venceu (regra da tela Segurança). Peça uma reabertura ou ajuste o prazo em Exercícios e prazos.','warn');return;}
     toast('Nada em rascunho para enviar neste período.','warn');return;
@@ -863,7 +900,8 @@ function sendScope(){
     let msg=`${n} lançamento(s) de ${deptName(S.dept)} enviados para a diretoria.`;
     if(foraPrazo)msg+=` ${foraPrazo} mês(es) com prazo vencido ficaram de fora.`;
     if(semObs.length)msg+=` ${semObs.length} ${plural(semObs.length,'item ficou de fora por falta','itens ficaram de fora por falta')} de observação.`;
-    toast(msg,(foraPrazo||semObs.length)?'warn':undefined);
+    if(semDetEnv.length)msg+=` ${semDetEnv.length} ${plural(semDetEnv.length,'item ficou de fora por falta','itens ficaram de fora por falta')} de detalhamento.`;
+    toast(msg,(foraPrazo||semObs.length||semDetEnv.length)?'warn':undefined);
   }).catch(fail);
 }
 
@@ -875,7 +913,7 @@ function baixarModelo(){
   const MESES=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
   const aoa=[
     [`PLANEJAMENTO ORÇAMENTÁRIO ${ano} · ${deptName(S.dept)}`],
-    ['Preencha o código da categoria (aba CATEGORIAS), o detalhamento e os valores mensais. '+(detObrig()?'Linhas sem categoria, sem detalhamento ou sem valor são ignoradas.':'Linhas sem categoria ou sem valor são ignoradas; sem detalhamento, o item entra com o nome da categoria.')+' Para lançar mais de um item no mesmo centro de custo, duplique a linha dele. A última coluna, Observação para a diretoria, é opcional — acima do limite configurado pela TI, o envio para aprovação exige observação.'],
+    ['Preencha o código da categoria (aba CATEGORIAS), o detalhamento e os valores mensais. '+(detObrig()?'Linhas sem categoria ou sem valor são ignoradas; sem detalhamento, a linha vira pendência para completar no resumo da importação.':'Linhas sem categoria ou sem valor são ignoradas; o detalhamento é opcional.')+' Para lançar mais de um item no mesmo centro de custo, duplique a linha dele. A última coluna, Observação para a diretoria, é opcional — acima do limite configurado pela TI, o envio para aprovação exige observação.'],
     ['','','','','',...MESES],
     ['COD C.CUSTO','CENTRO DE CUSTO','COD C.FINANCEIRA','CATEGORIA FINANCEIRA','DETALHAMENTO',...Array(12).fill(''),'OBSERVAÇÃO PARA A DIRETORIA (OPCIONAL)'],
     ...myCCs.map(c=>[c.COD_CC,c.DESC_CC||'','','',''])
@@ -911,10 +949,10 @@ function parseSheet(rows){
     if(blank(cc)||blank(cat))return;
     if(cdI>=0&&blank(g(cdI)))return;
     const catD=String((catDI>=0&&!blank(g(catDI))?g(catDI):'')||(ccDI>=0&&!blank(g(ccDI))?g(ccDI):'')).trim();
-    const detAuto=blank(g(detI));const det=normDet(String(!detAuto?g(detI):(catD||'Item'))).slice(0,120);
+    const det=blank(g(detI))?'':normDet(String(g(detI))).slice(0,120);
     const vals=mc.map(c=>{const x=g(c);return typeof x==='number'&&isFinite(x)&&x>0?Math.round(x*100)/100:0;});
     if(!vals.some(v=>v>0))return;
-    out.push({cc:String(cc).replace(/\D/g,'').padStart(10,'0'),cat:String(cat).replace(/\D/g,'').padStart(6,'0'),det,detAuto,catD,vals,obs:obsI>=0&&!blank(g(obsI))?String(g(obsI)).trim().slice(0,255):''});
+    out.push({cc:String(cc).replace(/\D/g,'').padStart(10,'0'),cat:String(cat).replace(/\D/g,'').padStart(6,'0'),det,catD,vals,obs:obsI>=0&&!blank(g(obsI))?String(g(obsI)).trim().slice(0,255):''});
   });
   return {items:out,ccD};
 }
@@ -934,13 +972,13 @@ function readFile(file){
   fr.readAsArrayBuffer(file);
 }
 function impPreview(){
-  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0,soFech=0,fechX=0,semDet=0;const novos=[];const compl=[];const seen=new Set();
+  const p=S.imp.sheets[S.imp.sel];let dup=0,outro=0,inval=0,soFech=0,fechX=0;const pend=[];const novos=[];const compl=[];const seen=new Set();
   p.items.forEach(r=>{
     // o cadastro do ERP decide: CC existe? categoria existe? o CC é deste departamento?
     const cad=DB.ccs.find(c=>c.COD_CC===r.cc);
     if(!cad||!DB.cats.some(c=>c.COD_CAT===r.cat)){inval++;return;}
     if(cad.COD_DPTO!==S.dept){outro++;return;}
-    if(r.detAuto){semDet++;if(detObrig())return;const dcat=(DB.cats.find(x=>x.COD_CAT===r.cat)||{}).DESC_CAT;r.det=normDet(dcat||r.catD||'Item').slice(0,120);}
+    if(!r.det&&detObrig()){pend.push(r);return;}
     const k=(r.cc+'|'+r.cat+'|'+r.det).toLowerCase();
     if(seen.has(k)){dup++;return;}
     seen.add(k);
@@ -956,13 +994,14 @@ function impPreview(){
     novos.filter(r=>!r.obs&&r.vals.reduce((a,v,m)=>a+(v>0&&mOpen(S.ano,m)?v:0),0)>limObs).length
     +compl.filter(r=>{if(r.obs)return false;const ja=findPlanItem(S.ano,S.dept,r.cc,r.cat,r.det);if(!ja||ja.obs)return false;return mesesFaltantes(ja,r.vals,S.ano).reduce((a,m)=>a+r.vals[m],0)>limObs;}).length
   ):0;
-  return {found:p.items.length,dup,outro,inval,semDet,detObrig:detObrig(),novos,compl,soFech,obsFalta,limObs,
+  return {found:p.items.length,dup,outro,inval,pend,detObrig:detObrig(),novos,compl,soFech,obsFalta,limObs,
     total:novos.reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(mOpen(S.ano,m)?v:0),0),0)+totalCompl,
     fech:fechX+novos.concat(compl).reduce((a,r)=>a+r.vals.reduce((b,v,m)=>b+(!mOpen(S.ano,m)&&v>0?v:0),0),0)};
 }
 function doImport(){
   if(escrevendo())return;
   const pv=impPreview();const p=S.imp.sheets[S.imp.sel];const ano=S.ano;const tasks=[];
+  if((pv.pend||[]).length){toast('Existem itens sem detalhamento. Complete as informa\u00e7\u00f5es antes de importar.','warn');return;}
   pv.novos.forEach(r=>{
     if(!DB.ccMap[r.cc]&&p.ccD[r.cc])DB.ccMap[r.cc]=p.ccD[r.cc];
     if(!DB.catMap[r.cat]&&r.catD)DB.catMap[r.cat]=r.catD;
@@ -1014,7 +1053,7 @@ function renderComp(){
     t+=`<tr class="grp"><td class="item"><span class="grpdesc">${esc(deptName(dep))}</span><span class="code">${dep}</span>${gest?`<span class="detline">${esc(gest)}</span>`:''}</td><td colspan="${ms.length}"></td><td class="tot">${money(sub)}</td></tr>`;
     g.forEach(i=>{
       const rt=ms.reduce((b,m)=>b+vig(i,m),0);
-      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(i.det)}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}</td>`;
+      t+=`<tr><td class="item"><span class="catline"><span class="code">${i.cat}</span> - ${esc(catDesc(i.cat))}</span><span class="detline">${esc(detShow(i.det))}</span>${i.obs?`<span class="obs">${esc(i.obs)}</span>`:''}</td>`;
       ms.forEach(m=>{
         const st=i.prev[m]>0?i.st[m]:'';
         const ap=st==='Aprovado'&&i.apr[m]!=null;
@@ -1102,7 +1141,7 @@ function renderCompAcomp(h,G,set,its){
     ULTg=Math.max(ULTg,ULT);
     const rmap={};rws.forEach(r=>{const k=r.cc+'|'+r.cat;rmap[k]=rmap[k]||rep(0);rmap[k][Number(r.mes)-1]+=Number(r.valor)||0;});
     const keys=[...new Set([...gi.map(i=>i.cc+'|'+i.cat),...Object.keys(rmap)])].sort();
-    perDept[d]={ULT,rows:keys.map(k=>{const [cc,cat]=k.split('|');const g=gi.filter(i=>i.cc===cc&&i.cat===cat);const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));return {cc,cat,names:g.map(i=>i.det),apr,rv:rmap[k]||rep(0)};})};
+    perDept[d]={ULT,rows:keys.map(k=>{const [cc,cat]=k.split('|');const g=gi.filter(i=>i.cc===cc&&i.cat===cat);const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));return {cc,cat,names:g.map(i=>detShow(i.det)),apr,rv:rmap[k]||rep(0)};})};
   });
   const falhos=allDeps.filter(d=>((DB.real[S.ano]||{})[d])===null);
   let A=0,R=0,over=0;
@@ -1210,7 +1249,7 @@ function renderAcomp(){
     const rows=keys.map(k=>{
       const [cc,cat]=k.split('|');const g=its.filter(i=>i.cc===cc&&i.cat===cat);
       const apr=rep(0);g.forEach(i=>i.apr.forEach((v,m)=>{if(i.st[m]==='Aprovado'&&v)apr[m]+=v;}));
-      return {cc,cat,names:g.map(i=>i.det),apr,rv:rmap[k]||rep(0)};
+      return {cc,cat,names:g.map(i=>detShow(i.det)),apr,rv:rmap[k]||rep(0)};
     });
     const upto=a=>ULT<0?0:a.slice(0,ULT+1).reduce((x,y)=>x+y,0);
     const A=rows.reduce((a,r)=>a+upto(r.apr),0),R=rows.reduce((a,r)=>a+upto(r.rv),0),saldo=A-R;
@@ -1300,7 +1339,7 @@ function renderAprov(){
     rows.forEach(x=>{
       const d=dOf(x);const k=dKey(x);const mes=d.mode==='mes';const need=!mes&&needMotNow(x,d);
       const rateio=!mes&&d.d==='ok'&&d.val!==x.prev?(()=>{const lv=loteVals(x,d);return `<span class="sub">Rateio: ${x.pm.map(m=>MES[m]+' '+fmt(lv[m])).join(' · ')}</span>`;})():'';
-      r+=`<tr><td><b>${esc(x.i.det)}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
+      r+=`<tr><td><b>${esc(detShow(x.i.det))}</b><span class="sub"><span class="code">${x.i.cc}</span> · <span class="code">${x.i.cat}</span></span><span class="sub">${x.pm.map(m=>MES[m]).join(', ')}</span>${x.i.obs?`<span class="obs">“${esc(x.i.obs)}”</span>`:''}</td>
         <td class="num">${money(x.prev)}</td>
         <td class="num">${mes?'<span class="muted">—</span>':`<input class="aval" data-key="a-${esc(x.i.key)}" data-k="${esc(k)}" inputmode="decimal" value="${fmt(d.val)}" ${(closed||d.d==='no')?'disabled':''} aria-label="Valor aprovado de ${esc(x.i.det)}">`}</td>
         <td>${mes?'':`<div class="dec"><button class="yes" data-k="${esc(k)}" data-d="ok" aria-pressed="${d.d==='ok'}" ${closed?'disabled':''}>✓ Aprovar</button><button class="no" data-k="${esc(k)}" data-d="no" aria-pressed="${d.d==='no'}" ${closed?'disabled':''}>✗ Reprovar</button></div>`}<button class="lnk" data-mode-k="${esc(k)}" ${closed?'disabled':''} style="margin-top:6px">${mes?'Voltar à decisão única':'Decidir mês a mês'}</button></td>
